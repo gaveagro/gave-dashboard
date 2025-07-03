@@ -746,97 +746,98 @@ const Admin = () => {
               </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Crear Nueva Inversión</CardTitle>
-              <CardDescription>
-                Agregar inversiones adicionales a usuarios existentes
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="existingUser">Seleccionar Usuario</Label>
-                  <Select>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleccionar usuario" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {profiles.filter(p => p.role === 'investor').map((profile) => (
-                        <SelectItem key={profile.id} value={profile.user_id}>
-                          {profile.name || profile.email} - Balance: ${profile.account_balance?.toLocaleString() || '0'} MXN
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <div className="col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Crear Nueva Inversión</CardTitle>
+                <CardDescription>
+                  Agregar inversiones adicionales a usuarios existentes
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div>
+                    <Label htmlFor="existingUser">Seleccionar Usuario</Label>
+                    <Select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar usuario" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {profiles.filter(p => p.role === 'investor').map((profile) => (
+                          <SelectItem key={profile.id} value={profile.user_id}>
+                            {profile.name || profile.email} - Balance: ${profile.account_balance?.toLocaleString() || '0'} MXN
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="newInvestmentSpecies">Especie de Planta</Label>
+                    <Select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar especie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plantSpecies.map((species) => (
+                          <SelectItem key={species.id} value={species.id}>
+                            {species.name} ({species.scientific_name})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-4 flex flex-col justify-center">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Total de la inversión:</span>
+                      <span className="text-lg font-bold text-green-600">$0 MXN</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="newInvestmentSpecies">Especie de Planta</Label>
-                  <Select>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleccionar especie" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plantSpecies.map((species) => (
-                        <SelectItem key={species.id} value={species.id}>
-                          {species.name} ({species.scientific_name})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div>
+                    <Label>Cantidad de Plantas</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="Ej: 100" 
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label>Precio por Planta (MXN)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="Ej: 850.00" 
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label>Año Plantación</Label>
+                    <Input 
+                      type="number" 
+                      defaultValue={new Date().getFullYear()} 
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <Label>Año Cosecha Esperada</Label>
+                    <Input 
+                      type="number" 
+                      defaultValue={new Date().getFullYear() + 25} 
+                      className="w-full"
+                    />
+                  </div>
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <Label>Cantidad de Plantas</Label>
-                  <Input 
-                    type="number" 
-                    placeholder="Ej: 100" 
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <Label>Precio por Planta (MXN)</Label>
-                  <Input 
-                    type="number" 
-                    step="0.01" 
-                    placeholder="Ej: 850.00" 
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <Label>Año Plantación</Label>
-                  <Input 
-                    type="number" 
-                    defaultValue={new Date().getFullYear()} 
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <Label>Año Cosecha Esperada</Label>
-                  <Input 
-                    type="number" 
-                    defaultValue={new Date().getFullYear() + 25} 
-                    className="w-full"
-                  />
-                </div>
-              </div>
 
-              <div className="bg-muted/50 rounded-lg p-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Total de la inversión:</span>
-                  <span className="text-xl font-bold text-green-600">$0 MXN</span>
-                </div>
-              </div>
-
-              <Button className="w-full" size="lg">
-                <Plus className="h-4 w-4 mr-2" />
-                Crear Nueva Inversión
-              </Button>
-            </CardContent>
-          </Card>
+                <Button className="w-full" size="lg">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear Nueva Inversión
+                </Button>
+              </CardContent>
+            </Card>
           </div>
+        </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
