@@ -1,6 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Leaf, Info, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Leaf, Info, TrendingUp, MapPin, Camera, ExternalLink } from 'lucide-react';
+import PlotMap from '@/components/PlotMap';
+import { useState } from 'react';
 
 // Datos de ejemplo de parcelas
 const plots = [
@@ -9,6 +12,8 @@ const plots = [
     name: 'Parcela Norte',
     location: 'Oaxaca, México',
     coordinates: '17.0732°N, 96.7266°W',
+    latitude: 17.0732,
+    longitude: -96.7266,
     area: 15.5, // hectáreas
     totalPlants: 3100,
     availablePlants: 2900,
@@ -18,13 +23,19 @@ const plots = [
     lastUpdate: '2024-12-15',
     status: 'Activa',
     rainfall: 650, // mm anuales
-    temperature: '18-25°C'
+    temperature: '18-25°C',
+    dronePhotos: [
+      { year: 2024, url: '/placeholder-drone-north.jpg', description: 'Levantamiento aéreo 2024' },
+      { year: 2023, url: '/placeholder-drone-north-2023.jpg', description: 'Levantamiento aéreo 2023' }
+    ]
   },
   {
     id: 2,
     name: 'Parcela Sur',
     location: 'Oaxaca, México',
     coordinates: '16.9252°N, 96.7266°W',
+    latitude: 16.9252,
+    longitude: -96.7266,
     area: 22.3, // hectáreas
     totalPlants: 4460,
     availablePlants: 4200,
@@ -34,11 +45,17 @@ const plots = [
     lastUpdate: '2024-12-10',
     status: 'En desarrollo',
     rainfall: 780, // mm anuales
-    temperature: '16-23°C'
+    temperature: '16-23°C',
+    dronePhotos: [
+      { year: 2024, url: '/placeholder-drone-south.jpg', description: 'Levantamiento aéreo 2024' },
+      { year: 2023, url: '/placeholder-drone-south-2023.jpg', description: 'Levantamiento aéreo 2023' }
+    ]
   }
 ];
 
 const Plots = () => {
+  const [selectedPlot, setSelectedPlot] = useState<number | null>(null);
+  
   const formatNumber = (num: number, decimals: number = 0) => {
     return new Intl.NumberFormat('es-MX', {
       minimumFractionDigits: decimals,
@@ -238,6 +255,61 @@ const Plots = () => {
                       width: `${getAvailabilityPercentage(plot.availablePlants, plot.totalPlants)}%`
                     }}
                   ></div>
+                </div>
+              </div>
+
+              {/* Mapa y Fotografías */}
+              <div className="border-t pt-4 space-y-4">
+                {/* Mapa */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Ubicación</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`https://www.google.com/maps?q=${plot.latitude},${plot.longitude}`, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Ver en Google Maps
+                    </Button>
+                  </div>
+                  <PlotMap 
+                    latitude={plot.latitude} 
+                    longitude={plot.longitude} 
+                    name={plot.name}
+                  />
+                </div>
+
+                {/* Fotografías Aéreas */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Camera className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Fotografías Aéreas</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {plot.dronePhotos.map((photo, index) => (
+                      <Card key={index} className="overflow-hidden">
+                        <div className="aspect-video bg-muted/20 flex items-center justify-center border-b">
+                          <div className="text-center p-4">
+                            <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                            <div className="text-sm font-medium">Foto Aérea {photo.year}</div>
+                            <div className="text-xs text-muted-foreground">{photo.description}</div>
+                          </div>
+                        </div>
+                        <CardContent className="p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Año {photo.year}</span>
+                            <Button variant="outline" size="sm">
+                              Ver Completa
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
               </div>
             </CardContent>

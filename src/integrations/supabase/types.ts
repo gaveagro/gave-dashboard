@@ -9,16 +9,319 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      documents: {
+        Row: {
+          created_at: string
+          document_name: string
+          document_type: string
+          document_url: string
+          id: string
+          investment_id: string | null
+          uploaded_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_name: string
+          document_type: string
+          document_url: string
+          id?: string
+          investment_id?: string | null
+          uploaded_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_name?: string
+          document_type?: string
+          document_url?: string
+          id?: string
+          investment_id?: string | null
+          uploaded_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investments: {
+        Row: {
+          created_at: string
+          expected_harvest_year: number
+          id: string
+          plant_count: number
+          plantation_year: number
+          plot_id: string | null
+          price_per_plant: number
+          species_id: string
+          status: string | null
+          total_amount: number
+          updated_at: string
+          user_id: string
+          weight_per_plant_kg: number | null
+        }
+        Insert: {
+          created_at?: string
+          expected_harvest_year: number
+          id?: string
+          plant_count: number
+          plantation_year: number
+          plot_id?: string | null
+          price_per_plant: number
+          species_id: string
+          status?: string | null
+          total_amount: number
+          updated_at?: string
+          user_id: string
+          weight_per_plant_kg?: number | null
+        }
+        Update: {
+          created_at?: string
+          expected_harvest_year?: number
+          id?: string
+          plant_count?: number
+          plantation_year?: number
+          plot_id?: string | null
+          price_per_plant?: number
+          species_id?: string
+          status?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+          weight_per_plant_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investments_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investments_species_id_fkey"
+            columns: ["species_id"]
+            isOneToOne: false
+            referencedRelation: "plant_species"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean | null
+          title: string
+          type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean | null
+          title: string
+          type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean | null
+          title?: string
+          type?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      plant_species: {
+        Row: {
+          carbon_capture_per_plant: number | null
+          created_at: string
+          description: string | null
+          id: string
+          maturation_years: number
+          max_weight_kg: number
+          min_weight_kg: number
+          name: string
+          scientific_name: string | null
+        }
+        Insert: {
+          carbon_capture_per_plant?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          maturation_years: number
+          max_weight_kg: number
+          min_weight_kg: number
+          name: string
+          scientific_name?: string | null
+        }
+        Update: {
+          carbon_capture_per_plant?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          maturation_years?: number
+          max_weight_kg?: number
+          min_weight_kg?: number
+          name?: string
+          scientific_name?: string | null
+        }
+        Relationships: []
+      }
+      plot_photos: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          photo_url: string
+          plot_id: string
+          taken_date: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          photo_url: string
+          plot_id: string
+          taken_date?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          photo_url?: string
+          plot_id?: string
+          taken_date?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plot_photos_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plots: {
+        Row: {
+          area: number
+          available_plants: number
+          coordinates: string
+          created_at: string
+          elevation: number | null
+          id: string
+          latitude: number | null
+          location: string
+          longitude: number | null
+          name: string
+          rainfall: number | null
+          soil_type: string | null
+          status: string | null
+          temperature: string | null
+          total_plants: number
+          updated_at: string
+        }
+        Insert: {
+          area: number
+          available_plants?: number
+          coordinates: string
+          created_at?: string
+          elevation?: number | null
+          id?: string
+          latitude?: number | null
+          location: string
+          longitude?: number | null
+          name: string
+          rainfall?: number | null
+          soil_type?: string | null
+          status?: string | null
+          temperature?: string | null
+          total_plants?: number
+          updated_at?: string
+        }
+        Update: {
+          area?: number
+          available_plants?: number
+          coordinates?: string
+          created_at?: string
+          elevation?: number | null
+          id?: string
+          latitude?: number | null
+          location?: string
+          longitude?: number | null
+          name?: string
+          rainfall?: number | null
+          soil_type?: string | null
+          status?: string | null
+          temperature?: string | null
+          total_plants?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          account_balance: number | null
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_balance?: number | null
+          created_at?: string
+          email: string
+          id?: string
+          name?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_balance?: number | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "investor"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +436,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "investor"],
+    },
   },
 } as const
