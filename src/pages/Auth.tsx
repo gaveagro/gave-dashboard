@@ -154,6 +154,18 @@ const Auth = () => {
                   >
                     {loading ? t('common.loading') : t('auth.signIn')}
                   </Button>
+                  
+                  <Button 
+                    type="button"
+                    variant="link" 
+                    className="w-full text-sm text-muted-foreground hover:text-primary"
+                    onClick={() => {
+                      // TODO: Implement password reset
+                      alert('Funcionalidad de restablecimiento de contraseña próximamente');
+                    }}
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Button>
                 </form>
               </TabsContent>
 
@@ -217,14 +229,6 @@ const Auth = () => {
               </TabsContent>
             </Tabs>
 
-            {/* Test Credentials Note */}
-            <div className="mt-6 p-3 bg-muted/50 rounded-lg">
-              <p className="text-xs text-muted-foreground text-center">
-                <strong>Credenciales de prueba:</strong><br />
-                Admin: admin@gaveagro.com<br />
-                Contraseña: admin123
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
