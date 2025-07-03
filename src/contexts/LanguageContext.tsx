@@ -64,6 +64,11 @@ const translations = {
     'auth.forgotPassword': '¿Olvidaste tu contraseña?',
     'auth.noAccount': '¿No tienes cuenta?',
     'auth.hasAccount': '¿Ya tienes cuenta?',
+    'auth.signUpSuccess': 'Registro exitoso',
+    'auth.checkEmail': 'Por favor verifica tu correo electrónico para completar el registro',
+    'auth.resetEmailSent': 'Correo de restablecimiento enviado',
+    'auth.checkEmailForReset': 'Revisa tu correo para restablecer tu contraseña',
+    'auth.enterEmailFirst': 'Por favor ingresa tu correo electrónico primero',
     
     // Common
     'common.loading': 'Cargando...',
@@ -132,6 +137,11 @@ const translations = {
     'auth.forgotPassword': 'Forgot your password?',
     'auth.noAccount': "Don't have an account?",
     'auth.hasAccount': 'Already have an account?',
+    'auth.signUpSuccess': 'Registration successful',
+    'auth.checkEmail': 'Please check your email to complete registration',
+    'auth.resetEmailSent': 'Reset email sent',
+    'auth.checkEmailForReset': 'Check your email to reset your password',
+    'auth.enterEmailFirst': 'Please enter your email address first',
     
     // Common
     'common.loading': 'Loading...',

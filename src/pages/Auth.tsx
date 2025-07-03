@@ -9,17 +9,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Leaf, Mail, Lock, User } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import LanguageToggle from '@/components/LanguageToggle';
 
 const Auth = () => {
   const { signIn, signUp, user } = useAuth();
   const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     name: ''
   });
+  const { toast } = useToast();
 
   // Redirect if already authenticated
   if (user) {
@@ -59,19 +64,51 @@ const Auth = () => {
       setError(error.message);
     } else {
       setError(null);
-      // Show success message
-      alert('Por favor verifica tu correo electrónico para completar el registro.');
+      toast({
+        title: t('auth.signUpSuccess'),
+        description: t('auth.checkEmail'),
+      });
     }
     
     setLoading(false);
   };
 
+  const handlePasswordReset = async () => {
+    if (!formData.email) {
+      setError(t('auth.enterEmailFirst'));
+      return;
+    }
+
+    setResetLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) {
+      setError(error.message);
+    } else {
+      toast({
+        title: t('auth.resetEmailSent'),
+        description: t('auth.checkEmailForReset'),
+      });
+    }
+
+    setResetLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center p-4">
+      {/* Language Toggle */}
+      <div className="absolute top-4 right-4">
+        <LanguageToggle />
+      </div>
+      
       <div className="w-full max-w-md space-y-6">
         {/* Logo and Header */}
         <div className="text-center space-y-4">
-          <div className="mx-auto w-20 h-20 bg-gradient-agave rounded-xl flex items-center justify-center">
+          <div className="mx-auto w-20 h-20 bg-white/90 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg border border-primary/20">
             <img 
               src="/lovable-uploads/18fae893-7739-4fe1-bd49-75690fca47bd.png" 
               alt="Gavé Logo" 
@@ -159,12 +196,10 @@ const Auth = () => {
                     type="button"
                     variant="link" 
                     className="w-full text-sm text-muted-foreground hover:text-primary"
-                    onClick={() => {
-                      // TODO: Implement password reset
-                      alert('Funcionalidad de restablecimiento de contraseña próximamente');
-                    }}
+                    onClick={handlePasswordReset}
+                    disabled={resetLoading}
                   >
-                    ¿Olvidaste tu contraseña?
+                    {resetLoading ? t('common.loading') : t('auth.forgotPassword')}
                   </Button>
                 </form>
               </TabsContent>
