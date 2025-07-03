@@ -12,18 +12,27 @@ const speciesData = {
   'Espadín': {
     scientificName: 'Agave angustifolia Haw',
     maturationYears: 5,
-    expectedWeight: { min: 50, max: 60 }, // kg por planta
-    carbonCapture: 0.85, // toneladas CO₂ por planta
+    weightRange: { min: 40, max: 60 }, // kg por planta configurable
     description: 'Especie principal de Gavé, ideal para mezcal'
   },
   'Salmiana': {
     scientificName: 'Agave Salmiana ssp. Crassispina',
     maturationYears: 7,
-    expectedWeight: { min: 80, max: 120 }, // kg por planta
-    carbonCapture: 0.92, // toneladas CO₂ por planta
+    weightRange: { min: 60, max: 90 }, // kg por planta configurable
     description: 'Especie de crecimiento lento pero alto rendimiento'
+  },
+  'Atrovirens': {
+    scientificName: 'Agave Atrovirens',
+    maturationYears: 7,
+    weightRange: { min: 60, max: 90 }, // kg por planta configurable
+    description: 'Especie robusta de alto rendimiento'
   }
 };
+
+// CO2 capturado: 30-60 toneladas por año por hectárea
+// Densidad: 2,500 plantas por hectárea
+const carbonCapturePerHectarePerYear = { min: 30, max: 60 }; // toneladas CO₂
+const plantsPerHectare = 2500;
 
 const yearlyPrices = {
   '2021': 450, // MXN por planta
@@ -51,6 +60,14 @@ export const InvestmentSimulator: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [numberOfPlants, setNumberOfPlants] = useState<number>(200);
   const [selectedPricePerKg, setSelectedPricePerKg] = useState<number[]>([12]);
+  const [weightPerPlant, setWeightPerPlant] = useState<number[]>([50]);
+
+  // Efecto para ajustar el peso cuando cambia la especie
+  React.useEffect(() => {
+    const species = speciesData[selectedSpecies as keyof typeof speciesData];
+    const defaultWeight = (species.weightRange.min + species.weightRange.max) / 2;
+    setWeightPerPlant([defaultWeight]);
+  }, [selectedSpecies]);
 
   const results: InvestmentResults = useMemo(() => {
     // 1. Datos base
@@ -59,7 +76,7 @@ export const InvestmentSimulator: React.FC = () => {
     const totalInvestment = numberOfPlants * pricePerPlant;
 
     // 2. Cálculo de rendimiento
-    const avgWeightPerPlant = (species.expectedWeight.min + species.expectedWeight.max) / 2;
+    const avgWeightPerPlant = weightPerPlant[0];
     const totalYield = numberOfPlants * avgWeightPerPlant;
     const grossRevenue = totalYield * selectedPricePerKg[0];
 
@@ -71,7 +88,12 @@ export const InvestmentSimulator: React.FC = () => {
     // 4. Métricas finales
     const finalReturn = totalInvestment + investorProfit;
     const roi = totalInvestment > 0 ? (investorProfit / totalInvestment) * 100 : 0;
-    const totalCarbonCapture = numberOfPlants * species.carbonCapture;
+    
+    // 5. Cálculo correcto de CO2: 30-60 ton/año/hectárea, 2500 plantas/hectárea
+    const hectares = numberOfPlants / plantsPerHectare;
+    const avgCO2PerHectarePerYear = (carbonCapturePerHectarePerYear.min + carbonCapturePerHectarePerYear.max) / 2;
+    const totalCarbonCapture = hectares * avgCO2PerHectarePerYear * species.maturationYears;
+    
     const maturationDate = new Date(Date.now() + species.maturationYears * 365 * 24 * 60 * 60 * 1000);
 
     return {
@@ -86,7 +108,7 @@ export const InvestmentSimulator: React.FC = () => {
       maturationDate,
       avgWeightPerPlant
     };
-  }, [selectedSpecies, selectedYear, numberOfPlants, selectedPricePerKg]);
+  }, [selectedSpecies, selectedYear, numberOfPlants, selectedPricePerKg, weightPerPlant]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -184,6 +206,28 @@ export const InvestmentSimulator: React.FC = () => {
               <p className="text-sm text-muted-foreground">
                 Mínimo 1, máximo 1,000 plantas
               </p>
+            </div>
+
+            {/* Peso Esperado por Planta */}
+            <div className="space-y-4">
+              <Label>Peso Esperado por Planta</Label>
+              <div className="px-3">
+                <Slider
+                  value={weightPerPlant}
+                  onValueChange={setWeightPerPlant}
+                  max={speciesData[selectedSpecies as keyof typeof speciesData].weightRange.max}
+                  min={speciesData[selectedSpecies as keyof typeof speciesData].weightRange.min}
+                  step={1}
+                  className="w-full"
+                />
+              </div>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>{speciesData[selectedSpecies as keyof typeof speciesData].weightRange.min} kg</span>
+                <span className="font-medium text-primary text-lg">
+                  {formatNumber(weightPerPlant[0])} kg por planta
+                </span>
+                <span>{speciesData[selectedSpecies as keyof typeof speciesData].weightRange.max} kg</span>
+              </div>
             </div>
 
             {/* Precio Esperado por Kg */}
