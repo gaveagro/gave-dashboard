@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users, DollarSign, Settings, Bell, Leaf, Edit } from "lucide-react";
+import { Users, DollarSign, Settings, Bell, Leaf, Edit, Plus, Trash2, Upload, MapPin } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Profile {
   id: string;
@@ -38,6 +40,16 @@ interface Investment {
     name: string;
     scientific_name: string;
   };
+  profiles?: {
+    name: string;
+    email: string;
+  };
+}
+
+interface PlantSpecies {
+  id: string;
+  name: string;
+  scientific_name: string;
 }
 
 interface UserInvestmentsDialogProps {
@@ -295,6 +307,9 @@ const Admin = () => {
   const [notificationTitle, setNotificationTitle] = useState("");
   const [notificationMessage, setNotificationMessage] = useState("");
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [plantSpecies, setPlantSpecies] = useState<PlantSpecies[]>([]);
+  const [investmentsLoading, setInvestmentsLoading] = useState(false);
 
   // Redirect if not admin
   if (profile?.role !== 'admin') {
@@ -302,7 +317,10 @@ const Admin = () => {
   }
 
   useEffect(() => {
-    fetchProfiles();
+    fetchProfiles().then(() => {
+      fetchAllInvestments();
+    });
+    fetchPlantSpecies();
   }, []);
 
   const fetchProfiles = async () => {
@@ -323,6 +341,61 @@ const Admin = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllInvestments = async () => {
+    setInvestmentsLoading(true);
+    try {
+      const { data: investmentsData, error } = await supabase
+        .from('investments')
+        .select(`
+          *,
+          plant_species (
+            name,
+            scientific_name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Enriquecer con datos de perfil
+      const enrichedInvestments = investmentsData?.map(investment => {
+        const userProfile = profiles.find(p => p.user_id === investment.user_id);
+        return {
+          ...investment,
+          profiles: userProfile ? {
+            name: userProfile.name || userProfile.email,
+            email: userProfile.email
+          } : undefined
+        };
+      }) || [];
+
+      setInvestments(enrichedInvestments);
+    } catch (error) {
+      console.error('Error fetching investments:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las inversiones",
+        variant: "destructive"
+      });
+    } finally {
+      setInvestmentsLoading(false);
+    }
+  };
+
+  const fetchPlantSpecies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('plant_species')
+        .select('id, name, scientific_name')
+        .order('name');
+
+      if (error) throw error;
+      setPlantSpecies(data || []);
+    } catch (error) {
+      console.error('Error fetching plant species:', error);
     }
   };
 
@@ -442,6 +515,68 @@ const Admin = () => {
     }
   };
 
+  const updateInvestmentField = async (investmentId: string, field: string, value: any) => {
+    try {
+      const updateData: any = { [field]: value };
+      
+      // Si se actualiza plant_count o price_per_plant, recalcular total_amount
+      const investment = investments.find(inv => inv.id === investmentId);
+      if (investment) {
+        if (field === 'plant_count') {
+          updateData.total_amount = value * investment.price_per_plant;
+        } else if (field === 'price_per_plant') {
+          updateData.total_amount = investment.plant_count * value;
+        }
+      }
+
+      const { error } = await supabase
+        .from('investments')
+        .update(updateData)
+        .eq('id', investmentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Inversión actualizada",
+        description: "Los datos se actualizaron correctamente"
+      });
+
+      fetchAllInvestments();
+    } catch (error) {
+      console.error('Error updating investment:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la inversión",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteInvestment = async (investmentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('investments')
+        .delete()
+        .eq('id', investmentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Inversión eliminada",
+        description: "La inversión se eliminó correctamente"
+      });
+
+      fetchAllInvestments();
+    } catch (error) {
+      console.error('Error deleting investment:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la inversión",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -461,10 +596,18 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Usuarios
+          </TabsTrigger>
+          <TabsTrigger value="investments" className="flex items-center gap-2">
+            <Leaf className="h-4 w-4" />
+            Inversiones
+          </TabsTrigger>
+          <TabsTrigger value="plots" className="flex items-center gap-2">
+            <MapPin className="h-4 w-4" />
+            Parcelas
           </TabsTrigger>
           <TabsTrigger value="finances" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
@@ -547,46 +690,170 @@ const Admin = () => {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="font-medium">${profile.account_balance.toLocaleString()} MXN</p>
-                        <p className="text-sm text-muted-foreground">Balance</p>
+                        <Input
+                          type="number"
+                          className="w-32 text-right"
+                          defaultValue={profile.account_balance}
+                          onBlur={(e) => {
+                            const newBalance = parseFloat(e.target.value);
+                            if (newBalance !== profile.account_balance) {
+                              updateBalance(profile.user_id, newBalance);
+                            }
+                          }}
+                        />
+                        <p className="text-sm text-muted-foreground">Balance MXN</p>
                       </div>
-                       {profile.role === 'investor' && (
-                         <div className="flex items-center gap-2">
-                           <Dialog>
-                             <DialogTrigger asChild>
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 className="flex items-center gap-2"
-                                 onClick={() => setSelectedUser(profile)}
-                               >
-                                 <Leaf className="h-4 w-4" />
-                                 Ver Inversiones
-                               </Button>
-                             </DialogTrigger>
-                             {selectedUser && (
-                               <UserInvestmentsDialog 
-                                 profile={selectedUser} 
-                                 onClose={() => setSelectedUser(null)} 
-                               />
-                             )}
-                           </Dialog>
-                           <Input
-                             type="number"
-                             className="w-32"
-                             defaultValue={profile.account_balance}
-                             onBlur={(e) => {
-                               const newBalance = parseFloat(e.target.value);
-                               if (newBalance !== profile.account_balance) {
-                                 updateBalance(profile.user_id, newBalance);
-                               }
-                             }}
-                           />
-                         </div>
-                       )}
                     </div>
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="investments" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestión de Inversiones</CardTitle>
+              <CardDescription>
+                Administra todas las inversiones de los usuarios
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {investmentsLoading ? (
+                <div className="text-center py-8">Cargando inversiones...</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Especie</TableHead>
+                      <TableHead>Cantidad Plantas</TableHead>
+                      <TableHead>Precio/Planta</TableHead>
+                      <TableHead>Año Plantación</TableHead>
+                      <TableHead>Año Cosecha</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Fecha Inversión</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {investments.map((investment) => (
+                      <TableRow key={investment.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{investment.profiles?.name || investment.profiles?.email}</p>
+                            <p className="text-sm text-muted-foreground">{investment.profiles?.email}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Select 
+                            defaultValue={investment.species_id}
+                            onValueChange={(value) => updateInvestmentField(investment.id, 'species_id', value)}
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {plantSpecies.map((species) => (
+                                <SelectItem key={species.id} value={species.id}>
+                                  {species.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-20"
+                            defaultValue={investment.plant_count}
+                            onBlur={(e) => updateInvestmentField(investment.id, 'plant_count', parseInt(e.target.value))}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className="w-24"
+                            defaultValue={investment.price_per_plant}
+                            onBlur={(e) => updateInvestmentField(investment.id, 'price_per_plant', parseFloat(e.target.value))}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-20"
+                            defaultValue={investment.plantation_year}
+                            onBlur={(e) => updateInvestmentField(investment.id, 'plantation_year', parseInt(e.target.value))}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            className="w-20"
+                            defaultValue={investment.expected_harvest_year}
+                            onBlur={(e) => updateInvestmentField(investment.id, 'expected_harvest_year', parseInt(e.target.value))}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          ${investment.total_amount.toLocaleString()} MXN
+                        </TableCell>
+                        <TableCell>
+                          {new Date(investment.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteInvestment(investment.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="plots" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestión de Parcelas</CardTitle>
+              <CardDescription>
+                Administra parcelas, fotos aéreas y geo-referenciación
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-medium mb-4">Subir Fotos de Dron</h3>
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                    <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Arrastra fotos aéreas o haz click para seleccionar
+                    </p>
+                    <Button variant="outline">
+                      Seleccionar Archivos
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-medium mb-4">Geo-referenciación</h3>
+                  <div className="space-y-4">
+                    <Button variant="outline" className="w-full">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Abrir Editor de Mapas
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Utiliza herramientas gratuitas como Google Maps o OpenStreetMap para dibujar las parcelas.
+                    </p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
