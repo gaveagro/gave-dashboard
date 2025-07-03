@@ -61,7 +61,29 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Gavé Investment Theme Colors
+				contrast: {
+					DEFAULT: 'hsl(var(--contrast))',
+					foreground: 'hsl(var(--contrast-foreground))'
+				},
+				investment: {
+					DEFAULT: 'hsl(var(--investment))',
+					foreground: 'hsl(var(--investment-foreground))'
+				},
+				profit: {
+					DEFAULT: 'hsl(var(--profit))',
+					foreground: 'hsl(var(--profit-foreground))'
+				},
+				roi: {
+					DEFAULT: 'hsl(var(--roi))',
+					foreground: 'hsl(var(--roi-foreground))'
 				}
+			},
+			backgroundImage: {
+				'gradient-agave': 'var(--gradient-agave)',
+				'gradient-earth': 'var(--gradient-earth)',
+				'gradient-investment': 'var(--gradient-investment)'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +106,30 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				fadeIn: {
+					'0%': { opacity: '0', transform: 'translateY(10px)' },
+					'100%': { opacity: '1', transform: 'translateY(0)' }
+				},
+				slideUp: {
+					'0%': { transform: 'translateY(100%)', opacity: '0' },
+					'100%': { transform: 'translateY(0)', opacity: '1' }
+				},
+				pulseGlow: {
+					'0%, 100%': { 
+						boxShadow: '0 0 20px hsl(var(--primary) / 0.3)' 
+					},
+					'50%': { 
+						boxShadow: '0 0 40px hsl(var(--primary) / 0.6)' 
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'fade-in': 'fadeIn 0.5s ease-in-out',
+				'slide-up': 'slideUp 0.3s ease-out',
+				'pulse-glow': 'pulseGlow 2s ease-in-out infinite'
 			}
 		}
 	},

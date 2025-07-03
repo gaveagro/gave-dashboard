@@ -2,41 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Gavé Agrotecnología Design System - Tema Agave 
+Basado en colores PANTONE especificados
 All colors MUST be HSL.
 */
 
 @layer base {
   :root {
+    /* Gavé Brand Colors - Converted PANTONE to HSL */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 160 8% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 160 8% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 160 8% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* PANTONE 7694 C - Agave Green Primary */
+    --primary: 165 45% 35%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* PANTONE 7474 C - Secondary Green */
+    --secondary: 155 35% 45%;
+    --secondary-foreground: 160 8% 15%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* PANTONE 296 C - Blue Accent */
+    --accent: 205 85% 45%;
+    --accent-foreground: 0 0% 98%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Cool Gray 9 C */
+    --muted: 200 6% 85%;
+    --muted-foreground: 200 8% 45%;
+
+    /* PANTONE 611 C - Contrast Green */
+    --contrast: 85 35% 55%;
+    --contrast-foreground: 160 8% 15%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 155 25% 88%;
+    --input: 155 25% 88%;
+    --ring: 165 45% 35%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Agave Theme Gradients */
+    --gradient-agave: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
+    --gradient-earth: linear-gradient(180deg, hsl(var(--contrast)), hsl(var(--primary)));
+    --gradient-investment: linear-gradient(45deg, hsl(var(--accent)), hsl(var(--primary)));
+
+    /* Investment Status Colors */
+    --investment: 165 45% 35%;
+    --investment-foreground: 0 0% 98%;
+    --profit: 120 60% 40%;
+    --profit-foreground: 0 0% 98%;
+    --roi: 85 35% 55%;
+    --roi-foreground: 160 8% 15%;
 
     --sidebar-background: 0 0% 98%;
 
@@ -56,41 +79,47 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark theme para Gavé */
+    --background: 160 15% 8%;
+    --foreground: 155 20% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 160 15% 10%;
+    --card-foreground: 155 20% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 160 15% 10%;
+    --popover-foreground: 155 20% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 165 50% 50%;
+    --primary-foreground: 160 15% 8%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 155 40% 25%;
+    --secondary-foreground: 155 20% 95%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 205 85% 55%;
+    --accent-foreground: 160 15% 8%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --muted: 160 10% 20%;
+    --muted-foreground: 155 15% 65%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --contrast: 85 40% 65%;
+    --contrast-foreground: 160 15% 8%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 155 20% 95%;
+
+    --border: 160 15% 20%;
+    --input: 160 15% 20%;
+    --ring: 165 50% 50%;
+
+    /* Sidebar dark theme */
+    --sidebar-background: 160 15% 8%;
+    --sidebar-foreground: 155 20% 85%;
+    --sidebar-primary: 165 50% 50%;
+    --sidebar-primary-foreground: 160 15% 8%;
+    --sidebar-accent: 160 10% 15%;
+    --sidebar-accent-foreground: 155 20% 85%;
+    --sidebar-border: 160 15% 15%;
+    --sidebar-ring: 165 50% 50%;
   }
 }
 
