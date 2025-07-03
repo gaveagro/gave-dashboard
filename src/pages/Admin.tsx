@@ -753,18 +753,18 @@ const Admin = () => {
                 Agregar inversiones adicionales a usuarios existentes
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="existingUser">Seleccionar Usuario</Label>
                   <Select>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Seleccionar usuario" />
                     </SelectTrigger>
                     <SelectContent>
                       {profiles.filter(p => p.role === 'investor').map((profile) => (
                         <SelectItem key={profile.id} value={profile.user_id}>
-                          {profile.name || profile.email}
+                          {profile.name || profile.email} - Balance: ${profile.account_balance?.toLocaleString() || '0'} MXN
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -773,13 +773,13 @@ const Admin = () => {
                 <div>
                   <Label htmlFor="newInvestmentSpecies">Especie de Planta</Label>
                   <Select>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Seleccionar especie" />
                     </SelectTrigger>
                     <SelectContent>
                       {plantSpecies.map((species) => (
                         <SelectItem key={species.id} value={species.id}>
-                          {species.name}
+                          {species.name} ({species.scientific_name})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -787,26 +787,51 @@ const Admin = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <Label>Cantidad de Plantas</Label>
-                  <Input type="number" placeholder="0" />
+                  <Input 
+                    type="number" 
+                    placeholder="Ej: 100" 
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <Label>Precio por Planta (MXN)</Label>
-                  <Input type="number" step="0.01" placeholder="0.00" />
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="Ej: 850.00" 
+                    className="w-full"
+                  />
                 </div>
                 <div>
                   <Label>Año Plantación</Label>
-                  <Input type="number" defaultValue={new Date().getFullYear()} />
+                  <Input 
+                    type="number" 
+                    defaultValue={new Date().getFullYear()} 
+                    className="w-full"
+                  />
                 </div>
                 <div>
-                  <Label>Año Cosecha</Label>
-                  <Input type="number" defaultValue={new Date().getFullYear() + 25} />
+                  <Label>Año Cosecha Esperada</Label>
+                  <Input 
+                    type="number" 
+                    defaultValue={new Date().getFullYear() + 25} 
+                    className="w-full"
+                  />
                 </div>
               </div>
 
-              <Button className="w-full">
+              <div className="bg-muted/50 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Total de la inversión:</span>
+                  <span className="text-xl font-bold text-green-600">$0 MXN</span>
+                </div>
+              </div>
+
+              <Button className="w-full" size="lg">
+                <Plus className="h-4 w-4 mr-2" />
                 Crear Nueva Inversión
               </Button>
             </CardContent>
@@ -1287,57 +1312,81 @@ const Admin = () => {
         </TabsContent>
 
         <TabsContent value="finances" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Gestión de Precios de Plantas</CardTitle>
                 <CardDescription>
-                  Actualizar precios por especie para simulación y nuevas inversiones
+                  Actualizar precios por especie y año para simulación y nuevas inversiones
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex gap-4 mb-4">
-                    <div className="flex-1">
-                      <Label>Año</Label>
-                      <Input type="number" placeholder="2024" defaultValue={new Date().getFullYear()} />
-                    </div>
-                    <div className="flex-1">
-                      <Label>Especie</Label>
-                      <Select>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccionar especie" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {plantSpecies.map((species) => (
-                            <SelectItem key={species.id} value={species.id}>
-                              {species.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex-1">
-                      <Label>Precio por Planta (MXN)</Label>
-                      <Input type="number" step="0.01" placeholder="0.00" />
-                    </div>
-                    <div className="flex items-end">
-                      <Button>Agregar Precio</Button>
-                    </div>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div>
+                    <Label>Año</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="2024" 
+                      defaultValue={new Date().getFullYear()} 
+                      className="w-full"
+                    />
                   </div>
+                  <div>
+                    <Label>Especie</Label>
+                    <Select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Seleccionar especie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {plantSpecies.map((species) => (
+                          <SelectItem key={species.id} value={species.id}>
+                            {species.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Precio por Planta (MXN)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01" 
+                      placeholder="850.00" 
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Precio
+                    </Button>
+                  </div>
+                </div>
 
-                  <div className="border rounded-lg p-4">
-                    <h4 className="font-medium mb-3">Precios Actuales</h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="border rounded-lg">
+                  <div className="p-4 border-b bg-muted/20">
+                    <h4 className="font-medium">Historial de Precios por Especie</h4>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid gap-4">
                       {plantSpecies.map((species) => (
-                        <div key={species.id} className="flex items-center justify-between p-2 border rounded">
-                          <div>
-                            <p className="font-medium">{species.name}</p>
-                            <p className="text-sm text-muted-foreground">{species.scientific_name}</p>
+                        <div key={species.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border rounded-lg">
+                          <div className="flex-1 min-w-0 mb-2 lg:mb-0">
+                            <p className="font-medium truncate">{species.name}</p>
+                            <p className="text-sm text-muted-foreground truncate">{species.scientific_name}</p>
                           </div>
-                          <div className="text-right">
-                            <p className="font-medium">$850.00 MXN (2024)</p>
-                            <p className="text-sm text-muted-foreground">$800.00 MXN (2023)</p>
+                          <div className="flex flex-col lg:flex-row gap-2 lg:gap-4">
+                            <div className="text-right">
+                              <p className="font-medium">$850.00 MXN</p>
+                              <p className="text-xs text-muted-foreground">2024</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium text-muted-foreground">$800.00 MXN</p>
+                              <p className="text-xs text-muted-foreground">2023</p>
+                            </div>
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       ))}
@@ -1354,16 +1403,16 @@ const Admin = () => {
                   Cargar documentos de reportes financieros y de crecimiento
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label>Año del Reporte</Label>
-                    <Input type="number" placeholder="2024" />
+                    <Input type="number" placeholder="2024" className="w-full" />
                   </div>
                   <div>
                     <Label>Tipo de Reporte</Label>
                     <Select>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Seleccionar tipo" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1374,15 +1423,17 @@ const Admin = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Arrastra archivos PDF o haz click para seleccionar
-                    </p>
-                    <Button variant="outline" size="sm">
-                      Seleccionar Archivos
-                    </Button>
-                  </div>
+                </div>
+                
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Arrastra archivos PDF o haz click para seleccionar
+                  </p>
+                  <Button variant="outline">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Seleccionar Archivos
+                  </Button>
                 </div>
               </CardContent>
             </Card>
