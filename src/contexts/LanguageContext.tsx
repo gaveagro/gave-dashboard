@@ -116,6 +116,26 @@ const translations = {
     'simulator.harvestBreakdown': 'Harvest Breakdown',
     'simulator.proceed': 'Proceed with this Investment',
     
+    // Documents
+    'documents.title': 'My Documents',
+    'documents.description': 'Documents related to your investments and contracts',
+    'documents.contract': 'Contract',
+    'documents.report': 'Report',
+    'documents.date': 'Date',
+    'documents.size': 'Size',
+    'documents.type': 'Type',
+    'documents.download': 'Download',
+    'documents.active': 'Active',
+    'documents.pending': 'Pending',
+    'documents.noDocuments': 'No documents available',
+    'documents.noDocumentsDesc': 'Documents related to your investments will appear here once processed.',
+    'documents.info': 'Document Information',
+    'documents.infoDesc': 'Everything you need to know about your documents',
+    'documents.contractsTitle': 'Purchase Contracts',
+    'documents.contractsDesc': 'Legal documents that formalize your plant investment. Generated automatically after each approved purchase.',
+    'documents.reportsTitle': 'Annual Reports',
+    'documents.reportsDesc': 'Technical and market reports on plot status and growth projections for your plants.',
+    
     // Plots
     'plots.title': 'Cultivation Plots',
     'plots.description': 'Detailed information about our agave plots in Oaxaca',

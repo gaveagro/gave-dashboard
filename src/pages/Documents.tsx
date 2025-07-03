@@ -12,21 +12,21 @@ const Documents = () => {
   const documents = [
     {
       id: 1,
-      name: 'Contrato de Compraventa - Inversión #001',
+      name: t('language') === 'es' ? 'Contrato de Compraventa - Inversión #001' : 'Purchase Agreement - Investment #001',
       type: 'contract',
       uploadDate: '2024-11-15',
       size: '2.4 MB',
       status: 'active',
-      description: 'Contrato para la compra de 200 plantas de Espadín'
+      description: t('language') === 'es' ? 'Contrato para la compra de 200 plantas de Espadín' : 'Contract for the purchase of 200 Espadín plants'
     },
     {
       id: 2,
-      name: 'Reporte Anual 2024 - Parcela Norte',
+      name: t('language') === 'es' ? 'Reporte Anual 2025 - próximamente' : 'Annual Report 2025 - coming soon',
       type: 'annual_report',
       uploadDate: '2024-12-01',
       size: '8.7 MB',
       status: 'pending',
-      description: 'Reporte técnico y de mercado para el año 2024'
+      description: t('language') === 'es' ? 'Reporte técnico y de mercado para el año 2025' : 'Technical and market report for 2025'
     }
   ];
 
@@ -48,11 +48,11 @@ const Documents = () => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'active':
-        return 'Activo';
+        return t('language') === 'es' ? 'Activo' : 'Active';
       case 'pending':
-        return 'Pendiente';
+        return t('language') === 'es' ? 'Pendiente' : 'Pending';
       default:
-        return 'Desconocido';
+        return t('language') === 'es' ? 'Desconocido' : 'Unknown';
     }
   };
 
@@ -64,7 +64,7 @@ const Documents = () => {
           {t('nav.documents')}
         </h1>
         <p className="text-muted-foreground text-lg">
-          Documentos relacionados con tus inversiones y contratos
+          {t('language') === 'es' ? 'Documentos relacionados con tus inversiones y contratos' : 'Documents related to your investments and contracts'}
         </p>
       </div>
 
@@ -94,20 +94,20 @@ const Documents = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Fecha:</span>
-                    <span>{new Date(doc.uploadDate).toLocaleDateString('es-MX')}</span>
+                    <span className="text-muted-foreground">{t('language') === 'es' ? 'Fecha:' : 'Date:'}:</span>
+                    <span>{new Date(doc.uploadDate).toLocaleDateString(t('language') === 'es' ? 'es-MX' : 'en-US')}</span>
                   </div>
                   
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Tamaño:</span>
+                    <span className="text-muted-foreground">{t('language') === 'es' ? 'Tamaño:' : 'Size:'}:</span>
                     <span>{doc.size}</span>
                   </div>
                   
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Tipo:</span>
-                    <span>{doc.type === 'contract' ? 'Contrato' : 'Reporte'}</span>
+                    <span className="text-muted-foreground">{t('language') === 'es' ? 'Tipo:' : 'Type:'}:</span>
+                    <span>{doc.type === 'contract' ? (t('language') === 'es' ? 'Contrato' : 'Contract') : (t('language') === 'es' ? 'Reporte' : 'Report')}</span>
                   </div>
                 </div>
 
@@ -118,7 +118,7 @@ const Documents = () => {
                     disabled={doc.status === 'pending'}
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Descargar
+                    {t('language') === 'es' ? 'Descargar' : 'Download'}
                   </Button>
                   <Button variant="outline" size="sm">
                     {t('common.view')}
@@ -131,9 +131,9 @@ const Documents = () => {
           <Card className="animate-fade-in">
             <CardContent className="p-8 text-center">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No hay documentos disponibles</h3>
+              <h3 className="text-lg font-medium mb-2">{t('language') === 'es' ? 'No hay documentos disponibles' : 'No documents available'}</h3>
               <p className="text-muted-foreground">
-                Los documentos relacionados con tus inversiones aparecerán aquí una vez que sean procesados.
+                {t('language') === 'es' ? 'Los documentos relacionados con tus inversiones aparecerán aquí una vez que sean procesados.' : 'Documents related to your investments will appear here once processed.'}
               </p>
             </CardContent>
           </Card>
@@ -144,26 +144,24 @@ const Documents = () => {
       <Card className="animate-fade-in bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
         <CardHeader>
           <CardTitle className="text-primary">
-            Información sobre Documentos
+            {t('language') === 'es' ? 'Información sobre Documentos' : 'Document Information'}
           </CardTitle>
           <CardDescription>
-            Todo lo que necesitas saber sobre tus documentos
+            {t('language') === 'es' ? 'Todo lo que necesitas saber sobre tus documentos' : 'Everything you need to know about your documents'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <h4 className="font-medium mb-2">Contratos de Compraventa</h4>
+              <h4 className="font-medium mb-2">{t('language') === 'es' ? 'Contratos de Compraventa' : 'Purchase Contracts'}</h4>
               <p className="text-muted-foreground">
-                Documentos legales que formalizan tu inversión en plantas de agave. 
-                Se generan automáticamente después de cada compra aprobada.
+                {t('language') === 'es' ? 'Documentos legales que formalizan tu inversión en plantas de agave. Se generan automáticamente después de cada compra aprobada.' : 'Legal documents that formalize your agave plant investment. Generated automatically after each approved purchase.'}
               </p>
             </div>
             <div>
-              <h4 className="font-medium mb-2">Reportes Anuales</h4>
+              <h4 className="font-medium mb-2">{t('language') === 'es' ? 'Reportes Anuales' : 'Annual Reports'}</h4>
               <p className="text-muted-foreground">
-                Informes técnicos y de mercado sobre el estado de las parcelas y 
-                las proyecciones de crecimiento de tus plantas.
+                {t('language') === 'es' ? 'Informes técnicos y de mercado sobre el estado de las parcelas y las proyecciones de crecimiento de tus plantas.' : 'Technical and market reports on plot status and growth projections for your plants.'}
               </p>
             </div>
           </div>
