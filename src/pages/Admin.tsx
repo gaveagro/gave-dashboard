@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users, DollarSign, Settings, Bell, Leaf, Edit, Plus, Trash2, Upload, MapPin } from "lucide-react";
+import { Users, DollarSign, Settings, Bell, Leaf, Edit, Plus, Trash2, Upload, MapPin, BarChart3 } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -304,6 +304,13 @@ const Admin = () => {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserName, setNewUserName] = useState("");
   const [newUserBalance, setNewUserBalance] = useState("0");
+  const [newUserSpecies, setNewUserSpecies] = useState("");
+  const [newUserPlantCount, setNewUserPlantCount] = useState("0");
+  const [newUserPricePerPlant, setNewUserPricePerPlant] = useState("0");
+  const [newUserPlantationYear, setNewUserPlantationYear] = useState(new Date().getFullYear().toString());
+  const [newUserHarvestYear, setNewUserHarvestYear] = useState((new Date().getFullYear() + 25).toString());
+  const [selectedPlotForPhoto, setSelectedPlotForPhoto] = useState("");
+  const [plots, setPlots] = useState<any[]>([]);
   const [notificationTitle, setNotificationTitle] = useState("");
   const [notificationMessage, setNotificationMessage] = useState("");
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
@@ -321,7 +328,22 @@ const Admin = () => {
       fetchAllInvestments();
     });
     fetchPlantSpecies();
+    fetchPlots();
   }, []);
+
+  const fetchPlots = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('plots')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setPlots(data || []);
+    } catch (error) {
+      console.error('Error fetching plots:', error);
+    }
+  };
 
   const fetchProfiles = async () => {
     try {
@@ -419,12 +441,51 @@ const Admin = () => {
 
       if (error) throw error;
 
-      // Actualizar el balance si se especificó
-      if (data.user && newUserBalance !== "0") {
-        await supabase
+      if (data.user) {
+        // Crear perfil manualmente si no existe
+        const { error: profileError } = await supabase
           .from('profiles')
-          .update({ account_balance: parseFloat(newUserBalance) })
-          .eq('user_id', data.user.id);
+          .upsert({
+            user_id: data.user.id,
+            email: newUserEmail,
+            name: newUserName,
+            role: 'investor',
+            account_balance: 0
+          });
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+        }
+
+        // Crear inversión si se especificaron datos
+        if (newUserSpecies && newUserPlantCount !== "0") {
+          const plantCount = parseInt(newUserPlantCount);
+          const pricePerPlant = parseFloat(newUserPricePerPlant);
+          const totalAmount = plantCount * pricePerPlant;
+
+          const { error: investmentError } = await supabase
+            .from('investments')
+            .insert({
+              user_id: data.user.id,
+              species_id: newUserSpecies,
+              plant_count: plantCount,
+              price_per_plant: pricePerPlant,
+              total_amount: totalAmount,
+              plantation_year: parseInt(newUserPlantationYear),
+              expected_harvest_year: parseInt(newUserHarvestYear),
+              status: 'active'
+            });
+
+          if (investmentError) {
+            console.error('Error creating investment:', investmentError);
+          } else {
+            // Actualizar balance del usuario
+            await supabase
+              .from('profiles')
+              .update({ account_balance: totalAmount })
+              .eq('user_id', data.user.id);
+          }
+        }
       }
 
       toast({
@@ -432,10 +493,18 @@ const Admin = () => {
         description: `Usuario ${newUserEmail} creado exitosamente`
       });
 
+      // Reset form
       setNewUserEmail("");
       setNewUserName("");
       setNewUserBalance("0");
+      setNewUserSpecies("");
+      setNewUserPlantCount("0");
+      setNewUserPricePerPlant("0");
+      setNewUserPlantationYear(new Date().getFullYear().toString());
+      setNewUserHarvestYear((new Date().getFullYear() + 25).toString());
+      
       fetchProfiles();
+      fetchAllInvestments();
     } catch (error) {
       console.error('Error creating user:', error);
       toast({
@@ -595,8 +664,12 @@ const Admin = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs defaultValue="dashboard" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Dashboard
+          </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Usuarios
@@ -618,6 +691,101 @@ const Admin = () => {
             Notificaciones
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="text-2xl font-bold">{profiles.filter(p => p.role === 'investor').length}</p>
+                    <p className="text-sm text-muted-foreground">Inversores</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2">
+                  <Leaf className="h-5 w-5 text-green-500" />
+                  <div>
+                    <p className="text-2xl font-bold">{investments.reduce((sum, inv) => sum + inv.plant_count, 0)}</p>
+                    <p className="text-sm text-muted-foreground">Plantas Totales</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-yellow-500" />
+                  <div>
+                    <p className="text-2xl font-bold">${investments.reduce((sum, inv) => sum + inv.total_amount, 0).toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground">Inversión Total</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-purple-500" />
+                  <div>
+                    <p className="text-2xl font-bold">{plots.length}</p>
+                    <p className="text-sm text-muted-foreground">Parcelas</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Inversiones por Año</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(
+                    investments.reduce((acc, inv) => {
+                      const year = inv.plantation_year;
+                      acc[year] = (acc[year] || 0) + inv.plant_count;
+                      return acc;
+                    }, {} as Record<number, number>)
+                  ).map(([year, count]) => (
+                    <div key={year} className="flex justify-between">
+                      <span>{year}</span>
+                      <span className="font-medium">{count} plantas</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Especies Plantadas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(
+                    investments.reduce((acc, inv) => {
+                      const species = inv.plant_species?.name || 'Sin especie';
+                      acc[species] = (acc[species] || 0) + inv.plant_count;
+                      return acc;
+                    }, {} as Record<string, number>)
+                  ).map(([species, count]) => (
+                    <div key={species} className="flex justify-between">
+                      <span>{species}</span>
+                      <span className="font-medium">{count} plantas</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
           <Card>
@@ -649,18 +817,73 @@ const Admin = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="userBalance">Balance Inicial (MXN)</Label>
+                  <Label htmlFor="userSpecies">Especie de Planta</Label>
+                  <Select value={newUserSpecies} onValueChange={setNewUserSpecies}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar especie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plantSpecies.map((species) => (
+                        <SelectItem key={species.id} value={species.id}>
+                          {species.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <Label htmlFor="userPlantCount">Cantidad de Plantas</Label>
                   <Input
-                    id="userBalance"
+                    id="userPlantCount"
                     type="number"
-                    value={newUserBalance}
-                    onChange={(e) => setNewUserBalance(e.target.value)}
+                    value={newUserPlantCount}
+                    onChange={(e) => setNewUserPlantCount(e.target.value)}
                     placeholder="0"
                   />
                 </div>
+                <div>
+                  <Label htmlFor="userPricePerPlant">Precio por Planta (MXN)</Label>
+                  <Input
+                    id="userPricePerPlant"
+                    type="number"
+                    step="0.01"
+                    value={newUserPricePerPlant}
+                    onChange={(e) => setNewUserPricePerPlant(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="userPlantationYear">Año Plantación</Label>
+                  <Input
+                    id="userPlantationYear"
+                    type="number"
+                    value={newUserPlantationYear}
+                    onChange={(e) => setNewUserPlantationYear(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="userHarvestYear">Año Cosecha</Label>
+                  <Input
+                    id="userHarvestYear"
+                    type="number"
+                    value={newUserHarvestYear}
+                    onChange={(e) => setNewUserHarvestYear(e.target.value)}
+                  />
+                </div>
               </div>
+
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">Total de la inversión:</p>
+                <p className="text-lg font-bold">
+                  ${(parseInt(newUserPlantCount || "0") * parseFloat(newUserPricePerPlant || "0")).toLocaleString()} MXN
+                </p>
+              </div>
+
               <Button onClick={createUser} className="w-full">
-                Crear Usuario
+                Crear Usuario con Inversión
               </Button>
             </CardContent>
           </Card>
@@ -829,22 +1052,54 @@ const Admin = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div>
                   <h3 className="font-medium mb-4">Subir Fotos de Dron</h3>
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-                    <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Arrastra fotos aéreas o haz click para seleccionar
-                    </p>
-                    <Button variant="outline">
-                      Seleccionar Archivos
-                    </Button>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Seleccionar Parcela</Label>
+                      <Select value={selectedPlotForPhoto} onValueChange={setSelectedPlotForPhoto}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar parcela" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plots.map((plot) => (
+                            <SelectItem key={plot.id} value={plot.id}>
+                              {plot.name} - {plot.location}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                      <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Arrastra fotos aéreas o haz click para seleccionar
+                      </p>
+                      <Button variant="outline" disabled={!selectedPlotForPhoto}>
+                        Seleccionar Archivos
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 <div>
                   <h3 className="font-medium mb-4">Geo-referenciación</h3>
                   <div className="space-y-4">
+                    <div>
+                      <Label>Parcela a Geo-referenciar</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar parcela" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plots.map((plot) => (
+                            <SelectItem key={plot.id} value={plot.id}>
+                              {plot.name} - {plot.location}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button variant="outline" className="w-full">
                       <MapPin className="h-4 w-4 mr-2" />
                       Abrir Editor de Mapas
@@ -855,24 +1110,155 @@ const Admin = () => {
                   </div>
                 </div>
               </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Gestión de Parcelas</CardTitle>
+                  <CardDescription>Editar datos de las parcelas existentes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Ubicación</TableHead>
+                        <TableHead>Área (ha)</TableHead>
+                        <TableHead>Plantas Totales</TableHead>
+                        <TableHead>Plantas Disponibles</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {plots.map((plot) => (
+                        <TableRow key={plot.id}>
+                          <TableCell>
+                            <Input
+                              defaultValue={plot.name}
+                              className="w-32"
+                              onBlur={(e) => {
+                                // Aquí implementarías la actualización
+                                console.log('Update plot name:', e.target.value);
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>{plot.location}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              defaultValue={plot.area}
+                              className="w-20"
+                              step="0.1"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              defaultValue={plot.total_plants}
+                              className="w-20"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              defaultValue={plot.available_plants}
+                              className="w-20"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
+                              {plot.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="finances">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gestión Financiera</CardTitle>
-              <CardDescription>
-                Próximamente: Gestión de precios de plantas, reportes anuales, etc.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Esta sección estará disponible en futuras actualizaciones.
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="finances" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gestión de Precios de Plantas</CardTitle>
+                <CardDescription>
+                  Actualizar precios por especie para simulación y nuevas inversiones
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {plantSpecies.map((species) => (
+                    <div key={species.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{species.name}</p>
+                        <p className="text-sm text-muted-foreground">{species.scientific_name}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Precio MXN"
+                          className="w-24"
+                        />
+                        <Button size="sm" variant="outline">
+                          Actualizar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Subir Reportes Anuales</CardTitle>
+                <CardDescription>
+                  Cargar documentos de reportes financieros y de crecimiento
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Año del Reporte</Label>
+                    <Input type="number" placeholder="2024" />
+                  </div>
+                  <div>
+                    <Label>Tipo de Reporte</Label>
+                    <Select>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="financiero">Reporte Financiero</SelectItem>
+                        <SelectItem value="crecimiento">Reporte de Crecimiento</SelectItem>
+                        <SelectItem value="carbono">Captura de Carbono</SelectItem>
+                        <SelectItem value="cosecha">Reporte de Cosecha</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Arrastra archivos PDF o haz click para seleccionar
+                    </p>
+                    <Button variant="outline" size="sm">
+                      Seleccionar Archivos
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-6">
