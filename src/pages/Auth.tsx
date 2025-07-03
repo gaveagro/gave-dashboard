@@ -160,7 +160,7 @@ const Auth = () => {
                       id="signin-email"
                       name="email"
                       type="email"
-                      placeholder="admin@gaveagro.com"
+                      placeholder="tu@email.com"
                       value={formData.email}
                       onChange={handleInputChange}
                       required
