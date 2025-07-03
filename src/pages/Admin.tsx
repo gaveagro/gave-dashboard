@@ -442,7 +442,7 @@ const Admin = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Crear perfil manualmente si no existe
+        // Crear perfil manualmente si no existe - ASEGURAR QUE SIEMPRE SE CREE
         const { error: profileError } = await supabase
           .from('profiles')
           .upsert({
@@ -451,10 +451,17 @@ const Admin = () => {
             name: newUserName,
             role: 'investor',
             account_balance: 0
+          }, {
+            onConflict: 'user_id'
           });
 
         if (profileError) {
           console.error('Error creating profile:', profileError);
+          toast({
+            title: "Advertencia",
+            description: "Usuario creado pero hubo problemas con el perfil",
+            variant: "destructive"
+          });
         }
 
         // Crear inversión si se especificaron datos
@@ -737,7 +744,73 @@ const Admin = () => {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Crear Nueva Inversión</CardTitle>
+              <CardDescription>
+                Agregar inversiones adicionales a usuarios existentes
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="existingUser">Seleccionar Usuario</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar usuario" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {profiles.filter(p => p.role === 'investor').map((profile) => (
+                        <SelectItem key={profile.id} value={profile.user_id}>
+                          {profile.name || profile.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="newInvestmentSpecies">Especie de Planta</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar especie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plantSpecies.map((species) => (
+                        <SelectItem key={species.id} value={species.id}>
+                          {species.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <Label>Cantidad de Plantas</Label>
+                  <Input type="number" placeholder="0" />
+                </div>
+                <div>
+                  <Label>Precio por Planta (MXN)</Label>
+                  <Input type="number" step="0.01" placeholder="0.00" />
+                </div>
+                <div>
+                  <Label>Año Plantación</Label>
+                  <Input type="number" defaultValue={new Date().getFullYear()} />
+                </div>
+                <div>
+                  <Label>Año Cosecha</Label>
+                  <Input type="number" defaultValue={new Date().getFullYear() + 25} />
+                </div>
+              </div>
+
+              <Button className="w-full">
+                Crear Nueva Inversión
+              </Button>
+            </CardContent>
+          </Card>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1122,6 +1195,7 @@ const Admin = () => {
                       <TableRow>
                         <TableHead>Nombre</TableHead>
                         <TableHead>Ubicación</TableHead>
+                        <TableHead>Especie Principal</TableHead>
                         <TableHead>Área (ha)</TableHead>
                         <TableHead>Plantas Totales</TableHead>
                         <TableHead>Plantas Disponibles</TableHead>
@@ -1142,7 +1216,27 @@ const Admin = () => {
                               }}
                             />
                           </TableCell>
-                          <TableCell>{plot.location}</TableCell>
+                          <TableCell>
+                            <Input
+                              defaultValue={plot.location}
+                              className="w-40"
+                              placeholder="Ciudad, Estado"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Select>
+                              <SelectTrigger className="w-40">
+                                <SelectValue placeholder="Seleccionar especie" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {plantSpecies.map((species) => (
+                                  <SelectItem key={species.id} value={species.id}>
+                                    {species.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell>
                             <Input
                               type="number"
@@ -1166,9 +1260,16 @@ const Admin = () => {
                             />
                           </TableCell>
                           <TableCell>
-                            <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
-                              {plot.status}
-                            </Badge>
+                            <Select defaultValue={plot.status}>
+                              <SelectTrigger className="w-28">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Activa">Activa</SelectItem>
+                                <SelectItem value="Inactiva">Inactiva</SelectItem>
+                                <SelectItem value="Mantenimiento">Mantenimiento</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             <Button variant="outline" size="sm">
@@ -1196,25 +1297,52 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {plantSpecies.map((species) => (
-                    <div key={species.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{species.name}</p>
-                        <p className="text-sm text-muted-foreground">{species.scientific_name}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Precio MXN"
-                          className="w-24"
-                        />
-                        <Button size="sm" variant="outline">
-                          Actualizar
-                        </Button>
-                      </div>
+                  <div className="flex gap-4 mb-4">
+                    <div className="flex-1">
+                      <Label>Año</Label>
+                      <Input type="number" placeholder="2024" defaultValue={new Date().getFullYear()} />
                     </div>
-                  ))}
+                    <div className="flex-1">
+                      <Label>Especie</Label>
+                      <Select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar especie" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plantSpecies.map((species) => (
+                            <SelectItem key={species.id} value={species.id}>
+                              {species.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex-1">
+                      <Label>Precio por Planta (MXN)</Label>
+                      <Input type="number" step="0.01" placeholder="0.00" />
+                    </div>
+                    <div className="flex items-end">
+                      <Button>Agregar Precio</Button>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg p-4">
+                    <h4 className="font-medium mb-3">Precios Actuales</h4>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {plantSpecies.map((species) => (
+                        <div key={species.id} className="flex items-center justify-between p-2 border rounded">
+                          <div>
+                            <p className="font-medium">{species.name}</p>
+                            <p className="text-sm text-muted-foreground">{species.scientific_name}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">$850.00 MXN (2024)</p>
+                            <p className="text-sm text-muted-foreground">$800.00 MXN (2023)</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
