@@ -1,28 +1,40 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Leaf, Clock, TrendingUp } from 'lucide-react';
-
-// Datos de ejemplo de inversiones del usuario
-const userInvestments = [
-  {
-    id: 1,
-    species: 'Espadín',
-    scientificName: 'Agave angustifolia Haw',
-    plantCount: 200,
-    investmentAmount: 50000,
-    currentValue: 67500,
-    plantationYear: 2025,
-    maturationYear: 2030,
-    pricePerPlant: 250,
-    expectedWeight: 55, // kg promedio por planta
-    roi: 35.0,
-    carbonCapture: 170, // total tons CO₂
-    status: 'Activa',
-    plotLocation: 'Parcela Norte - Oaxaca'
-  }
-];
+import { InvestmentChart } from '@/components/InvestmentChart';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Investments = () => {
+  const [userInvestments, setUserInvestments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    fetchUserInvestments();
+  }, []);
+
+  const fetchUserInvestments = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: investments, error } = await supabase
+        .from('investments')
+        .select(`
+          *,
+          plant_species:species_id (name, scientific_name, carbon_capture_per_plant)
+        `)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setUserInvestments(investments || []);
+    } catch (error) {
+      console.error('Error fetching investments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
@@ -41,16 +53,27 @@ const Investments = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Activa':
+      case 'active':
         return 'bg-profit/10 text-profit border-profit/20';
-      case 'Pendiente':
+      case 'pending':
         return 'bg-accent/10 text-accent border-accent/20';
-      case 'Completada':
+      case 'completed':
         return 'bg-primary/10 text-primary border-primary/20';
       default:
         return 'bg-muted/10 text-muted-foreground border-muted/20';
     }
   };
+
+  if (loading) {
+    return <div className="container mx-auto p-6">Cargando inversiones...</div>;
+  }
+
+  const chartData = userInvestments.map(inv => ({
+    species: inv.plant_species?.name || 'Desconocida',
+    amount: inv.total_amount,
+    count: inv.plant_count,
+    year: inv.plantation_year
+  }));
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -73,7 +96,7 @@ const Investments = () => {
               <div className="text-sm text-muted-foreground">Total Plantas</div>
             </div>
             <div className="text-2xl font-bold text-primary mt-1">
-              {userInvestments.reduce((acc, inv) => acc + inv.plantCount, 0)}
+              {userInvestments.reduce((acc, inv) => acc + inv.plant_count, 0)}
             </div>
           </CardContent>
         </Card>
@@ -85,7 +108,7 @@ const Investments = () => {
               <div className="text-sm text-muted-foreground">Inversión Total</div>
             </div>
             <div className="text-2xl font-bold text-investment mt-1">
-              {formatCurrency(userInvestments.reduce((acc, inv) => acc + inv.investmentAmount, 0))}
+              {formatCurrency(userInvestments.reduce((acc, inv) => acc + inv.total_amount, 0))}
             </div>
           </CardContent>
         </Card>
@@ -97,7 +120,7 @@ const Investments = () => {
               <div className="text-sm text-muted-foreground">Valor Actual</div>
             </div>
             <div className="text-2xl font-bold text-profit mt-1">
-              {formatCurrency(userInvestments.reduce((acc, inv) => acc + inv.currentValue, 0))}
+              Usar simulador
             </div>
           </CardContent>
         </Card>
@@ -109,11 +132,26 @@ const Investments = () => {
               <div className="text-sm text-muted-foreground">CO₂ Capturado</div>
             </div>
             <div className="text-2xl font-bold text-contrast mt-1">
-              {formatNumber(userInvestments.reduce((acc, inv) => acc + inv.carbonCapture, 0), 1)} t
+              {formatNumber(userInvestments.reduce((acc, inv) => acc + (inv.plant_species?.carbon_capture_per_plant || 0.5) * inv.plant_count, 0), 1)} t
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Pie Chart para múltiples inversiones */}
+      {userInvestments.length > 1 && (
+        <Card className="animate-fade-in">
+          <CardHeader>
+            <CardTitle>Distribución de Inversiones</CardTitle>
+            <CardDescription>
+              Porcentaje de inversión por especie de agave
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <InvestmentChart investments={chartData} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lista de Inversiones */}
       <div className="space-y-6">
@@ -126,14 +164,14 @@ const Investments = () => {
                 <div className="space-y-1">
                   <CardTitle className="flex items-center gap-2">
                     <Leaf className="h-5 w-5 text-primary" />
-                    {investment.species} - {investment.plantCount} plantas
+                    {investment.plant_species?.name || 'Especie desconocida'} - {investment.plant_count} plantas
                   </CardTitle>
                   <CardDescription>
-                    {investment.scientificName} • {investment.plotLocation}
+                    {investment.plant_species?.scientific_name || 'Nombre científico no disponible'}
                   </CardDescription>
                 </div>
                 <Badge className={getStatusColor(investment.status)}>
-                  {investment.status}
+                  {investment.status === 'active' ? 'Activa' : investment.status === 'pending' ? 'Pendiente' : 'Completada'}
                 </Badge>
               </div>
             </CardHeader>
@@ -144,30 +182,30 @@ const Investments = () => {
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Inversión Inicial</div>
                   <div className="text-lg font-bold text-investment">
-                    {formatCurrency(investment.investmentAmount)}
+                    {formatCurrency(investment.total_amount)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {formatCurrency(investment.pricePerPlant)} por planta
+                    {formatCurrency(investment.price_per_plant)} por planta
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Valor Actual</div>
+                  <div className="text-sm text-muted-foreground">Valor Estimado</div>
                   <div className="text-lg font-bold text-profit">
-                    {formatCurrency(investment.currentValue)}
+                    Usar simulador
                   </div>
-                  <div className="text-xs text-profit">
-                    +{formatCurrency(investment.currentValue - investment.investmentAmount)} ganancia
+                  <div className="text-xs text-muted-foreground">
+                    Simula diferentes escenarios de precio
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">ROI Proyectado</div>
                   <div className="text-lg font-bold text-roi">
-                    {formatNumber(investment.roi, 1)}%
+                    Usar simulador
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Al vencimiento
+                    Para calcular escenarios
                   </div>
                 </div>
               </div>
@@ -179,7 +217,7 @@ const Investments = () => {
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <div className="font-medium">Año de Plantación</div>
-                      <div className="text-muted-foreground">{investment.plantationYear}</div>
+                      <div className="text-muted-foreground">{investment.plantation_year}</div>
                     </div>
                   </div>
                   
@@ -187,16 +225,16 @@ const Investments = () => {
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <div className="font-medium">Cosecha Estimada</div>
-                      <div className="text-muted-foreground">{investment.maturationYear}</div>
+                      <div className="text-muted-foreground">{investment.expected_harvest_year}</div>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-2">
                     <Leaf className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="font-medium">Peso Esperado</div>
+                      <div className="font-medium">Peso Estimado</div>
                       <div className="text-muted-foreground">
-                        {formatNumber(investment.expectedWeight * investment.plantCount)} kg total
+                        Usar simulador para estimar
                       </div>
                     </div>
                   </div>
@@ -206,7 +244,7 @@ const Investments = () => {
                     <div>
                       <div className="font-medium">Captura CO₂</div>
                       <div className="text-muted-foreground">
-                        {formatNumber(investment.carbonCapture, 1)} tons
+                        {formatNumber((investment.plant_species?.carbon_capture_per_plant || 0.5) * investment.plant_count, 1)} tons
                       </div>
                     </div>
                   </div>
@@ -218,14 +256,14 @@ const Investments = () => {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm font-medium">Progreso de Maduración</div>
                   <div className="text-sm text-muted-foreground">
-                    {investment.maturationYear - new Date().getFullYear()} años restantes
+                    {investment.expected_harvest_year - new Date().getFullYear()} años restantes
                   </div>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
                   <div 
                     className="bg-gradient-agave h-2 rounded-full transition-all duration-300"
                     style={{ 
-                      width: `${((new Date().getFullYear() - investment.plantationYear) / (investment.maturationYear - investment.plantationYear)) * 100}%` 
+                      width: `${Math.max(0, Math.min(100, ((new Date().getFullYear() - investment.plantation_year) / (investment.expected_harvest_year - investment.plantation_year)) * 100))}%` 
                     }}
                   ></div>
                 </div>

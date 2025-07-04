@@ -856,7 +856,7 @@ const Admin = () => {
               </CardContent>
           </Card>
 
-          <Card className="col-span-2">
+          <Card className="col-span-3">
             <CardHeader>
               <CardTitle>Crear Nueva Inversión</CardTitle>
               <CardDescription>
