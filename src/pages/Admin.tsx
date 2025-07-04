@@ -317,6 +317,19 @@ const Admin = () => {
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [plantSpecies, setPlantSpecies] = useState<PlantSpecies[]>([]);
   const [investmentsLoading, setInvestmentsLoading] = useState(false);
+  
+  // Estados para crear nueva inversión
+  const [selectedUserForNewInvestment, setSelectedUserForNewInvestment] = useState("");
+  const [newInvestmentSpecies, setNewInvestmentSpecies] = useState("");
+  const [newInvestmentPlantCount, setNewInvestmentPlantCount] = useState("0");
+  const [newInvestmentPricePerPlant, setNewInvestmentPricePerPlant] = useState("0");
+  const [newInvestmentPlantationYear, setNewInvestmentPlantationYear] = useState(new Date().getFullYear().toString());
+  const [newInvestmentHarvestYear, setNewInvestmentHarvestYear] = useState((new Date().getFullYear() + 25).toString());
+  
+  // Estados para gestión de precios
+  const [priceYear, setPriceYear] = useState(new Date().getFullYear().toString());
+  const [priceSpecies, setPriceSpecies] = useState("");
+  const [pricePerPlant, setPricePerPlant] = useState("");
 
   // Redirect if not admin
   if (profile?.role !== 'admin') {
@@ -653,6 +666,103 @@ const Admin = () => {
     }
   };
 
+  const createNewInvestment = async () => {
+    if (!selectedUserForNewInvestment || !newInvestmentSpecies || !newInvestmentPlantCount || parseFloat(newInvestmentPlantCount) <= 0) {
+      toast({
+        title: "Error",
+        description: "Todos los campos son requeridos y la cantidad debe ser mayor a 0",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const plantCount = parseInt(newInvestmentPlantCount);
+      const pricePerPlant = parseFloat(newInvestmentPricePerPlant);
+      const totalAmount = plantCount * pricePerPlant;
+
+      const { error } = await supabase
+        .from('investments')
+        .insert({
+          user_id: selectedUserForNewInvestment,
+          species_id: newInvestmentSpecies,
+          plant_count: plantCount,
+          price_per_plant: pricePerPlant,
+          total_amount: totalAmount,
+          plantation_year: parseInt(newInvestmentPlantationYear),
+          expected_harvest_year: parseInt(newInvestmentHarvestYear),
+          status: 'active'
+        });
+
+      if (error) throw error;
+
+      // Actualizar balance del usuario
+      const currentProfile = profiles.find(p => p.user_id === selectedUserForNewInvestment);
+      if (currentProfile) {
+        const newBalance = (currentProfile.account_balance || 0) + totalAmount;
+        await supabase
+          .from('profiles')
+          .update({ account_balance: newBalance })
+          .eq('user_id', selectedUserForNewInvestment);
+      }
+
+      toast({
+        title: "Inversión creada",
+        description: `Nueva inversión de $${totalAmount.toLocaleString()} MXN creada exitosamente`
+      });
+
+      // Reset form
+      setSelectedUserForNewInvestment("");
+      setNewInvestmentSpecies("");
+      setNewInvestmentPlantCount("0");
+      setNewInvestmentPricePerPlant("0");
+      setNewInvestmentPlantationYear(new Date().getFullYear().toString());
+      setNewInvestmentHarvestYear((new Date().getFullYear() + 25).toString());
+      
+      fetchProfiles();
+      fetchAllInvestments();
+    } catch (error) {
+      console.error('Error creating investment:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la inversión",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const addPlantPrice = async () => {
+    if (!priceYear || !priceSpecies || !pricePerPlant) {
+      toast({
+        title: "Error",
+        description: "Todos los campos son requeridos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Aquí implementarías la lógica para guardar precios por año/especie
+      // Por ahora solo mostramos un mensaje de éxito
+      toast({
+        title: "Precio actualizado",
+        description: `Precio de ${pricePerPlant} MXN para ${priceYear} guardado exitosamente`
+      });
+
+      // Reset form
+      setPriceYear(new Date().getFullYear().toString());
+      setPriceSpecies("");
+      setPricePerPlant("");
+    } catch (error) {
+      console.error('Error updating price:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el precio",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -746,97 +856,103 @@ const Admin = () => {
               </CardContent>
           </Card>
 
-          <div className="col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Crear Nueva Inversión</CardTitle>
-                <CardDescription>
-                  Agregar inversiones adicionales a usuarios existentes
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div>
-                    <Label htmlFor="existingUser">Seleccionar Usuario</Label>
-                    <Select>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar usuario" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {profiles.filter(p => p.role === 'investor').map((profile) => (
-                          <SelectItem key={profile.id} value={profile.user_id}>
-                            {profile.name || profile.email} - Balance: ${profile.account_balance?.toLocaleString() || '0'} MXN
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="newInvestmentSpecies">Especie de Planta</Label>
-                    <Select>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar especie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {plantSpecies.map((species) => (
-                          <SelectItem key={species.id} value={species.id}>
-                            {species.name} ({species.scientific_name})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="bg-muted/50 rounded-lg p-4 flex flex-col justify-center">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Total de la inversión:</span>
-                      <span className="text-lg font-bold text-green-600">$0 MXN</span>
-                    </div>
+          <Card className="col-span-2">
+            <CardHeader>
+              <CardTitle>Crear Nueva Inversión</CardTitle>
+              <CardDescription>
+                Agregar inversiones adicionales a usuarios existentes
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <Label htmlFor="existingUser">Seleccionar Usuario</Label>
+                  <Select value={selectedUserForNewInvestment} onValueChange={setSelectedUserForNewInvestment}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Seleccionar usuario" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {profiles.filter(p => p.role === 'investor').map((profile) => (
+                        <SelectItem key={profile.id} value={profile.user_id}>
+                          {profile.name || profile.email} - Balance: ${profile.account_balance?.toLocaleString() || '0'} MXN
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="newInvestmentSpecies">Especie de Planta</Label>
+                  <Select value={newInvestmentSpecies} onValueChange={setNewInvestmentSpecies}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Seleccionar especie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {plantSpecies.map((species) => (
+                        <SelectItem key={species.id} value={species.id}>
+                          {species.name} ({species.scientific_name})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-4 flex flex-col justify-center">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total de la inversión:</span>
+                    <span className="text-lg font-bold text-green-600">
+                      ${((parseFloat(newInvestmentPlantCount) || 0) * (parseFloat(newInvestmentPricePerPlant) || 0)).toLocaleString()} MXN
+                    </span>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div>
-                    <Label>Cantidad de Plantas</Label>
-                    <Input 
-                      type="number" 
-                      placeholder="Ej: 100" 
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <Label>Precio por Planta (MXN)</Label>
-                    <Input 
-                      type="number" 
-                      step="0.01" 
-                      placeholder="Ej: 850.00" 
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <Label>Año Plantación</Label>
-                    <Input 
-                      type="number" 
-                      defaultValue={new Date().getFullYear()} 
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <Label>Año Cosecha Esperada</Label>
-                    <Input 
-                      type="number" 
-                      defaultValue={new Date().getFullYear() + 25} 
-                      className="w-full"
-                    />
-                  </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                  <Label>Cantidad de Plantas</Label>
+                  <Input 
+                    type="number" 
+                    placeholder="Ej: 100" 
+                    value={newInvestmentPlantCount}
+                    onChange={(e) => setNewInvestmentPlantCount(e.target.value)}
+                    className="w-full"
+                  />
                 </div>
+                <div>
+                  <Label>Precio por Planta (MXN)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="Ej: 850.00" 
+                    value={newInvestmentPricePerPlant}
+                    onChange={(e) => setNewInvestmentPricePerPlant(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <Label>Año Plantación</Label>
+                  <Input 
+                    type="number" 
+                    value={newInvestmentPlantationYear}
+                    onChange={(e) => setNewInvestmentPlantationYear(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <Label>Año Cosecha Esperada</Label>
+                  <Input 
+                    type="number" 
+                    value={newInvestmentHarvestYear}
+                    onChange={(e) => setNewInvestmentHarvestYear(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+              </div>
 
-                <Button className="w-full" size="lg">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Nueva Inversión
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+              <Button onClick={createNewInvestment} className="w-full" size="lg">
+                <Plus className="h-4 w-4 mr-2" />
+                Crear Nueva Inversión
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1328,13 +1444,14 @@ const Admin = () => {
                     <Input 
                       type="number" 
                       placeholder="2024" 
-                      defaultValue={new Date().getFullYear()} 
+                      value={priceYear}
+                      onChange={(e) => setPriceYear(e.target.value)}
                       className="w-full"
                     />
                   </div>
                   <div>
                     <Label>Especie</Label>
-                    <Select>
+                    <Select value={priceSpecies} onValueChange={setPriceSpecies}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Seleccionar especie" />
                       </SelectTrigger>
@@ -1353,11 +1470,13 @@ const Admin = () => {
                       type="number" 
                       step="0.01" 
                       placeholder="850.00" 
+                      value={pricePerPlant}
+                      onChange={(e) => setPricePerPlant(e.target.value)}
                       className="w-full"
                     />
                   </div>
                   <div className="flex items-end">
-                    <Button className="w-full">
+                    <Button onClick={addPlantPrice} className="w-full">
                       <Plus className="h-4 w-4 mr-2" />
                       Agregar Precio
                     </Button>

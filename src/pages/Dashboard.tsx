@@ -161,9 +161,11 @@ const Dashboard = () => {
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed">
             Gavé Agrotecnología, S.P.R. de R.L. de C.V. es una empresa pionera en agricultura regenerativa 
-            especializada en el cultivo sostenible de agave para la producción de mezcal premium. 
-            Nuestro modelo de inversión permite a los socios participar en el crecimiento de plantaciones 
-            de agave mientras contribuyen a la regeneración del suelo y la captura de carbono.
+            especializada en el cultivo sostenible de Agave para los sectores que demandan estas plantas 
+            como materia prima: Mezcal, Biocombustibles, Forraje Ganadero, Bioplásticos, Edulcorantes, 
+            Prebióticos, entre otros. Nuestro modelo de inversión permite a los socios participar en el 
+            crecimiento de plantaciones de agave mientras contribuyen a la regeneración del suelo y la 
+            captura de carbono.
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
@@ -176,7 +178,7 @@ const Dashboard = () => {
               <div className="text-xs text-muted-foreground">Utilidades para inversionista</div>
             </div>
             <div className="space-y-1">
-              <div className="text-2xl font-bold text-contrast">0.85+</div>
+              <div className="text-2xl font-bold text-contrast">0.5+</div>
               <div className="text-xs text-muted-foreground">Tons CO₂ por planta</div>
             </div>
           </div>
