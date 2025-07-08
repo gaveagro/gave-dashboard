@@ -88,7 +88,7 @@ const Plots = () => {
           Parcelas de Cultivo
         </h1>
         <p className="text-muted-foreground text-lg">
-          Información detallada sobre nuestras parcelas de agave en Oaxaca
+          Información detallada sobre nuestras parcelas de agave
         </p>
       </div>
 
@@ -328,8 +328,8 @@ const Plots = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Nuestras parcelas en Oaxaca están diseñadas siguiendo principios de agricultura regenerativa, 
+        <p className="text-sm text-muted-foreground leading-relaxed">
+            Nuestras parcelas están diseñadas siguiendo principios de agricultura regenerativa, 
             promoviendo la biodiversidad, mejorando la estructura del suelo y maximizando la captura de carbono. 
             Cada parcela es monitoreada constantemente para asegurar las mejores condiciones de crecimiento 
             para nuestras plantas de agave.

@@ -1,4 +1,4 @@
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface InvestmentData {
   species: string;
@@ -11,35 +11,140 @@ interface InvestmentChartProps {
   investments: InvestmentData[];
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+const COLORS = ['#059669', '#0d9488', '#0891b2', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef'];
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    return (
+      <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+        <p className="font-medium">{data.name}</p>
+        <p className="text-primary">
+          <span className="font-semibold">${data.value.toLocaleString()}</span> invertido
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {data.payload.count} plantas
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export const InvestmentChart = ({ investments }: InvestmentChartProps) => {
   if (investments.length <= 1) {
     return null;
   }
 
+  // Datos por especies
+  const speciesData = investments.reduce((acc: any[], inv) => {
+    const existing = acc.find(item => item.name === inv.species);
+    if (existing) {
+      existing.value += inv.amount;
+      existing.count += inv.count;
+    } else {
+      acc.push({
+        name: inv.species,
+        value: inv.amount,
+        count: inv.count
+      });
+    }
+    return acc;
+  }, []);
+
+  // Datos por años
+  const yearData = investments.reduce((acc: any[], inv) => {
+    const existing = acc.find(item => item.name === inv.year.toString());
+    if (existing) {
+      existing.value += inv.amount;
+      existing.count += inv.count;
+    } else {
+      acc.push({
+        name: inv.year.toString(),
+        value: inv.amount,
+        count: inv.count
+      });
+    }
+    return acc;
+  }, []);
+
   return (
-    <div className="w-full h-64">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={investments}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            label={({ species, percent }) => `${species} ${(percent * 100).toFixed(0)}%`}
-            outerRadius={80}
-            fill="#8884d8"
-            dataKey="amount"
-          >
-            {investments.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, 'Inversión']} />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Chart por Especies */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-center">Distribución por Especies</h3>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={speciesData}
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                innerRadius={40}
+                paddingAngle={2}
+                dataKey="value"
+                className="drop-shadow-lg"
+              >
+                {speciesData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={COLORS[index % COLORS.length]}
+                    className="hover:opacity-80 transition-opacity cursor-pointer"
+                  />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex flex-wrap justify-center gap-3">
+          {speciesData.map((entry, index) => (
+            <div key={entry.name} className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: COLORS[index % COLORS.length] }}
+              />
+              <span className="text-sm font-medium">{entry.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Chart por Años */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-center">Distribución por Años de Establecimiento</h3>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={yearData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <XAxis 
+                dataKey="name" 
+                className="text-sm"
+                tick={{ fontSize: 12 }}
+              />
+              <YAxis 
+                className="text-sm"
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar 
+                dataKey="value" 
+                radius={[4, 4, 0, 0]}
+                className="drop-shadow-sm"
+              >
+                {yearData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={COLORS[index % COLORS.length]}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 };

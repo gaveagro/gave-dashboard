@@ -142,9 +142,9 @@ const Investments = () => {
       {userInvestments.length > 1 && (
         <Card className="animate-fade-in">
           <CardHeader>
-            <CardTitle>Distribución de Inversiones</CardTitle>
+            <CardTitle>Análisis de Inversiones</CardTitle>
             <CardDescription>
-              Porcentaje de inversión por especie de agave
+              Distribución detallada de tus inversiones por especies y años de establecimiento
             </CardDescription>
           </CardHeader>
           <CardContent>

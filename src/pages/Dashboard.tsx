@@ -2,19 +2,40 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Leaf, Calculator, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-// Datos de ejemplo basados en las especificaciones
-const userInvestments = {
-  totalInvested: 50000,
-  currentValue: 67500,
-  totalPlants: 200,
-  species: 'Espadín',
-  plantationYear: 2025,
-  expectedHarvest: '2030',
-  roi: 35.0
-};
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const [userInvestments, setUserInvestments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserInvestments();
+    }
+  }, [user]);
+
+  const fetchUserInvestments = async () => {
+    try {
+      const { data: investments, error } = await supabase
+        .from('investments')
+        .select(`
+          *,
+          plant_species:species_id (name, scientific_name, carbon_capture_per_plant)
+        `)
+        .eq('user_id', user?.id);
+
+      if (error) throw error;
+      setUserInvestments(investments || []);
+    } catch (error) {
+      console.error('Error fetching investments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
@@ -23,6 +44,23 @@ const Dashboard = () => {
       maximumFractionDigits: 0
     }).format(amount);
   };
+
+  // Calcular métricas basadas en inversiones reales
+  const totalPlants = userInvestments.reduce((acc, inv) => acc + inv.plant_count, 0);
+  const totalInvested = userInvestments.reduce((acc, inv) => acc + inv.total_amount, 0);
+  
+  // Calcular CO2 capturado basado en la edad de cada planta
+  const totalCO2Captured = userInvestments.reduce((acc, inv) => {
+    const currentYear = new Date().getFullYear();
+    const plantAge = Math.max(0, currentYear - inv.plantation_year);
+    const co2PerPlantPerYear = inv.plant_species?.carbon_capture_per_plant || 0.5;
+    return acc + (inv.plant_count * co2PerPlantPerYear * plantAge);
+  }, 0);
+
+  // Determinar cosecha estimada (más próxima)
+  const nextHarvest = userInvestments.reduce((earliest, inv) => {
+    return !earliest || inv.expected_harvest_year < earliest ? inv.expected_harvest_year : earliest;
+  }, null);
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -37,75 +75,79 @@ const Dashboard = () => {
       </div>
 
       {/* Métricas Principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="animate-fade-in border-investment/20 bg-gradient-to-br from-investment/5 to-investment/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-investment flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Inversión Total
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-investment">
-              {formatCurrency(userInvestments.totalInvested)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {userInvestments.totalPlants} plantas de {userInvestments.species}
-            </p>
-          </CardContent>
-        </Card>
+      {loading ? (
+        <div className="text-center py-8">Cargando datos...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card className="animate-fade-in border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-primary flex items-center gap-2">
+                <Leaf className="h-4 w-4" />
+                Total Plantas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {totalPlants.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                En {userInvestments.length} inversión{userInvestments.length !== 1 ? 'es' : ''}
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card className="animate-fade-in border-profit/20 bg-gradient-to-br from-profit/5 to-profit/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-profit flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Valor Actual
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-profit">
-              {formatCurrency(userInvestments.currentValue)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Proyección actual de mercado
-            </p>
-          </CardContent>
-        </Card>
+          <Card className="animate-fade-in border-investment/20 bg-gradient-to-br from-investment/5 to-investment/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-investment flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Inversión Total
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-investment">
+                {formatCurrency(totalInvested)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Capital invertido en agave
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card className="animate-fade-in border-roi/20 bg-gradient-to-br from-roi/5 to-roi/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-roi flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              ROI Proyectado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-roi">
-              {userInvestments.roi}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Retorno estimado al vencimiento
-            </p>
-          </CardContent>
-        </Card>
+          <Card className="animate-fade-in border-contrast/20 bg-gradient-to-br from-contrast/5 to-contrast/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-contrast flex items-center gap-2">
+                <Leaf className="h-4 w-4" />
+                CO₂ Capturado
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-contrast">
+                {totalCO2Captured.toFixed(1)} t
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Impacto ambiental acumulado
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card className="animate-fade-in border-accent/20 bg-gradient-to-br from-accent/5 to-accent/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-accent flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Cosecha Estimada
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-accent">
-              {userInvestments.expectedHarvest}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Año de maduración del {userInvestments.species}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="animate-fade-in border-accent/20 bg-gradient-to-br from-accent/5 to-accent/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-accent flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Próxima Cosecha
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-accent">
+                {nextHarvest || 'N/A'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {userInvestments.length > 1 ? 'Cosecha más próxima' : 'Año de maduración'}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Acciones Rápidas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -160,12 +202,14 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Gavé Agrotecnología, S.P.R. de R.L. de C.V. es una empresa pionera en agricultura regenerativa 
-            especializada en el cultivo sostenible de Agave para los sectores que demandan estas plantas 
-            como materia prima: Mezcal, Biocombustibles, Forraje Ganadero, Bioplásticos, Edulcorantes, 
-            Prebióticos, entre otros. Nuestro modelo de inversión permite a los socios participar en el 
-            crecimiento de plantaciones de agave mientras contribuyen a la regeneración del suelo y la 
-            captura de carbono.
+            Gavé Agrotecnología es una empresa líder en agricultura regenerativa especializada en el cultivo 
+            sostenible de agave. Nuestro enfoque integral abarca desde la producción para mezcal hasta 
+            aplicaciones innovadoras en biocombustibles, forraje ganadero, bioplásticos y edulcorantes naturales. 
+            
+            Como inversionista, participas en un modelo sostenible que no solo genera retornos financieros 
+            atractivos, sino que también contribuye activamente a la regeneración del suelo, la captura de 
+            carbono y el desarrollo de comunidades rurales. Cada planta que cultivas representa un compromiso 
+            con el futuro de la agricultura mexicana y el medio ambiente.
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
