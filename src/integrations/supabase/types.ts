@@ -16,30 +16,36 @@ export type Database = {
     Tables: {
       documents: {
         Row: {
+          contract_type: string | null
           created_at: string
           document_name: string
           document_type: string
           document_url: string
+          file_size: number | null
           id: string
           investment_id: string | null
           uploaded_by: string | null
           user_id: string
         }
         Insert: {
+          contract_type?: string | null
           created_at?: string
           document_name: string
           document_type: string
           document_url: string
+          file_size?: number | null
           id?: string
           investment_id?: string | null
           uploaded_by?: string | null
           user_id: string
         }
         Update: {
+          contract_type?: string | null
           created_at?: string
           document_name?: string
           document_type?: string
           document_url?: string
+          file_size?: number | null
           id?: string
           investment_id?: string | null
           uploaded_by?: string | null
@@ -147,6 +153,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      plant_prices: {
+        Row: {
+          created_at: string
+          id: string
+          price_per_plant: number
+          species_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          price_per_plant: number
+          species_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          price_per_plant?: number
+          species_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plant_prices_species_id_fkey"
+            columns: ["species_id"]
+            isOneToOne: false
+            referencedRelation: "plant_species"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       plant_species: {
         Row: {

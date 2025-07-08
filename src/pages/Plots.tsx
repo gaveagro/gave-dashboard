@@ -156,9 +156,9 @@ const Plots = () => {
                     <Leaf className="h-5 w-5 text-primary" />
                     {plot.name}
                   </CardTitle>
-                  <CardDescription>
-                    {plot.location} • {plot.coordinates}
-                  </CardDescription>
+                   <CardDescription>
+                     {plot.location} • {plot.coordinates}
+                   </CardDescription>
                 </div>
                 <Badge className={getStatusColor(plot.status)}>
                   {plot.status}

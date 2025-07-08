@@ -331,6 +331,18 @@ const Admin = () => {
   const [priceYear, setPriceYear] = useState(new Date().getFullYear().toString());
   const [priceSpecies, setPriceSpecies] = useState("");
   const [pricePerPlant, setPricePerPlant] = useState("");
+  
+  // Estados para crear nueva parcela
+  const [newPlotName, setNewPlotName] = useState("");
+  const [newPlotLocation, setNewPlotLocation] = useState("");
+  const [newPlotArea, setNewPlotArea] = useState("");
+  const [newPlotTotalPlants, setNewPlotTotalPlants] = useState("");
+  const [newPlotLatitude, setNewPlotLatitude] = useState("");
+  const [newPlotLongitude, setNewPlotLongitude] = useState("");
+  const [newPlotSoilType, setNewPlotSoilType] = useState("");
+  const [newPlotElevation, setNewPlotElevation] = useState("");
+  const [newPlotRainfall, setNewPlotRainfall] = useState("");
+  const [newPlotTemperature, setNewPlotTemperature] = useState("");
 
   // Redirect if not admin
   if (profile?.role !== 'admin') {
@@ -446,66 +458,48 @@ const Admin = () => {
     }
 
     try {
-      const { data, error } = await supabase.auth.admin.createUser({
-        email: newUserEmail,
-        password: 'TempPassword123!', // Usuario deberá cambiar la contraseña
-        email_confirm: true,
-        user_metadata: { name: newUserName }
-      });
+      // Crear usuario directamente en la tabla profiles
+      const tempUserId = crypto.randomUUID();
+      
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: tempUserId,
+          email: newUserEmail,
+          name: newUserName,
+          role: 'investor',
+          account_balance: 0
+        });
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
-      if (data.user) {
-        // Crear perfil manualmente si no existe - ASEGURAR QUE SIEMPRE SE CREE
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            user_id: data.user.id,
-            email: newUserEmail,
-            name: newUserName,
-            role: 'investor',
-            account_balance: 0
-          }, {
-            onConflict: 'user_id'
+      // Crear inversión si se especificaron datos
+      if (newUserSpecies && newUserPlantCount !== "0") {
+        const plantCount = parseInt(newUserPlantCount);
+        const pricePerPlant = parseFloat(newUserPricePerPlant);
+        const totalAmount = plantCount * pricePerPlant;
+
+        const { error: investmentError } = await supabase
+          .from('investments')
+          .insert({
+            user_id: tempUserId,
+            species_id: newUserSpecies,
+            plant_count: plantCount,
+            price_per_plant: pricePerPlant,
+            total_amount: totalAmount,
+            plantation_year: parseInt(newUserPlantationYear),
+            expected_harvest_year: parseInt(newUserHarvestYear),
+            status: 'active'
           });
 
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
-          toast({
-            title: "Advertencia",
-            description: "Usuario creado pero hubo problemas con el perfil",
-            variant: "destructive"
-          });
-        }
-
-        // Crear inversión si se especificaron datos
-        if (newUserSpecies && newUserPlantCount !== "0") {
-          const plantCount = parseInt(newUserPlantCount);
-          const pricePerPlant = parseFloat(newUserPricePerPlant);
-          const totalAmount = plantCount * pricePerPlant;
-
-          const { error: investmentError } = await supabase
-            .from('investments')
-            .insert({
-              user_id: data.user.id,
-              species_id: newUserSpecies,
-              plant_count: plantCount,
-              price_per_plant: pricePerPlant,
-              total_amount: totalAmount,
-              plantation_year: parseInt(newUserPlantationYear),
-              expected_harvest_year: parseInt(newUserHarvestYear),
-              status: 'active'
-            });
-
-          if (investmentError) {
-            console.error('Error creating investment:', investmentError);
-          } else {
-            // Actualizar balance del usuario
-            await supabase
-              .from('profiles')
-              .update({ account_balance: totalAmount })
-              .eq('user_id', data.user.id);
-          }
+        if (investmentError) {
+          console.error('Error creating investment:', investmentError);
+        } else {
+          // Actualizar balance del usuario
+          await supabase
+            .from('profiles')
+            .update({ account_balance: totalAmount })
+            .eq('user_id', tempUserId);
         }
       }
 
@@ -732,6 +726,65 @@ const Admin = () => {
     }
   };
 
+  const createNewPlot = async () => {
+    if (!newPlotName || !newPlotLocation || !newPlotArea) {
+      toast({
+        title: "Error",
+        description: "Nombre, ubicación y área son requeridos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('plots')
+        .insert({
+          name: newPlotName,
+          location: newPlotLocation,
+          area: parseFloat(newPlotArea),
+          total_plants: parseInt(newPlotTotalPlants) || 0,
+          available_plants: parseInt(newPlotTotalPlants) || 0,
+          latitude: newPlotLatitude ? parseFloat(newPlotLatitude) : null,
+          longitude: newPlotLongitude ? parseFloat(newPlotLongitude) : null,
+          coordinates: newPlotLatitude && newPlotLongitude ? `${newPlotLatitude}°N, ${newPlotLongitude}°W` : '',
+          soil_type: newPlotSoilType || null,
+          elevation: newPlotElevation ? parseInt(newPlotElevation) : null,
+          rainfall: newPlotRainfall ? parseInt(newPlotRainfall) : null,
+          temperature: newPlotTemperature || null,
+          status: 'Activa'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Parcela creada",
+        description: `Parcela ${newPlotName} creada exitosamente`
+      });
+
+      // Reset form
+      setNewPlotName("");
+      setNewPlotLocation("");
+      setNewPlotArea("");
+      setNewPlotTotalPlants("");
+      setNewPlotLatitude("");
+      setNewPlotLongitude("");
+      setNewPlotSoilType("");
+      setNewPlotElevation("");
+      setNewPlotRainfall("");
+      setNewPlotTemperature("");
+      
+      fetchPlots();
+    } catch (error) {
+      console.error('Error creating plot:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la parcela",
+        variant: "destructive"
+      });
+    }
+  };
+
   const addPlantPrice = async () => {
     if (!priceYear || !priceSpecies || !pricePerPlant) {
       toast({
@@ -743,8 +796,18 @@ const Admin = () => {
     }
 
     try {
-      // Aquí implementarías la lógica para guardar precios por año/especie
-      // Por ahora solo mostramos un mensaje de éxito
+      const { error } = await supabase
+        .from('plant_prices')
+        .upsert({
+          species_id: priceSpecies,
+          year: parseInt(priceYear),
+          price_per_plant: parseFloat(pricePerPlant)
+        }, {
+          onConflict: 'species_id,year'
+        });
+
+      if (error) throw error;
+
       toast({
         title: "Precio actualizado",
         description: `Precio de ${pricePerPlant} MXN para ${priceYear} guardado exitosamente`
@@ -1342,6 +1405,122 @@ const Admin = () => {
         <TabsContent value="plots" className="space-y-6">
           <Card>
             <CardHeader>
+              <CardTitle>Crear Nueva Parcela</CardTitle>
+              <CardDescription>
+                Agregar una nueva parcela al sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label>Nombre de la Parcela</Label>
+                  <Input 
+                    value={newPlotName}
+                    onChange={(e) => setNewPlotName(e.target.value)}
+                    placeholder="Ej: Parcela Norte" 
+                  />
+                </div>
+                <div>
+                  <Label>Ubicación</Label>
+                  <Input 
+                    value={newPlotLocation}
+                    onChange={(e) => setNewPlotLocation(e.target.value)}
+                    placeholder="Ej: Oaxaca, México" 
+                  />
+                </div>
+                <div>
+                  <Label>Área (hectáreas)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.1" 
+                    value={newPlotArea}
+                    onChange={(e) => setNewPlotArea(e.target.value)}
+                    placeholder="Ej: 15.5" 
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Total de Plantas</Label>
+                  <Input 
+                    type="number" 
+                    value={newPlotTotalPlants}
+                    onChange={(e) => setNewPlotTotalPlants(e.target.value)}
+                    placeholder="Ej: 3100" 
+                  />
+                </div>
+                <div>
+                  <Label>Tipo de Suelo</Label>
+                  <Input 
+                    value={newPlotSoilType}
+                    onChange={(e) => setNewPlotSoilType(e.target.value)}
+                    placeholder="Ej: Franco-arenoso" 
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Latitud</Label>
+                  <Input 
+                    type="number" 
+                    step="any" 
+                    value={newPlotLatitude}
+                    onChange={(e) => setNewPlotLatitude(e.target.value)}
+                    placeholder="Ej: 17.0732" 
+                  />
+                </div>
+                <div>
+                  <Label>Longitud</Label>
+                  <Input 
+                    type="number" 
+                    step="any" 
+                    value={newPlotLongitude}
+                    onChange={(e) => setNewPlotLongitude(e.target.value)}
+                    placeholder="Ej: -96.7266" 
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label>Elevación (metros)</Label>
+                  <Input 
+                    type="number" 
+                    value={newPlotElevation}
+                    onChange={(e) => setNewPlotElevation(e.target.value)}
+                    placeholder="Ej: 1580" 
+                  />
+                </div>
+                <div>
+                  <Label>Precipitación (mm/año)</Label>
+                  <Input 
+                    type="number" 
+                    value={newPlotRainfall}
+                    onChange={(e) => setNewPlotRainfall(e.target.value)}
+                    placeholder="Ej: 650" 
+                  />
+                </div>
+                <div>
+                  <Label>Temperatura</Label>
+                  <Input 
+                    value={newPlotTemperature}
+                    onChange={(e) => setNewPlotTemperature(e.target.value)}
+                    placeholder="Ej: 18-25°C" 
+                  />
+                </div>
+              </div>
+              
+              <Button onClick={createNewPlot} className="w-full" size="lg">
+                <Plus className="h-4 w-4 mr-2" />
+                Crear Parcela
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Gestión de Parcelas</CardTitle>
               <CardDescription>
                 Administra parcelas, fotos aéreas y geo-referenciación
@@ -1371,6 +1550,9 @@ const Admin = () => {
                       <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground mb-4">
                         Arrastra fotos aéreas o haz click para seleccionar
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Límite: 100MB por imagen. Formatos: JPG, PNG, WebP
                       </p>
                       <Button variant="outline" disabled={!selectedPlotForPhoto}>
                         Seleccionar Archivos
