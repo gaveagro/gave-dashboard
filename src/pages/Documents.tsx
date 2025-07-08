@@ -33,20 +33,42 @@ const Documents = () => {
   const [loading, setLoading] = useState(true);
   const [uploadingContract, setUploadingContract] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [contractType, setContractType] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [documentName, setDocumentName] = useState("");
+  const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+    if (profile?.role === 'admin') {
+      fetchUsers();
+    }
+  }, [profile]);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .eq('role', 'investor')
+        .order('name');
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
 
   const fetchDocuments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('user_id', profile?.user_id)
-        .order('created_at', { ascending: false });
+      let query = supabase.from('documents').select('*');
+      
+      // Si es admin, mostrar todos los documentos, si no, solo los del usuario
+      if (profile?.role !== 'admin') {
+        query = query.eq('user_id', profile?.user_id);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setDocuments(data || []);
@@ -79,7 +101,7 @@ const Documents = () => {
   };
 
   const uploadContract = async () => {
-    if (!selectedFile || !contractType || !documentName) {
+    if (!selectedFile || !selectedUserId || !documentName) {
       toast({
         title: "Error",
         description: "Todos los campos son requeridos",
@@ -107,11 +129,11 @@ const Documents = () => {
       const { error: docError } = await supabase
         .from('documents')
         .insert({
-          user_id: profile?.user_id,
+          user_id: selectedUserId,
           document_name: documentName,
           document_type: 'contract',
           document_url: publicUrl,
-          contract_type: contractType,
+          contract_type: 'contrato',
           file_size: selectedFile.size,
           uploaded_by: profile?.user_id
         });
@@ -125,7 +147,7 @@ const Documents = () => {
 
       // Reset form
       setSelectedFile(null);
-      setContractType("");
+      setSelectedUserId("");
       setDocumentName("");
       
       // Refresh documents
@@ -246,21 +268,23 @@ const Documents = () => {
                     placeholder="Ej: Contrato Inversión Parcela Norte"
                   />
                 </div>
-                <div>
-                  <Label>Tipo de Contrato</Label>
-                  <Select value={contractType} onValueChange={setContractType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contractTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {profile?.role === 'admin' && (
+                  <div>
+                    <Label>Usuario</Label>
+                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar usuario" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.user_id} value={user.user_id}>
+                            {user.name} ({user.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div>
                   <Label>Archivo</Label>
                   <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
@@ -285,7 +309,7 @@ const Documents = () => {
                 <Button 
                   onClick={uploadContract} 
                   className="w-full" 
-                  disabled={uploadingContract || !selectedFile || !contractType || !documentName}
+                  disabled={uploadingContract || !selectedFile || !selectedUserId || !documentName}
                 >
                   {uploadingContract ? 'Subiendo...' : 'Subir Contrato'}
                 </Button>

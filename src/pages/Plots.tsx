@@ -3,58 +3,64 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Leaf, Info, TrendingUp, MapPin, Camera, ExternalLink } from 'lucide-react';
 import PlotMap from '@/components/PlotMap';
-import { useState } from 'react';
-
-// Datos de ejemplo de parcelas
-const plots = [
-  {
-    id: 1,
-    name: 'Parcela Norte',
-    location: 'Oaxaca, México',
-    coordinates: '17.0732°N, 96.7266°W',
-    latitude: 17.0732,
-    longitude: -96.7266,
-    area: 15.5, // hectáreas
-    totalPlants: 3100,
-    availablePlants: 2900,
-    species: ['Espadín', 'Salmiana'],
-    soilType: 'Franco-arenoso',
-    elevation: 1580, // metros
-    lastUpdate: '2024-12-15',
-    status: 'Activa',
-    rainfall: 650, // mm anuales
-    temperature: '18-25°C',
-    dronePhotos: [
-      { year: 2024, url: '/placeholder-drone-north.jpg', description: 'Levantamiento aéreo 2024' },
-      { year: 2023, url: '/placeholder-drone-north-2023.jpg', description: 'Levantamiento aéreo 2023' }
-    ]
-  },
-  {
-    id: 2,
-    name: 'Parcela Sur',
-    location: 'Oaxaca, México',
-    coordinates: '16.9252°N, 96.7266°W',
-    latitude: 16.9252,
-    longitude: -96.7266,
-    area: 22.3, // hectáreas
-    totalPlants: 4460,
-    availablePlants: 4200,
-    species: ['Salmiana', 'Atrovirens'],
-    soilType: 'Arcillo-limoso',
-    elevation: 1650, // metros
-    lastUpdate: '2024-12-10',
-    status: 'En desarrollo',
-    rainfall: 780, // mm anuales
-    temperature: '16-23°C',
-    dronePhotos: [
-      { year: 2024, url: '/placeholder-drone-south.jpg', description: 'Levantamiento aéreo 2024' },
-      { year: 2023, url: '/placeholder-drone-south-2023.jpg', description: 'Levantamiento aéreo 2023' }
-    ]
-  }
-];
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const Plots = () => {
   const [selectedPlot, setSelectedPlot] = useState<number | null>(null);
+  const [plots, setPlots] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchPlots();
+  }, []);
+
+  const fetchPlots = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('plots')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      
+      // Transformar datos para compatibilidad
+      const transformedPlots = data.map(plot => ({
+        id: plot.id,
+        name: plot.name,
+        location: plot.location,
+        coordinates: plot.coordinates,
+        latitude: plot.latitude,
+        longitude: plot.longitude,
+        area: plot.area,
+        totalPlants: plot.total_plants,
+        availablePlants: plot.available_plants,
+        species: ['Espadín', 'Salmiana'], // Datos por defecto
+        soilType: plot.soil_type,
+        elevation: plot.elevation,
+        lastUpdate: plot.updated_at,
+        status: plot.status,
+        rainfall: plot.rainfall,
+        temperature: plot.temperature,
+        dronePhotos: [
+          { year: 2024, url: '/placeholder-drone.jpg', description: 'Levantamiento aéreo 2024' }
+        ]
+      }));
+      
+      setPlots(transformedPlots);
+    } catch (error) {
+      console.error('Error fetching plots:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las parcelas",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const formatNumber = (num: number, decimals: number = 0) => {
     return new Intl.NumberFormat('es-MX', {
@@ -79,6 +85,14 @@ const Plots = () => {
   const getAvailabilityPercentage = (available: number, total: number) => {
     return ((available / total) * 100).toFixed(1);
   };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center">Cargando parcelas...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-8">

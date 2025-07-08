@@ -311,6 +311,7 @@ const Admin = () => {
   const [newUserPlantationYear, setNewUserPlantationYear] = useState(new Date().getFullYear().toString());
   const [newUserHarvestYear, setNewUserHarvestYear] = useState((new Date().getFullYear() + 25).toString());
   const [selectedPlotForPhoto, setSelectedPlotForPhoto] = useState("");
+  const [plantPrices, setPlantPrices] = useState<any[]>([]);
   const [plots, setPlots] = useState<any[]>([]);
   const [notificationTitle, setNotificationTitle] = useState("");
   const [notificationMessage, setNotificationMessage] = useState("");
@@ -368,6 +369,73 @@ const Admin = () => {
       setPlots(data || []);
     } catch (error) {
       console.error('Error fetching plots:', error);
+    }
+  };
+
+  const fetchPlantPrices = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('plant_prices')
+        .select(`
+          *,
+          plant_species (name, scientific_name)
+        `)
+        .order('year', { ascending: false });
+
+      if (error) throw error;
+      setPlantPrices(data || []);
+    } catch (error) {
+      console.error('Error fetching plant prices:', error);
+    }
+  };
+
+  const deletePlot = async (plotId: string) => {
+    try {
+      const { error } = await supabase
+        .from('plots')
+        .delete()
+        .eq('id', plotId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Parcela eliminada",
+        description: "La parcela se eliminó correctamente"
+      });
+
+      fetchPlots();
+    } catch (error) {
+      console.error('Error deleting plot:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la parcela",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deletePlantPrice = async (priceId: string) => {
+    try {
+      const { error } = await supabase
+        .from('plant_prices')
+        .delete()
+        .eq('id', priceId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Precio eliminado",
+        description: "El precio se eliminó correctamente"
+      });
+
+      fetchPlantPrices();
+    } catch (error) {
+      console.error('Error deleting plant price:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el precio",
+        variant: "destructive"
+      });
     }
   };
 
@@ -458,20 +526,23 @@ const Admin = () => {
     }
 
     try {
-      // Crear usuario directamente en la tabla profiles
-      const tempUserId = crypto.randomUUID();
-      
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: tempUserId,
-          email: newUserEmail,
+      // Crear usuario usando Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: newUserEmail,
+        password: 'temp123456', // Contraseña temporal
+        email_confirm: true,
+        user_metadata: {
           name: newUserName,
-          role: 'investor',
-          account_balance: 0
-        });
+        }
+      });
 
-      if (profileError) throw profileError;
+      if (authError) throw authError;
+      
+      const userId = authData.user.id;
+
+      // El perfil se crea automáticamente por el trigger handle_new_user
+      // Esperamos un poco para que se complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Crear inversión si se especificaron datos
       if (newUserSpecies && newUserPlantCount !== "0") {
@@ -482,7 +553,7 @@ const Admin = () => {
         const { error: investmentError } = await supabase
           .from('investments')
           .insert({
-            user_id: tempUserId,
+            user_id: userId,
             species_id: newUserSpecies,
             plant_count: plantCount,
             price_per_plant: pricePerPlant,
@@ -499,13 +570,13 @@ const Admin = () => {
           await supabase
             .from('profiles')
             .update({ account_balance: totalAmount })
-            .eq('user_id', tempUserId);
+            .eq('user_id', userId);
         }
       }
 
       toast({
         title: "Usuario creado",
-        description: `Usuario ${newUserEmail} creado exitosamente`
+        description: `Usuario ${newUserEmail} creado exitosamente. Contraseña temporal: temp123456`
       });
 
       // Reset form
@@ -817,6 +888,7 @@ const Admin = () => {
       setPriceYear(new Date().getFullYear().toString());
       setPriceSpecies("");
       setPricePerPlant("");
+      fetchPlantPrices();
     } catch (error) {
       console.error('Error updating price:', error);
       toast({
@@ -1521,6 +1593,56 @@ const Admin = () => {
 
           <Card>
             <CardHeader>
+              <CardTitle>Parcelas Existentes</CardTitle>
+              <CardDescription>
+                Lista de todas las parcelas registradas en el sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Ubicación</TableHead>
+                      <TableHead>Área (ha)</TableHead>
+                      <TableHead>Total Plantas</TableHead>
+                      <TableHead>Disponibles</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {plots.map((plot) => (
+                      <TableRow key={plot.id}>
+                        <TableCell className="font-medium">{plot.name}</TableCell>
+                        <TableCell>{plot.location}</TableCell>
+                        <TableCell>{plot.area}</TableCell>
+                        <TableCell>{plot.total_plants}</TableCell>
+                        <TableCell>{plot.available_plants}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{plot.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => deletePlot(plot.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Gestión de Parcelas</CardTitle>
               <CardDescription>
                 Administra parcelas, fotos aéreas y geo-referenciación
@@ -1752,27 +1874,29 @@ const Admin = () => {
                   </div>
                   <div className="p-4">
                     <div className="grid gap-4">
-                      {plantSpecies.map((species) => (
-                        <div key={species.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border rounded-lg">
-                          <div className="flex-1 min-w-0 mb-2 lg:mb-0">
-                            <p className="font-medium truncate">{species.name}</p>
-                            <p className="text-sm text-muted-foreground truncate">{species.scientific_name}</p>
-                          </div>
-                          <div className="flex flex-col lg:flex-row gap-2 lg:gap-4">
-                            <div className="text-right">
-                              <p className="font-medium">$850.00 MXN</p>
-                              <p className="text-xs text-muted-foreground">2024</p>
+                      {plantPrices.length > 0 ? (
+                        plantPrices.map((price) => (
+                          <div key={price.id} className="flex flex-col lg:flex-row lg:items-center justify-between p-4 border rounded-lg">
+                            <div className="flex-1 min-w-0 mb-2 lg:mb-0">
+                              <p className="font-medium truncate">{(price as any).plant_species?.name}</p>
+                              <p className="text-sm text-muted-foreground truncate">{(price as any).plant_species?.scientific_name}</p>
                             </div>
-                            <div className="text-right">
-                              <p className="font-medium text-muted-foreground">$800.00 MXN</p>
-                              <p className="text-xs text-muted-foreground">2023</p>
+                            <div className="flex flex-col lg:flex-row gap-2 lg:gap-4">
+                              <div className="text-right">
+                                <p className="font-medium">${price.price_per_plant} MXN</p>
+                                <p className="text-xs text-muted-foreground">{price.year}</p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={() => deletePlantPrice(price.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <p className="text-center text-muted-foreground py-4">No hay precios registrados</p>
+                      )}
                     </div>
                   </div>
                 </div>
