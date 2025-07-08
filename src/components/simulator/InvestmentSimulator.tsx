@@ -6,6 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Calculator, TrendingUp, Clock, Leaf, Info } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 // Datos exactos del simulador según especificaciones
 const speciesData = {
@@ -56,11 +59,14 @@ interface InvestmentResults {
 }
 
 export const InvestmentSimulator: React.FC = () => {
+  const { user, profile } = useAuth();
+  const { toast } = useToast();
   const [selectedSpecies, setSelectedSpecies] = useState<string>('Espadín');
   const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [numberOfPlants, setNumberOfPlants] = useState<number>(200);
   const [selectedPricePerKg, setSelectedPricePerKg] = useState<number[]>([12]);
   const [weightPerPlant, setWeightPerPlant] = useState<number[]>([50]);
+  const [loading, setLoading] = useState(false);
 
   // Efecto para ajustar el peso cuando cambia la especie
   React.useEffect(() => {
@@ -124,6 +130,52 @@ export const InvestmentSimulator: React.FC = () => {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals
     }).format(num);
+  };
+
+  const handleProceedWithInvestment = async () => {
+    if (!user || !profile) {
+      toast({
+        title: "Acceso requerido",
+        description: "Debes iniciar sesión para proceder con la inversión",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await supabase.functions.invoke('send-investment-notification', {
+        body: {
+          userEmail: profile.email,
+          userName: profile.name || profile.email,
+          userPhone: profile.phone,
+          plantCount: numberOfPlants,
+          speciesName: selectedSpecies,
+          establishmentYear: parseInt(selectedYear),
+          totalInvestment: results.totalInvestment,
+          weightPerPlant: weightPerPlant[0],
+          pricePerKg: selectedPricePerKg[0]
+        }
+      });
+
+      if (response.error) {
+        throw response.error;
+      }
+
+      toast({
+        title: "Solicitud enviada",
+        description: "Hemos recibido tu interés en esta inversión. Nos pondremos en contacto contigo pronto.",
+      });
+    } catch (error) {
+      console.error('Error sending investment notification:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo enviar la solicitud. Intenta nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -393,13 +445,20 @@ export const InvestmentSimulator: React.FC = () => {
       <div className="text-center">
         <Button 
           size="lg" 
-          className="bg-gradient-agave hover:opacity-90 transition-all duration-300 animate-pulse-glow"
+          className="bg-gradient-agave hover:opacity-90 transition-all duration-300"
+          onClick={handleProceedWithInvestment}
+          disabled={loading}
         >
-          Proceder con esta Inversión
+          {loading ? 'Enviando solicitud...' : 'Proceder con esta Inversión'}
         </Button>
         <p className="text-sm text-muted-foreground mt-2">
           * Los cálculos son estimaciones basadas en condiciones promedio de cultivo
         </p>
+        {!user && (
+          <p className="text-sm text-amber-600 mt-2">
+            Inicia sesión para enviar tu solicitud de inversión
+          </p>
+        )}
       </div>
     </div>
   );

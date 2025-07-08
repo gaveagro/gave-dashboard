@@ -11,6 +11,7 @@ import Simulator from "./pages/Simulator";
 import Investments from "./pages/Investments";
 import Plots from "./pages/Plots";
 import Documents from "./pages/Documents";
+import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -33,6 +34,7 @@ const App = () => (
                 <Route path="/investments" element={<Investments />} />
                 <Route path="/plots" element={<Plots />} />
                 <Route path="/documents" element={<Documents />} />
+                <Route path="/profile" element={<Profile />} />
                 <Route path="/admin" element={<Admin />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

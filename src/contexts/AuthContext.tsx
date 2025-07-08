@@ -9,6 +9,8 @@ interface Profile {
   name: string | null;
   role: 'admin' | 'investor';
   account_balance: number;
+  phone?: string | null;
+  created_at?: string;
 }
 
 interface AuthContextType {

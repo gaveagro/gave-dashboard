@@ -286,6 +286,7 @@ export type Database = {
           email: string
           id: string
           name: string | null
+          phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
           user_id: string
@@ -296,6 +297,7 @@ export type Database = {
           email: string
           id?: string
           name?: string | null
+          phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           user_id: string
@@ -306,6 +308,7 @@ export type Database = {
           email?: string
           id?: string
           name?: string | null
+          phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           user_id?: string
@@ -323,6 +326,18 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      send_investment_notification: {
+        Args: {
+          user_email: string
+          user_name: string
+          user_phone: string
+          plant_count: number
+          species_name: string
+          establishment_year: number
+          total_investment: number
+        }
+        Returns: Json
       }
     }
     Enums: {

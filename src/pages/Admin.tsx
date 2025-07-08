@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users, DollarSign, Settings, Bell, Leaf, Edit, Plus, Trash2, Upload, MapPin, BarChart3 } from "lucide-react";
+import { Users, DollarSign, Settings, Bell, Leaf, Edit, Plus, Trash2, Upload, MapPin, BarChart3, FileText, Map } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 interface Profile {
   id: string;
@@ -996,7 +997,87 @@ const Admin = () => {
                       <span className="font-medium">{count} plantas</span>
                     </div>
                   ))}
-                </div>
+                 </div>
+               </CardContent>
+             </Card>
+
+             <Card>
+               <CardHeader>
+                 <CardTitle>Distribución de Plantas por Especie y Año</CardTitle>
+                 <CardDescription>
+                   Análisis detallado de la colocación de plantas invertidas
+                 </CardDescription>
+               </CardHeader>
+               <CardContent>
+                 {/* Datos para gráficos calculados inline */}
+                 {(() => {
+                   const speciesData = investments.reduce((acc: any[], inv) => {
+                     const existing = acc.find(item => item.name === inv.plant_species?.name);
+                     if (existing) {
+                       existing.value += inv.plant_count;
+                     } else {
+                       acc.push({
+                         name: inv.plant_species?.name || 'Desconocida',
+                         value: inv.plant_count
+                       });
+                     }
+                     return acc;
+                   }, []);
+
+                   const yearData = investments.reduce((acc: any[], inv) => {
+                     const existing = acc.find(item => item.name === inv.plantation_year.toString());
+                     if (existing) {
+                       existing.value += inv.plant_count;
+                     } else {
+                       acc.push({
+                         name: inv.plantation_year.toString(),
+                         value: inv.plant_count
+                       });
+                     }
+                     return acc;
+                   }, []);
+
+                   const COLORS = ['#059669', '#0d9488', '#0891b2', '#3b82f6', '#6366f1'];
+
+                   return (
+                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                       <div className="space-y-4">
+                         <h3 className="text-lg font-semibold text-center">Por Especies</h3>
+                         <div className="space-y-2">
+                           {speciesData.map((item, index) => (
+                             <div key={item.name} className="flex justify-between items-center">
+                               <div className="flex items-center gap-2">
+                                 <div 
+                                   className="w-3 h-3 rounded-full" 
+                                   style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                 />
+                                 <span>{item.name}</span>
+                               </div>
+                               <span className="font-medium">{item.value} plantas</span>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                       <div className="space-y-4">
+                         <h3 className="text-lg font-semibold text-center">Por Años</h3>
+                         <div className="space-y-2">
+                           {yearData.map((item, index) => (
+                             <div key={item.name} className="flex justify-between items-center">
+                               <div className="flex items-center gap-2">
+                                 <div 
+                                   className="w-3 h-3 rounded-full" 
+                                   style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                 />
+                                 <span>Año {item.name}</span>
+                               </div>
+                               <span className="font-medium">{item.value} plantas</span>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     </div>
+                   );
+                 })()}
               </CardContent>
             </Card>
           </div>
