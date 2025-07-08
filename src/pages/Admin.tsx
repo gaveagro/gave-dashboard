@@ -476,7 +476,7 @@ const Admin = () => {
 
       if (error) throw error;
 
-      // Enriquecer con datos de perfil
+      // Enriquecer con datos de perfil usando el estado de profiles
       const enrichedInvestments = investmentsData?.map(investment => {
         const userProfile = profiles.find(p => p.user_id === investment.user_id);
         return {
@@ -526,23 +526,28 @@ const Admin = () => {
     }
 
     try {
-      // Crear usuario usando Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Crear usuario usando signUp regular (no admin)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newUserEmail,
         password: 'temp123456', // Contraseña temporal
-        email_confirm: true,
-        user_metadata: {
-          name: newUserName,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            name: newUserName
+          }
         }
       });
 
       if (authError) throw authError;
       
-      const userId = authData.user.id;
+      const userId = authData.user?.id;
+      if (!userId) {
+        throw new Error('No se pudo obtener el ID del usuario');
+      }
 
       // El perfil se crea automáticamente por el trigger handle_new_user
       // Esperamos un poco para que se complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Crear inversión si se especificaron datos
       if (newUserSpecies && newUserPlantCount !== "0") {
@@ -576,7 +581,7 @@ const Admin = () => {
 
       toast({
         title: "Usuario creado",
-        description: `Usuario ${newUserEmail} creado exitosamente. Contraseña temporal: temp123456`
+        description: `Usuario ${newUserEmail} creado exitosamente. Debe confirmar su email para activar la cuenta.`
       });
 
       // Reset form
@@ -589,13 +594,16 @@ const Admin = () => {
       setNewUserPlantationYear(new Date().getFullYear().toString());
       setNewUserHarvestYear((new Date().getFullYear() + 25).toString());
       
-      fetchProfiles();
-      fetchAllInvestments();
+      // Actualizar datos después de crear el usuario
+      setTimeout(() => {
+        fetchProfiles();
+        fetchAllInvestments();
+      }, 3000);
     } catch (error) {
       console.error('Error creating user:', error);
       toast({
         title: "Error",
-        description: "No se pudo crear el usuario",
+        description: `No se pudo crear el usuario: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -869,15 +877,28 @@ const Admin = () => {
     try {
       const { error } = await supabase
         .from('plant_prices')
-        .upsert({
+        .insert({
           species_id: priceSpecies,
           year: parseInt(priceYear),
           price_per_plant: parseFloat(pricePerPlant)
-        }, {
-          onConflict: 'species_id,year'
         });
 
-      if (error) throw error;
+      if (error) {
+        // Si hay conflicto, intentar actualizar
+        if (error.code === '23505') {
+          const { error: updateError } = await supabase
+            .from('plant_prices')
+            .update({
+              price_per_plant: parseFloat(pricePerPlant)
+            })
+            .eq('species_id', priceSpecies)
+            .eq('year', parseInt(priceYear));
+          
+          if (updateError) throw updateError;
+        } else {
+          throw error;
+        }
+      }
 
       toast({
         title: "Precio actualizado",
@@ -893,7 +914,7 @@ const Admin = () => {
       console.error('Error updating price:', error);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el precio",
+        description: `No se pudo actualizar el precio: ${error.message}`,
         variant: "destructive"
       });
     }

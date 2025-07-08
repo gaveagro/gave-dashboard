@@ -37,13 +37,7 @@ const speciesData = {
 const carbonCapturePerHectarePerYear = { min: 30, max: 60 }; // toneladas CO₂
 const plantsPerHectare = 2500;
 
-const yearlyPrices = {
-  '2021': 450, // MXN por planta
-  '2022': 400,
-  '2023': 350,
-  '2024': 300,
-  '2025': 250
-};
+// Los precios ahora se cargan dinámicamente desde la base de datos
 
 interface InvestmentResults {
   totalInvestment: number;
@@ -67,6 +61,46 @@ export const InvestmentSimulator: React.FC = () => {
   const [selectedPricePerKg, setSelectedPricePerKg] = useState<number[]>([12]);
   const [weightPerPlant, setWeightPerPlant] = useState<number[]>([50]);
   const [loading, setLoading] = useState(false);
+  const [plantPrices, setPlantPrices] = useState<Record<string, number>>({});
+  const [plantSpeciesMap, setPlantSpeciesMap] = useState<Record<string, string>>({});
+  
+  // Cargar precios desde la base de datos
+  React.useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        const { data: pricesData } = await supabase
+          .from('plant_prices')
+          .select(`
+            *,
+            plant_species (name, scientific_name)
+          `);
+        
+        const { data: speciesData } = await supabase
+          .from('plant_species')
+          .select('*');
+
+        // Crear mapas de precios por año y especie
+        const priceMap: Record<string, number> = {};
+        const speciesMap: Record<string, string> = {};
+        
+        pricesData?.forEach(price => {
+          const key = `${price.plant_species.name}-${price.year}`;
+          priceMap[key] = price.price_per_plant;
+        });
+        
+        speciesData?.forEach(species => {
+          speciesMap[species.name] = species.id;
+        });
+
+        setPlantPrices(priceMap);
+        setPlantSpeciesMap(speciesMap);
+      } catch (error) {
+        console.error('Error fetching prices:', error);
+      }
+    };
+
+    fetchPrices();
+  }, []);
 
   // Efecto para ajustar el peso cuando cambia la especie
   React.useEffect(() => {
@@ -78,7 +112,8 @@ export const InvestmentSimulator: React.FC = () => {
   const results: InvestmentResults = useMemo(() => {
     // 1. Datos base
     const species = speciesData[selectedSpecies as keyof typeof speciesData];
-    const pricePerPlant = yearlyPrices[selectedYear as keyof typeof yearlyPrices];
+    const priceKey = `${selectedSpecies}-${selectedYear}`;
+    const pricePerPlant = plantPrices[priceKey] || 250; // fallback price
     const totalInvestment = numberOfPlants * pricePerPlant;
 
     // 2. Cálculo de rendimiento
@@ -114,7 +149,7 @@ export const InvestmentSimulator: React.FC = () => {
       maturationDate,
       avgWeightPerPlant
     };
-  }, [selectedSpecies, selectedYear, numberOfPlants, selectedPricePerKg, weightPerPlant]);
+  }, [selectedSpecies, selectedYear, numberOfPlants, selectedPricePerKg, weightPerPlant, plantPrices]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -234,11 +269,21 @@ export const InvestmentSimulator: React.FC = () => {
                   <SelectValue placeholder="Selecciona un año" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(yearlyPrices).map(([year, price]) => (
-                    <SelectItem key={year} value={year}>
-                      {year} - {formatCurrency(price)} por planta
-                    </SelectItem>
-                  ))}
+                  {Object.keys(plantPrices)
+                    .filter(key => key.startsWith(selectedSpecies + '-'))
+                    .map(key => {
+                      const year = key.split('-')[1];
+                      const price = plantPrices[key];
+                      return (
+                        <SelectItem key={year} value={year}>
+                          {year} - {formatCurrency(price)} por planta
+                        </SelectItem>
+                      );
+                    })
+                  }
+                  {Object.keys(plantPrices).filter(key => key.startsWith(selectedSpecies + '-')).length === 0 && (
+                    <SelectItem value="2025">2025 - $250 MXN por planta (precio por defecto)</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -321,7 +366,7 @@ export const InvestmentSimulator: React.FC = () => {
                 {formatCurrency(results.totalInvestment)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {formatNumber(numberOfPlants)} plantas × {formatCurrency(yearlyPrices[selectedYear as keyof typeof yearlyPrices])}
+                {formatNumber(numberOfPlants)} plantas × {formatCurrency(plantPrices[`${selectedSpecies}-${selectedYear}`] || 250)}
               </p>
             </CardContent>
           </Card>
