@@ -88,6 +88,11 @@ const Plots = () => {
     return Math.min(...plotInvestments.map(inv => inv.expected_harvest_year));
   };
 
+  const getPlantsEstablished = (plotId: string) => {
+    const plotInvestments = investments?.filter(inv => inv.plot_id === plotId) || [];
+    return plotInvestments.reduce((sum, inv) => sum + inv.plant_count, 0);
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
@@ -114,6 +119,7 @@ const Plots = () => {
           const recentPhotos = plotPhotos?.filter(photo => photo.plot_id === plot.id) || [];
           const plotProgress = getPlotProgress(plot.id);
           const nextHarvest = getNextHarvest(plot.id);
+          const plantsEstablished = getPlantsEstablished(plot.id);
           
           return (
             <Card key={plot.id} className="overflow-hidden">
@@ -140,8 +146,8 @@ const Plots = () => {
                     <p>{plot.area} hectáreas</p>
                   </div>
                   <div>
-                    <span className="font-medium">Plantas disponibles:</span>
-                    <p>{plot.available_plants.toLocaleString()} de {plot.total_plants.toLocaleString()}</p>
+                    <span className="font-medium">Plantas establecidas:</span>
+                    <p>{plantsEstablished.toLocaleString()} de {plot.total_plants.toLocaleString()}</p>
                   </div>
                 </div>
 
@@ -162,7 +168,7 @@ const Plots = () => {
                 )}
 
                 {/* Condiciones ambientales */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t">
                   {plot.temperature && (
                     <div className="flex items-center gap-2 text-sm">
                       <Thermometer className="h-4 w-4 text-orange-500" />
@@ -179,12 +185,6 @@ const Plots = () => {
                     <div className="flex items-center gap-2 text-sm">
                       <Mountain className="h-4 w-4 text-gray-500" />
                       <span>{plot.elevation}m</span>
-                    </div>
-                  )}
-                  {plot.soil_type && (
-                    <div className="text-sm">
-                      <span className="font-medium">Suelo:</span>
-                      <p>{plot.soil_type}</p>
                     </div>
                   )}
                 </div>

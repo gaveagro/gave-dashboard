@@ -16,7 +16,6 @@ import {
   Download, 
   Trash2, 
   Eye,
-  Camera,
   AlertCircle
 } from 'lucide-react';
 
@@ -29,23 +28,24 @@ const Documents = () => {
   const [documentType, setDocumentType] = useState('');
   const [documentName, setDocumentName] = useState('');
   const [contractType, setContractType] = useState('');
-  const [isDronePhoto, setIsDronePhoto] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents'],
     queryFn: async () => {
+      if (!user) return [];
+      
       let query = supabase.from('documents').select('*');
       
       if (!isAdmin) {
-        query = query.eq('user_id', user?.id);
+        query = query.eq('user_id', user.id);
       }
       
       const { data, error } = await query.order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data;
+      return data || [];
     },
     enabled: !!user
   });
@@ -60,30 +60,20 @@ const Documents = () => {
       return;
     }
 
-    // Solo admin puede subir fotos de dron
-    if (isDronePhoto && !isAdmin) {
-      toast({
-        title: "Error",
-        description: "Solo los administradores pueden subir fotos de dron",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setUploading(true);
     try {
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const bucketName = isDronePhoto ? 'drone-photos' : 'contracts';
-
+      
+      // Usar el bucket contracts para todos los documentos
       const { error: uploadError } = await supabase.storage
-        .from(bucketName)
+        .from('contracts')
         .upload(fileName, selectedFile);
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from(bucketName)
+        .from('contracts')
         .getPublicUrl(fileName);
 
       const { error: dbError } = await supabase
@@ -92,7 +82,7 @@ const Documents = () => {
           user_id: user.id,
           document_name: documentName,
           document_type: documentType,
-          contract_type: isDronePhoto ? null : contractType,
+          contract_type: documentType === 'contract' ? contractType : null,
           document_url: publicUrl,
           file_size: selectedFile.size,
           uploaded_by: user.id
@@ -102,7 +92,7 @@ const Documents = () => {
 
       toast({
         title: "Éxito",
-        description: `${isDronePhoto ? 'Foto' : 'Documento'} subido correctamente`
+        description: "Documento subido correctamente"
       });
 
       // Reset form
@@ -110,7 +100,6 @@ const Documents = () => {
       setDocumentType('');
       setDocumentName('');
       setContractType('');
-      setIsDronePhoto(false);
       
       // Refresh documents
       queryClient.invalidateQueries({ queryKey: ['documents'] });
@@ -128,22 +117,29 @@ const Documents = () => {
   };
 
   const handleDeleteDocument = async (documentId: string, documentUrl: string) => {
+    if (!isAdmin) {
+      toast({
+        title: "Error",
+        description: "Solo los administradores pueden eliminar documentos",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!confirm('¿Estás seguro de que deseas eliminar este documento?')) return;
 
     try {
       // Extract file path from URL
       const urlParts = documentUrl.split('/');
-      const bucketName = urlParts.includes('drone-photos') ? 'drone-photos' : 'contracts';
       const filePath = urlParts.slice(-2).join('/'); // Get last two parts (user_id/filename)
 
       // Delete from storage
       const { error: storageError } = await supabase.storage
-        .from(bucketName)
+        .from('contracts')
         .remove([filePath]);
 
       if (storageError) {
         console.error('Storage deletion error:', storageError);
-        // Continue with database deletion even if storage fails
       }
 
       // Delete from database
@@ -215,37 +211,13 @@ const Documents = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Subir {isDronePhoto ? 'Foto de Dron' : 'Documento'}
+            Subir Documento
           </CardTitle>
           <CardDescription>
-            {isDronePhoto ? 
-              'Sube fotos aéreas de las parcelas (solo administradores)' : 
-              'Sube contratos, identificaciones y otros documentos importantes'
-            }
+            Sube contratos, identificaciones y otros documentos importantes
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isAdmin && (
-            <div className="flex gap-4 mb-4">
-              <Button
-                variant={!isDronePhoto ? 'default' : 'outline'}
-                onClick={() => setIsDronePhoto(false)}
-                size="sm"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Documento
-              </Button>
-              <Button
-                variant={isDronePhoto ? 'default' : 'outline'}
-                onClick={() => setIsDronePhoto(true)}
-                size="sm"
-              >
-                <Camera className="h-4 w-4 mr-2" />
-                Foto de Dron
-              </Button>
-            </div>
-          )}
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="file">Archivo</Label>
@@ -253,7 +225,7 @@ const Documents = () => {
                 id="file"
                 type="file"
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                accept={isDronePhoto ? 'image/*' : '.pdf,.jpg,.jpeg,.png,.doc,.docx'}
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
               />
             </div>
 
@@ -263,7 +235,7 @@ const Documents = () => {
                 id="name"
                 value={documentName}
                 onChange={(e) => setDocumentName(e.target.value)}
-                placeholder={isDronePhoto ? "Ej: Parcela Norte - Enero 2024" : "Ej: Contrato de Inversión"}
+                placeholder="Ej: Contrato de Inversión"
               />
             </div>
 
@@ -274,26 +246,17 @@ const Documents = () => {
                   <SelectValue placeholder="Selecciona el tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {isDronePhoto ? (
-                    <>
-                      <SelectItem value="drone-photo">Foto de Dron</SelectItem>
-                      <SelectItem value="aerial-view">Vista Aérea</SelectItem>
-                      <SelectItem value="progress-photo">Foto de Progreso</SelectItem>
-                    </>
-                  ) : (
-                    <>
-                      <SelectItem value="contract">Contrato</SelectItem>
-                      <SelectItem value="identification">Identificación</SelectItem>
-                      <SelectItem value="tax-id">RFC/Identificación Fiscal</SelectItem>
-                      <SelectItem value="payment-proof">Comprobante de Pago</SelectItem>
-                      <SelectItem value="other">Otro</SelectItem>
-                    </>
-                  )}
+                  <SelectItem value="contract">Contrato</SelectItem>
+                  <SelectItem value="identification">Identificación</SelectItem>
+                  <SelectItem value="tax-id">RFC/Identificación Fiscal</SelectItem>
+                  <SelectItem value="payment-proof">Comprobante de Pago</SelectItem>
+                  {isAdmin && <SelectItem value="report">Reporte</SelectItem>}
+                  <SelectItem value="other">Otro</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {!isDronePhoto && documentType === 'contract' && (
+            {documentType === 'contract' && (
               <div className="space-y-2">
                 <Label htmlFor="contract-type">Tipo de Contrato</Label>
                 <Select value={contractType} onValueChange={setContractType}>
@@ -311,7 +274,7 @@ const Documents = () => {
           </div>
 
           <Button onClick={handleFileUpload} disabled={uploading || !selectedFile}>
-            {uploading ? 'Subiendo...' : `Subir ${isDronePhoto ? 'Foto' : 'Documento'}`}
+            {uploading ? 'Subiendo...' : 'Subir Documento'}
           </Button>
         </CardContent>
       </Card>
@@ -321,7 +284,7 @@ const Documents = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            {isDronePhoto ? 'Fotos de Dron' : 'Mis Documentos'}
+            Mis Documentos
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -331,11 +294,7 @@ const Documents = () => {
                 <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      {doc.document_type.includes('photo') || doc.document_type.includes('drone') ? (
-                        <Camera className="h-5 w-5 text-blue-500" />
-                      ) : (
-                        <FileText className="h-5 w-5 text-gray-500" />
-                      )}
+                      <FileText className="h-5 w-5 text-gray-500" />
                       <div>
                         <h4 className="font-medium">{doc.document_name}</h4>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">

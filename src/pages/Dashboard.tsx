@@ -16,7 +16,8 @@ import {
   Calculator,
   Users,
   TreePine,
-  DollarSign
+  DollarSign,
+  Plus
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -96,13 +97,19 @@ const Dashboard = () => {
     enabled: isAdmin,
   });
 
-  // Cálculos para usuarios
+  // Cálculos para usuarios con corrección del carbono capturado
   const userInvestments = investments?.filter(inv => inv.user_id === user?.id) || [];
   const totalPlants = userInvestments.reduce((sum, inv) => sum + inv.plant_count, 0);
   const totalInvested = userInvestments.reduce((sum, inv) => sum + inv.total_amount, 0);
+  
+  // Cálculo corregido del carbono capturado
   const totalCarbonCapture = userInvestments.reduce((sum, inv) => {
-    const species = plantSpecies?.find(s => s.id === inv.species_id);
-    return sum + (species?.carbon_capture_per_plant || 0) * inv.plant_count;
+    const currentYear = new Date().getFullYear();
+    const yearsSincePlanting = Math.max(0, currentYear - inv.plantation_year);
+    // 30 toneladas por hectárea por año, 2500 plantas por hectárea
+    const carbonPerPlantPerYear = 30 / 2500; // 0.012 toneladas por planta por año
+    const carbonCaptured = inv.plant_count * carbonPerPlantPerYear * yearsSincePlanting;
+    return sum + carbonCaptured;
   }, 0);
 
   // Próxima cosecha
@@ -194,10 +201,10 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-emerald-600">
-                {totalCarbonCapture.toFixed(1)} kg
+                {totalCarbonCapture.toFixed(1)} t
               </div>
               <p className="text-xs text-muted-foreground">
-                durante toda la vida
+                hasta la fecha
               </p>
             </CardContent>
           </Card>
@@ -291,6 +298,26 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Admin Quick Action for New Investment */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5" />
+              Acciones Rápidas de Administrador
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Link to="/admin">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Inversión
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Balance Section - Solo para Admin */}
       {isAdmin && (

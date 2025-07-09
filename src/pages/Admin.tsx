@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, Users, TreePine, Calendar, MapPin } from 'lucide-react';
+import { Edit, Trash2, Plus, Users, TreePine, Calendar, MapPin, Camera, Bell, Send } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -34,13 +34,28 @@ const Admin = () => {
   const [plantSpecies, setPlantSpecies] = useState<any[]>([]);
   const [selectedInvestment, setSelectedInvestment] = useState<any>(null);
   const [showInvestmentDialog, setShowInvestmentDialog] = useState(false);
+  const [showNewInvestmentDialog, setShowNewInvestmentDialog] = useState(false);
   const [showNewUserDialog, setShowNewUserDialog] = useState(false);
   const [showNewPlotDialog, setShowNewPlotDialog] = useState(false);
+  const [showNotificationDialog, setShowNotificationDialog] = useState(false);
+  const [showDronePhotoDialog, setShowDronePhotoDialog] = useState(false);
+  const [selectedPlotForPhoto, setSelectedPlotForPhoto] = useState<string>('');
+  const [dronePhotoFile, setDronePhotoFile] = useState<File | null>(null);
+  const [dronePhotoYear, setDronePhotoYear] = useState(new Date().getFullYear());
+  const [dronePhotoDescription, setDronePhotoDescription] = useState('');
   const [newUserData, setNewUserData] = useState({
     email: '',
-    name: '',
-    phone: '',
-    account_balance: 0
+    name: ''
+  });
+  const [newInvestmentData, setNewInvestmentData] = useState({
+    user_id: '',
+    species_id: '',
+    plant_count: 0,
+    plantation_year: new Date().getFullYear(),
+    expected_harvest_year: new Date().getFullYear() + 8,
+    price_per_plant: 0,
+    total_amount: 0,
+    plot_id: ''
   });
   const [newPlotData, setNewPlotData] = useState({
     name: '',
@@ -49,10 +64,15 @@ const Admin = () => {
     area: 0,
     total_plants: 0,
     available_plants: 0,
-    soil_type: '',
     temperature: '',
     rainfall: 0,
     elevation: 0
+  });
+  const [notificationData, setNotificationData] = useState({
+    user_id: '',
+    title: '',
+    message: '',
+    type: 'info'
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -212,9 +232,7 @@ const Admin = () => {
       const { error: profileError } = await supabase
         .from('profiles')
         .update({
-          name: newUserData.name,
-          phone: newUserData.phone,
-          account_balance: newUserData.account_balance
+          name: newUserData.name
         })
         .eq('user_id', authData.user.id);
 
@@ -226,7 +244,7 @@ const Admin = () => {
       });
 
       setShowNewUserDialog(false);
-      setNewUserData({ email: '', name: '', phone: '', account_balance: 0 });
+      setNewUserData({ email: '', name: '' });
       queryClient.invalidateQueries({ queryKey: ['user-profiles'] });
 
     } catch (error: any) {
@@ -234,6 +252,42 @@ const Admin = () => {
       toast({
         title: "Error",
         description: error.message || "Error al crear el usuario",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCreateInvestment = async () => {
+    try {
+      const { error } = await supabase
+        .from('investments')
+        .insert([newInvestmentData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Éxito",
+        description: "Inversión creada correctamente"
+      });
+
+      setShowNewInvestmentDialog(false);
+      setNewInvestmentData({
+        user_id: '',
+        species_id: '',
+        plant_count: 0,
+        plantation_year: new Date().getFullYear(),
+        expected_harvest_year: new Date().getFullYear() + 8,
+        price_per_plant: 0,
+        total_amount: 0,
+        plot_id: ''
+      });
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+
+    } catch (error: any) {
+      console.error('Error creating investment:', error);
+      toast({
+        title: "Error",
+        description: "Error al crear la inversión",
         variant: "destructive"
       });
     }
@@ -263,7 +317,6 @@ const Admin = () => {
         area: 0,
         total_plants: 0,
         available_plants: 0,
-        soil_type: '',
         temperature: '',
         rainfall: 0,
         elevation: 0
@@ -280,12 +333,98 @@ const Admin = () => {
     }
   };
 
+  const handleSendNotification = async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .insert([notificationData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Éxito",
+        description: "Notificación enviada correctamente"
+      });
+
+      setShowNotificationDialog(false);
+      setNotificationData({
+        user_id: '',
+        title: '',
+        message: '',
+        type: 'info'
+      });
+
+    } catch (error: any) {
+      console.error('Error sending notification:', error);
+      toast({
+        title: "Error",
+        description: "Error al enviar la notificación",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUploadDronePhoto = async () => {
+    if (!dronePhotoFile || !selectedPlotForPhoto) {
+      toast({
+        title: "Error",
+        description: "Por favor selecciona un archivo y una parcela",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const fileExt = dronePhotoFile.name.split('.').pop();
+      const fileName = `${selectedPlotForPhoto}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('drone-photos')
+        .upload(fileName, dronePhotoFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('drone-photos')
+        .getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase
+        .from('plot_photos')
+        .insert({
+          plot_id: selectedPlotForPhoto,
+          photo_url: publicUrl,
+          year: dronePhotoYear,
+          description: dronePhotoDescription
+        });
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Éxito",
+        description: "Foto subida correctamente"
+      });
+
+      setShowDronePhotoDialog(false);
+      setDronePhotoFile(null);
+      setSelectedPlotForPhoto('');
+      setDronePhotoDescription('');
+      queryClient.invalidateQueries({ queryKey: ['plot-photos'] });
+
+    } catch (error: any) {
+      console.error('Error uploading drone photo:', error);
+      toast({
+        title: "Error",
+        description: "Error al subir la foto",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Estadísticas para overview
   const totalInvestments = investments?.length || 0;
   const totalPlants = investments?.reduce((sum, inv) => sum + inv.plant_count, 0) || 0;
   const totalInvestmentAmount = investments?.reduce((sum, inv) => sum + inv.total_amount, 0) || 0;
   const speciesCount = new Set(investments?.map(inv => inv.species_id)).size;
-  const establishmentYears = new Set(investments?.map(inv => inv.plantation_year)).size;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -327,6 +466,13 @@ const Admin = () => {
         >
           <MapPin className="h-4 w-4 mr-2" />
           Parcelas
+        </Button>
+        <Button
+          variant={activeTab === 'notifications' ? 'default' : 'outline'}
+          onClick={() => setActiveTab('notifications')}
+        >
+          <Bell className="h-4 w-4 mr-2" />
+          Notificaciones
         </Button>
       </div>
 
@@ -460,8 +606,6 @@ const Admin = () => {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Teléfono</TableHead>
-                    <TableHead>Saldo</TableHead>
                     <TableHead>Rol</TableHead>
                     <TableHead>Fecha Registro</TableHead>
                   </TableRow>
@@ -471,8 +615,6 @@ const Admin = () => {
                     <TableRow key={profile.id}>
                       <TableCell className="font-medium">{profile.name || 'N/A'}</TableCell>
                       <TableCell>{profile.email}</TableCell>
-                      <TableCell>{profile.phone || 'N/A'}</TableCell>
-                      <TableCell>{formatCurrency(profile.account_balance || 0)}</TableCell>
                       <TableCell>
                         <Badge variant={profile.role === 'admin' ? 'default' : 'secondary'}>
                           {profile.role === 'admin' ? 'Admin' : 'Inversor'}
@@ -488,63 +630,20 @@ const Admin = () => {
         </Card>
       )}
 
-      {/* Plots Tab */}
-      {activeTab === 'plots' && (
+      {/* Investments Tab */}
+      {activeTab === 'investments' && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle>Gestión de Parcelas</CardTitle>
-                <CardDescription>Administra las parcelas y su información</CardDescription>
+                <CardTitle>Gestión de Inversiones</CardTitle>
+                <CardDescription>Administra las inversiones de los usuarios</CardDescription>
               </div>
-              <Button onClick={() => setShowNewPlotDialog(true)}>
+              <Button onClick={() => setShowNewInvestmentDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Nueva Parcela
+                Nueva Inversión
               </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre</TableHead>
-                    <TableHead>Ubicación</TableHead>
-                    <TableHead>Área (ha)</TableHead>
-                    <TableHead>Plantas Total</TableHead>
-                    <TableHead>Plantas Disponibles</TableHead>
-                    <TableHead>Estado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {plots?.map((plot) => (
-                    <TableRow key={plot.id}>
-                      <TableCell className="font-medium">{plot.name}</TableCell>
-                      <TableCell>{plot.location}</TableCell>
-                      <TableCell>{plot.area}</TableCell>
-                      <TableCell>{plot.total_plants.toLocaleString()}</TableCell>
-                      <TableCell>{plot.available_plants.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
-                          {plot.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeTab === 'investments' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Gestión de Inversiones</CardTitle>
-            <CardDescription>
-              Administra las inversiones de los usuarios
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -612,6 +711,85 @@ const Admin = () => {
                 </TableBody>
               </Table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Plots Tab */}
+      {activeTab === 'plots' && (
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Gestión de Parcelas</CardTitle>
+                <CardDescription>Administra las parcelas y su información</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => setShowDronePhotoDialog(true)} variant="outline">
+                  <Camera className="h-4 w-4 mr-2" />
+                  Subir Foto Dron
+                </Button>
+                <Button onClick={() => setShowNewPlotDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Parcela
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Ubicación</TableHead>
+                    <TableHead>Área (ha)</TableHead>
+                    <TableHead>Plantas Total</TableHead>
+                    <TableHead>Plantas Disponibles</TableHead>
+                    <TableHead>Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {plots?.map((plot) => (
+                    <TableRow key={plot.id}>
+                      <TableCell className="font-medium">{plot.name}</TableCell>
+                      <TableCell>{plot.location}</TableCell>
+                      <TableCell>{plot.area}</TableCell>
+                      <TableCell>{plot.total_plants.toLocaleString()}</TableCell>
+                      <TableCell>{plot.available_plants.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
+                          {plot.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Notifications Tab */}
+      {activeTab === 'notifications' && (
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Enviar Notificaciones</CardTitle>
+                <CardDescription>Envía notificaciones a usuarios específicos</CardDescription>
+              </div>
+              <Button onClick={() => setShowNotificationDialog(true)}>
+                <Send className="h-4 w-4 mr-2" />
+                Nueva Notificación
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Utiliza este panel para enviar notificaciones importantes a los usuarios del sistema.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -695,6 +873,7 @@ const Admin = () => {
         </Card>
       )}
 
+      {/* New User Dialog */}
       <Dialog open={showNewUserDialog} onOpenChange={setShowNewUserDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -722,25 +901,6 @@ const Admin = () => {
                 className="col-span-3" 
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phone" className="text-right">Teléfono</Label>
-              <Input 
-                id="phone" 
-                value={newUserData.phone}
-                onChange={(e) => setNewUserData({...newUserData, phone: e.target.value})}
-                className="col-span-3" 
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="balance" className="text-right">Saldo</Label>
-              <Input 
-                id="balance" 
-                type="number"
-                value={newUserData.account_balance}
-                onChange={(e) => setNewUserData({...newUserData, account_balance: parseFloat(e.target.value) || 0})}
-                className="col-span-3" 
-              />
-            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowNewUserDialog(false)}>
@@ -753,6 +913,180 @@ const Admin = () => {
         </DialogContent>
       </Dialog>
 
+      {/* New Investment Dialog */}
+      <Dialog open={showNewInvestmentDialog} onOpenChange={setShowNewInvestmentDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Inversión</DialogTitle>
+            <DialogDescription>
+              Agrega una nueva inversión al sistema.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {/* Investment form fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="investment-user">Usuario</Label>
+                <Select value={newInvestmentData.user_id} onValueChange={(value) => setNewInvestmentData({...newInvestmentData, user_id: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona usuario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(userProfiles).map((profile: any) => (
+                      <SelectItem key={profile.user_id} value={profile.user_id}>
+                        {profile.name || profile.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="investment-species">Especie</Label>
+                <Select value={newInvestmentData.species_id} onValueChange={(value) => setNewInvestmentData({...newInvestmentData, species_id: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona especie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {plantSpecies.map((species) => (
+                      <SelectItem key={species.id} value={species.id}>
+                        {species.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {/* Add more form fields as needed */}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowNewInvestmentDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateInvestment}>
+              Crear Inversión
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notification Dialog */}
+      <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Enviar Notificación</DialogTitle>
+            <DialogDescription>
+              Envía una notificación a un usuario específico.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="notification-user">Usuario</Label>
+              <Select value={notificationData.user_id} onValueChange={(value) => setNotificationData({...notificationData, user_id: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona usuario" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(userProfiles).map((profile: any) => (
+                    <SelectItem key={profile.user_id} value={profile.user_id}>
+                      {profile.name || profile.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notification-title">Título</Label>
+              <Input 
+                id="notification-title" 
+                value={notificationData.title}
+                onChange={(e) => setNotificationData({...notificationData, title: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notification-message">Mensaje</Label>
+              <Textarea 
+                id="notification-message" 
+                value={notificationData.message}
+                onChange={(e) => setNotificationData({...notificationData, message: e.target.value})}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowNotificationDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSendNotification}>
+              Enviar Notificación
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Drone Photo Dialog */}
+      <Dialog open={showDronePhotoDialog} onOpenChange={setShowDronePhotoDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Subir Foto de Dron</DialogTitle>
+            <DialogDescription>
+              Sube una foto aérea de una parcela específica.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="drone-plot">Parcela</Label>
+              <Select value={selectedPlotForPhoto} onValueChange={setSelectedPlotForPhoto}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona parcela" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plots?.map((plot) => (
+                    <SelectItem key={plot.id} value={plot.id}>
+                      {plot.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="drone-file">Archivo</Label>
+              <Input
+                id="drone-file"
+                type="file"
+                accept="image/*"
+                onChange={(e) => setDronePhotoFile(e.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="drone-year">Año</Label>
+              <Input 
+                id="drone-year" 
+                type="number"
+                value={dronePhotoYear}
+                onChange={(e) => setDronePhotoYear(parseInt(e.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="drone-description">Descripción</Label>
+              <Input 
+                id="drone-description" 
+                value={dronePhotoDescription}
+                onChange={(e) => setDronePhotoDescription(e.target.value)}
+                placeholder="Descripción opcional"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDronePhotoDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUploadDronePhoto}>
+              Subir Foto
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Plot Dialog */}
       <Dialog open={showNewPlotDialog} onOpenChange={setShowNewPlotDialog}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
@@ -870,6 +1204,7 @@ const Admin = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Investment Dialog */}
       <Dialog open={showInvestmentDialog} onOpenChange={setShowInvestmentDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
