@@ -13,6 +13,7 @@ import {
   User,
   Users,
   TrendingUp,
+  ClipboardList,
 } from "lucide-react"
 
 import {
@@ -57,7 +58,7 @@ const items = [
   {
     title: "Reportes",
     url: "/reports",
-    icon: Inbox,
+    icon: ClipboardList,
   },
   {
     title: "Simulador",
@@ -75,7 +76,7 @@ const adminItems = [
 ]
 
 export function AppSidebar() {
-  const { user, userProfile } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -84,7 +85,7 @@ export function AppSidebar() {
     navigate('/');
   };
 
-  const allItems = userProfile?.role === 'admin' ? [...items, ...adminItems] : items;
+  const allItems = profile?.role === 'admin' ? [...items, ...adminItems] : items;
 
   return (
     <Sidebar>
@@ -116,7 +117,7 @@ export function AppSidebar() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton>
-                  <User /> {userProfile?.name || user?.email}
+                  <User /> {profile?.name || user?.email}
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
