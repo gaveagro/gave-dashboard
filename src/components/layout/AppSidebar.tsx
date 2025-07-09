@@ -1,171 +1,139 @@
-import { NavLink, useLocation } from "react-router-dom";
+
+import {
+  Calendar,
+  ChevronUp,
+  Home,
+  Inbox,
+  Search,
+  Settings,
+  TreePine,
+  MapPin,
+  FileText,
+  Calculator,
+  User,
+  Users,
+  TrendingUp,
+} from "lucide-react"
+
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar";
-import { Calculator, TrendingUp, Leaf, Info, FileText, Settings } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+} from "@/components/ui/sidebar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { useAuth } from "@/contexts/AuthContext"
+import { supabase } from "@/integrations/supabase/client"
+import { useNavigate, useLocation } from "react-router-dom"
 
-const getNavigationItems = (t: any, isAdmin: boolean = false) => {
-  const items = [
-    {
-      title: t('nav.dashboard'),
-      url: "/",
-      icon: TrendingUp,
-      description: "Resumen de inversiones"
-    },
-    {
-      title: t('nav.simulator'),
-      url: "/simulator",
-      icon: Calculator,
-      description: "Simular nueva inversión"
-    },
-    {
-      title: t('nav.investments'),
-      url: "/investments",
-      icon: Leaf,
-      description: "Ver inversiones actuales"
-    },
-    {
-      title: t('nav.plots'),
-      url: "/plots",
-      icon: Info,
-      description: "Información de cultivos"
-    },
-    {
-      title: t('nav.documents'),
-      url: "/documents",
-      icon: FileText,
-      description: "Documentos y contratos"
-    }
-  ];
+// Menu items.
+const items = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: Home,
+  },
+  {
+    title: "Mis Inversiones",
+    url: "/investments",
+    icon: TrendingUp,
+  },
+  {
+    title: "Parcelas",
+    url: "/plots",
+    icon: MapPin,
+  },
+  {
+    title: "Documentos",
+    url: "/documents",
+    icon: FileText,
+  },
+  {
+    title: "Reportes",
+    url: "/reports",
+    icon: Inbox,
+  },
+  {
+    title: "Simulador",
+    url: "/simulator",
+    icon: Calculator,
+  },
+]
 
-  if (isAdmin) {
-    items.push({
-      title: t('nav.admin'),
-      url: "/admin",
-      icon: Settings,
-      description: "Panel administrativo"
-    });
-  }
-
-  return items;
-};
+const adminItems = [
+  {
+    title: "Panel Admin",
+    url: "/admin",
+    icon: Users,
+  },
+]
 
 export function AppSidebar() {
-  const { state } = useSidebar();
-  const { profile } = useAuth();
-  const { t } = useLanguage();
+  const { user, userProfile } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
-  const currentPath = location.pathname;
-  const isCollapsed = state === "collapsed";
-  
-  const navigationItems = getNavigationItems(t, profile?.role === 'admin');
 
-  const isActive = (path: string) => currentPath === path;
-  const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive 
-      ? "bg-primary/10 text-primary font-medium border-r-2 border-primary" 
-      : "hover:bg-muted/50 text-foreground";
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
+  const allItems = userProfile?.role === 'admin' ? [...items, ...adminItems] : items;
 
   return (
-    <Sidebar
-      className={`${isCollapsed ? "w-14" : "w-64"} border-r border-border bg-gradient-to-b from-background to-muted/20`}
-      collapsible="icon"
-    >
+    <Sidebar>
       <SidebarContent>
-        {/* Logo/Brand */}
-        <div className="p-4 border-b border-border">
-          {!isCollapsed ? (
-            <div className="flex items-center gap-3">
-              <img 
-                src="/lovable-uploads/18fae893-7739-4fe1-bd49-75690fca47bd.png" 
-                alt="Gavé Logo" 
-                className="w-8 h-6 object-contain"
-              />
-              <div className="space-y-1">
-                <h2 className="text-xl font-bold bg-gradient-agave bg-clip-text text-transparent">
-                  Gavé
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Agrotecnología
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-center">
-              <img 
-                src="/lovable-uploads/18fae893-7739-4fe1-bd49-75690fca47bd.png" 
-                alt="Gavé Logo" 
-                className="w-6 h-4 object-contain"
-              />
-            </div>
-          )}
-        </div>
-
         <SidebarGroup>
-          <SidebarGroupLabel>Navegación Principal</SidebarGroupLabel>
+          <SidebarGroupLabel>Aplicación</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => (
+              {allItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="h-4 w-4 flex-shrink-0" />
-                      {!isCollapsed && (
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">{item.title}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {item.description}
-                          </span>
-                        </div>
-                      )}
-                    </NavLink>
+                  <SidebarMenuButton 
+                    asChild
+                    isActive={location.pathname === item.url}
+                  >
+                    <a href={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* User Section */}
-        <div className="mt-auto p-4 border-t border-border">
-          {!isCollapsed ? (
-            <div className="space-y-2">
-              <div className="text-sm font-medium">
-                {profile?.name || 'Usuario'}
-                {profile?.role === 'admin' && (
-                  <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                    Admin
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {profile?.email}
-              </div>
-              <div className="text-xs text-primary font-medium">
-                Balance: ${profile?.account_balance?.toLocaleString() || '0'} MXN
-              </div>
-            </div>
-          ) : (
-            <div className="text-center">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
-                {(profile?.name || 'U').charAt(0).toUpperCase()}
-              </div>
-            </div>
-          )}
-        </div>
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton>
+                  <User /> {userProfile?.name || user?.email}
+                  <ChevronUp className="ml-auto" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" className="w-[--radix-popper-anchor-width]">
+                <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  <User />
+                  <span>Perfil</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <Settings />
+                  <span>Cerrar Sesión</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
-  );
+  )
 }
-
-export default AppSidebar;

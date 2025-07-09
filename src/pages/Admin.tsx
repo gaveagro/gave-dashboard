@@ -27,6 +27,7 @@ import { Edit, Trash2, Plus, Users, TreePine, Calendar, MapPin, Camera, Bell, Se
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -72,7 +73,8 @@ const Admin = () => {
     user_id: '',
     title: '',
     message: '',
-    type: 'info'
+    type: 'info',
+    send_to_all: false
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -216,36 +218,32 @@ const Admin = () => {
 
   const handleCreateUser = async () => {
     try {
-      // Create auth user first
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // First create the user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newUserData.email,
-        password: Math.random().toString(36).slice(-8), // Random password
-        email_confirm: true,
-        user_metadata: {
-          name: newUserData.name
+        password: Math.random().toString(36).slice(-8) + 'A1!', // Generate secure temporary password
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth`,
+          data: {
+            name: newUserData.name
+          }
         }
       });
 
       if (authError) throw authError;
 
-      // Update profile with additional data
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          name: newUserData.name
-        })
-        .eq('user_id', authData.user.id);
-
-      if (profileError) throw profileError;
-
       toast({
         title: "Éxito",
-        description: "Usuario creado correctamente"
+        description: "Usuario creado correctamente. Se ha enviado un email de confirmación."
       });
 
       setShowNewUserDialog(false);
       setNewUserData({ email: '', name: '' });
-      queryClient.invalidateQueries({ queryKey: ['user-profiles'] });
+      
+      // Refresh user profiles
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['user-profiles'] });
+      }, 2000);
 
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -259,9 +257,29 @@ const Admin = () => {
 
   const handleCreateInvestment = async () => {
     try {
+      // Calculate total amount based on plant count and price per plant
+      const calculatedTotal = newInvestmentData.plant_count * newInvestmentData.price_per_plant;
+      
+      // Determine expected harvest year based on species
+      const species = plantSpecies.find(s => s.id === newInvestmentData.species_id);
+      let maturationYears = 8; // default
+      if (species) {
+        if (species.name.toLowerCase().includes('atrovirens') || species.name.toLowerCase().includes('salmiana')) {
+          maturationYears = 7;
+        } else if (species.name.toLowerCase().includes('espadín')) {
+          maturationYears = 6;
+        }
+      }
+
+      const investmentToCreate = {
+        ...newInvestmentData,
+        total_amount: calculatedTotal,
+        expected_harvest_year: newInvestmentData.plantation_year + maturationYears
+      };
+
       const { error } = await supabase
         .from('investments')
-        .insert([newInvestmentData]);
+        .insert([investmentToCreate]);
 
       if (error) throw error;
 
@@ -335,11 +353,34 @@ const Admin = () => {
 
   const handleSendNotification = async () => {
     try {
-      const { error } = await supabase
-        .from('notifications')
-        .insert([notificationData]);
+      if (notificationData.send_to_all) {
+        // Send to all users
+        const userIds = Object.keys(userProfiles);
+        const notifications = userIds.map(userId => ({
+          user_id: userId,
+          title: notificationData.title,
+          message: notificationData.message,
+          type: notificationData.type
+        }));
 
-      if (error) throw error;
+        const { error } = await supabase
+          .from('notifications')
+          .insert(notifications);
+
+        if (error) throw error;
+      } else {
+        // Send to specific user
+        const { error } = await supabase
+          .from('notifications')
+          .insert([{
+            user_id: notificationData.user_id,
+            title: notificationData.title,
+            message: notificationData.message,
+            type: notificationData.type
+          }]);
+
+        if (error) throw error;
+      }
 
       toast({
         title: "Éxito",
@@ -351,7 +392,8 @@ const Admin = () => {
         user_id: '',
         title: '',
         message: '',
-        type: 'info'
+        type: 'info',
+        send_to_all: false
       });
 
     } catch (error: any) {
@@ -744,8 +786,7 @@ const Admin = () => {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Ubicación</TableHead>
                     <TableHead>Área (ha)</TableHead>
-                    <TableHead>Plantas Total</TableHead>
-                    <TableHead>Plantas Disponibles</TableHead>
+                    <TableHead>Plantas Establecidas</TableHead>
                     <TableHead>Estado</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -755,8 +796,7 @@ const Admin = () => {
                       <TableCell className="font-medium">{plot.name}</TableCell>
                       <TableCell>{plot.location}</TableCell>
                       <TableCell>{plot.area}</TableCell>
-                      <TableCell>{plot.total_plants.toLocaleString()}</TableCell>
-                      <TableCell>{plot.available_plants.toLocaleString()}</TableCell>
+                      <TableCell>{(plot.total_plants - plot.available_plants).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
                           {plot.status}
@@ -778,7 +818,7 @@ const Admin = () => {
             <div className="flex justify-between items-center">
               <div>
                 <CardTitle>Enviar Notificaciones</CardTitle>
-                <CardDescription>Envía notificaciones a usuarios específicos</CardDescription>
+                <CardDescription>Envía notificaciones a usuarios específicos o a todos</CardDescription>
               </div>
               <Button onClick={() => setShowNotificationDialog(true)}>
                 <Send className="h-4 w-4 mr-2" />
@@ -879,7 +919,7 @@ const Admin = () => {
           <DialogHeader>
             <DialogTitle>Crear Nuevo Usuario</DialogTitle>
             <DialogDescription>
-              Crea un nuevo usuario en el sistema.
+              Crea un nuevo usuario en el sistema. El usuario recibirá un email para establecer su contraseña.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -887,6 +927,7 @@ const Admin = () => {
               <Label htmlFor="email" className="text-right">Email</Label>
               <Input 
                 id="email" 
+                type="email"
                 value={newUserData.email}
                 onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
                 className="col-span-3" 
@@ -923,7 +964,6 @@ const Admin = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {/* Investment form fields */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="investment-user">Usuario</Label>
@@ -956,7 +996,56 @@ const Admin = () => {
                 </Select>
               </div>
             </div>
-            {/* Add more form fields as needed */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="plant-count">Cantidad de Plantas</Label>
+                <Input 
+                  id="plant-count" 
+                  type="number"
+                  value={newInvestmentData.plant_count}
+                  onChange={(e) => setNewInvestmentData({...newInvestmentData, plant_count: parseInt(e.target.value) || 0})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price-per-plant">Precio por Planta</Label>
+                <Input 
+                  id="price-per-plant" 
+                  type="number"
+                  step="0.01"
+                  value={newInvestmentData.price_per_plant}
+                  onChange={(e) => setNewInvestmentData({...newInvestmentData, price_per_plant: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="plantation-year">Año de Establecimiento</Label>
+                <Input 
+                  id="plantation-year" 
+                  type="number"
+                  value={newInvestmentData.plantation_year}
+                  onChange={(e) => setNewInvestmentData({...newInvestmentData, plantation_year: parseInt(e.target.value) || new Date().getFullYear()})}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="investment-plot">Parcela (Opcional)</Label>
+              <Select value={newInvestmentData.plot_id} onValueChange={(value) => setNewInvestmentData({...newInvestmentData, plot_id: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona parcela" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plots?.map((plot) => (
+                    <SelectItem key={plot.id} value={plot.id}>
+                      {plot.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="p-3 bg-muted rounded">
+              <p className="text-sm">
+                <strong>Inversión Total:</strong> {formatCurrency(newInvestmentData.plant_count * newInvestmentData.price_per_plant)}
+              </p>
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowNewInvestmentDialog(false)}>
@@ -975,25 +1064,37 @@ const Admin = () => {
           <DialogHeader>
             <DialogTitle>Enviar Notificación</DialogTitle>
             <DialogDescription>
-              Envía una notificación a un usuario específico.
+              Envía una notificación a un usuario específico o a todos los usuarios.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="notification-user">Usuario</Label>
-              <Select value={notificationData.user_id} onValueChange={(value) => setNotificationData({...notificationData, user_id: value})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona usuario" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(userProfiles).map((profile: any) => (
-                    <SelectItem key={profile.user_id} value={profile.user_id}>
-                      {profile.name || profile.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="send-to-all" 
+                checked={notificationData.send_to_all}
+                onCheckedChange={(checked) => setNotificationData({...notificationData, send_to_all: checked === true})}
+              />
+              <Label htmlFor="send-to-all">Enviar a todos los usuarios</Label>
             </div>
+            
+            {!notificationData.send_to_all && (
+              <div className="space-y-2">
+                <Label htmlFor="notification-user">Usuario</Label>
+                <Select value={notificationData.user_id} onValueChange={(value) => setNotificationData({...notificationData, user_id: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona usuario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(userProfiles).map((profile: any) => (
+                      <SelectItem key={profile.user_id} value={profile.user_id}>
+                        {profile.name || profile.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
             <div className="space-y-2">
               <Label htmlFor="notification-title">Título</Label>
               <Input 
@@ -1009,6 +1110,20 @@ const Admin = () => {
                 value={notificationData.message}
                 onChange={(e) => setNotificationData({...notificationData, message: e.target.value})}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notification-type">Tipo</Label>
+              <Select value={notificationData.type} onValueChange={(value) => setNotificationData({...notificationData, type: value})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="info">Información</SelectItem>
+                  <SelectItem value="warning">Advertencia</SelectItem>
+                  <SelectItem value="success">Éxito</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -1155,14 +1270,6 @@ const Admin = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="plot-soil">Tipo de Suelo</Label>
-                <Input 
-                  id="plot-soil" 
-                  value={newPlotData.soil_type}
-                  onChange={(e) => setNewPlotData({...newPlotData, soil_type: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="plot-temperature">Temperatura</Label>
                 <Input 
                   id="plot-temperature" 
@@ -1171,8 +1278,6 @@ const Admin = () => {
                   onChange={(e) => setNewPlotData({...newPlotData, temperature: e.target.value})}
                 />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="plot-rainfall">Precipitación (mm)</Label>
                 <Input 
@@ -1182,15 +1287,15 @@ const Admin = () => {
                   onChange={(e) => setNewPlotData({...newPlotData, rainfall: parseInt(e.target.value) || 0})}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="plot-elevation">Elevación (m)</Label>
-                <Input 
-                  id="plot-elevation" 
-                  type="number"
-                  value={newPlotData.elevation}
-                  onChange={(e) => setNewPlotData({...newPlotData, elevation: parseInt(e.target.value) || 0})}
-                />
-              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="plot-elevation">Elevación (m)</Label>
+              <Input 
+                id="plot-elevation" 
+                type="number"
+                value={newPlotData.elevation}
+                onChange={(e) => setNewPlotData({...newPlotData, elevation: parseInt(e.target.value) || 0})}
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2">

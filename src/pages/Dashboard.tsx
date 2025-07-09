@@ -1,121 +1,141 @@
 
-import React from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { 
-  Leaf, 
-  TrendingUp, 
-  Calendar, 
-  MapPin,
-  ExternalLink,
-  Bell,
-  FileText,
-  Calculator,
-  Users,
-  TreePine,
-  DollarSign,
-  Plus
-} from 'lucide-react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { TreePine, Coins, Leaf, Calendar, Plus } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
 
 const Dashboard = () => {
-  const { user, profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [showInvestmentRequestDialog, setShowInvestmentRequestDialog] = useState(false);
+  const [requestData, setRequestData] = useState({
+    user_name: '',
+    user_email: user?.email || '',
+    user_phone: '',
+    plant_count: 0,
+    species_name: '',
+    establishment_year: new Date().getFullYear(),
+    total_investment: 0,
+    weight_per_plant: 0,
+    price_per_kg: 0
+  });
 
+  // Fetch user's investments
   const { data: investments } = useQuery({
-    queryKey: ['investments', user?.id],
+    queryKey: ['user-investments', user?.id],
     queryFn: async () => {
-      if (!user) return null;
-      let query = supabase.from('investments').select('*');
+      if (!user?.id) return [];
       
-      if (!isAdmin) {
-        query = query.eq('user_id', user.id);
-      }
+      const { data, error } = await supabase
+        .from('investments')
+        .select(`
+          *,
+          plant_species (
+            name,
+            maturation_years
+          )
+        `)
+        .eq('user_id', user.id);
       
-      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!user,
+    enabled: !!user?.id,
   });
 
+  // Fetch plant species for the request form
   const { data: plantSpecies } = useQuery({
     queryKey: ['plant-species'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plant_species')
         .select('*');
+      
       if (error) throw error;
       return data;
     },
   });
 
-  const { data: notifications } = useQuery({
-    queryKey: ['notifications', user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  const unreadNotifications = notifications?.filter(n => !n.read);
-
-  const { data: userProfiles } = useQuery({
-    queryKey: ['user-profiles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*');
-      if (error) throw error;
-      return data;
-    },
-    enabled: isAdmin,
-  });
-
-  const { data: investmentRequests } = useQuery({
-    queryKey: ['investment-requests'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+  const handleSubmitRequest = async () => {
+    try {
+      const { error } = await supabase
         .from('investment_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .insert([{
+          user_id: user?.id,
+          ...requestData
+        }]);
+
       if (error) throw error;
-      return data;
-    },
-    enabled: isAdmin,
-  });
 
-  // Cálculos para usuarios con corrección del carbono capturado
-  const userInvestments = investments?.filter(inv => inv.user_id === user?.id) || [];
-  const totalPlants = userInvestments.reduce((sum, inv) => sum + inv.plant_count, 0);
-  const totalInvested = userInvestments.reduce((sum, inv) => sum + inv.total_amount, 0);
+      // Send notification email
+      await supabase.functions.invoke('send-investment-notification', {
+        body: requestData
+      });
+
+      toast({
+        title: "Solicitud enviada",
+        description: "Tu solicitud de inversión ha sido enviada correctamente"
+      });
+
+      setShowInvestmentRequestDialog(false);
+      setRequestData({
+        user_name: '',
+        user_email: user?.email || '',
+        user_phone: '',
+        plant_count: 0,
+        species_name: '',
+        establishment_year: new Date().getFullYear(),
+        total_investment: 0,
+        weight_per_plant: 0,
+        price_per_kg: 0
+      });
+
+    } catch (error: any) {
+      console.error('Error submitting request:', error);
+      toast({
+        title: "Error",
+        description: "Error al enviar la solicitud",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Calculate statistics
+  const totalPlants = investments?.reduce((sum, inv) => sum + inv.plant_count, 0) || 0;
+  const totalInvestment = investments?.reduce((sum, inv) => sum + inv.total_amount, 0) || 0;
   
-  // Cálculo corregido del carbono capturado
-  const totalCarbonCapture = userInvestments.reduce((sum, inv) => {
-    const currentYear = new Date().getFullYear();
-    const yearsSincePlanting = Math.max(0, currentYear - inv.plantation_year);
-    // 30 toneladas por hectárea por año, 2500 plantas por hectárea
-    const carbonPerPlantPerYear = 30 / 2500; // 0.012 toneladas por planta por año
-    const carbonCaptured = inv.plant_count * carbonPerPlantPerYear * yearsSincePlanting;
-    return sum + carbonCaptured;
-  }, 0);
+  // Calculate CO2 captured: 30 tons per hectare per year, 2500 plants per hectare
+  // So each plant captures: 30/2500 = 0.012 tons per year = 12 kg per year
+  const currentYear = new Date().getFullYear();
+  const totalCO2Captured = investments?.reduce((sum, inv) => {
+    const yearsGrown = Math.max(0, currentYear - inv.plantation_year);
+    const co2PerPlantPerYear = 12; // kg per plant per year
+    return sum + (inv.plant_count * co2PerPlantPerYear * yearsGrown);
+  }, 0) || 0;
 
-  // Próxima cosecha
-  const nextHarvest = userInvestments.reduce((earliest, inv) => {
-    return !earliest || inv.expected_harvest_year < earliest ? inv.expected_harvest_year : earliest;
-  }, null as number | null);
+  // Find next harvest
+  const nextHarvest = investments?.reduce((closest, inv) => {
+    if (!closest || inv.expected_harvest_year < closest.expected_harvest_year) {
+      return inv;
+    }
+    return closest;
+  }, null as any);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -126,317 +146,231 @@ const Dashboard = () => {
     }).format(amount);
   };
 
-  if (!user || !profile) {
-    return (
-      <div className="container mx-auto py-6">
-        <Card>
-          <CardContent className="pt-6">
-            <p>Por favor, inicia sesión para acceder al dashboard.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">
-            Bienvenido, {profile.name || profile.email}
-          </h1>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            {isAdmin ? 'Panel de Administración' : 'Panel de Inversiones'}
+            Bienvenido a tu panel de inversiones forestales
           </p>
         </div>
-        <Badge variant={isAdmin ? 'default' : 'secondary'}>
-          {isAdmin ? 'Administrador' : 'Inversionista'}
-        </Badge>
+        <Button onClick={() => setShowInvestmentRequestDialog(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nueva Inversión
+        </Button>
       </div>
 
-      {/* User Investment Summary - Solo para usuarios */}
-      {!isAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <TreePine className="h-4 w-4 text-green-600" />
-                Mis Plantas
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {totalPlants.toLocaleString()}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                plantas establecidas
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-blue-600" />
-                Inversión Total
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {formatCurrency(totalInvested)}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                invertido hasta ahora
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Leaf className="h-4 w-4 text-emerald-600" />
-                CO2 Capturado
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">
-                {totalCarbonCapture.toFixed(1)} t
-              </div>
-              <p className="text-xs text-muted-foreground">
-                hasta la fecha
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-orange-600" />
-                Próxima Cosecha
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {nextHarvest || 'N/A'}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                año estimado
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Calculator className="h-8 w-8 text-primary" />
-              <div>
-                <h3 className="font-semibold">Simulador</h3>
-                <p className="text-sm text-muted-foreground">Calcula tu inversión</p>
-              </div>
-            </div>
-            <Link to="/simulator">
-              <Button className="w-full mt-3" size="sm">
-                Simular Inversión
-              </Button>
-            </Link>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Plantas Totales
+            </CardTitle>
+            <TreePine className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalPlants.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">
+              plantas establecidas
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <TrendingUp className="h-8 w-8 text-emerald-600" />
-              <div>
-                <h3 className="font-semibold">Mis Inversiones</h3>
-                <p className="text-sm text-muted-foreground">Ver portafolio</p>
-              </div>
-            </div>
-            <Link to="/investments">
-              <Button className="w-full mt-3" size="sm" variant="outline">
-                Ver Inversiones
-              </Button>
-            </Link>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Inversión Total
+            </CardTitle>
+            <Coins className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalInvestment)}</div>
+            <p className="text-xs text-muted-foreground">
+              invertido hasta la fecha
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-blue-600" />
-              <div>
-                <h3 className="font-semibold">Documentos</h3>
-                <p className="text-sm text-muted-foreground">Contratos y docs</p>
-              </div>
-            </div>
-            <Link to="/documents">
-              <Button className="w-full mt-3" size="sm" variant="outline">
-                Ver Documentos
-              </Button>
-            </Link>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              CO₂ Secuestrado
+            </CardTitle>
+            <Leaf className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCO2Captured.toLocaleString()} kg</div>
+            <p className="text-xs text-muted-foreground">
+              hasta la fecha
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <MapPin className="h-8 w-8 text-orange-600" />
-              <div>
-                <h3 className="font-semibold">Parcelas</h3>
-                <p className="text-sm text-muted-foreground">Ubicaciones</p>
-              </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Próxima Cosecha
+            </CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {nextHarvest ? nextHarvest.expected_harvest_year : 'N/A'}
             </div>
-            <Link to="/plots">
-              <Button className="w-full mt-3" size="sm" variant="outline">
-                Ver Parcelas
-              </Button>
-            </Link>
+            <p className="text-xs text-muted-foreground">
+              {nextHarvest ? `${nextHarvest.plant_count.toLocaleString()} plantas` : 'Sin inversiones'}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Admin Quick Action for New Investment */}
-      {isAdmin && (
+      {/* Investments Progress */}
+      {investments && investments.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Acciones Rápidas de Administrador
-            </CardTitle>
+            <CardTitle>Progreso de Inversiones</CardTitle>
+            <CardDescription>
+              Estado de maduración de tus plantas por especie
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link to="/admin">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Inversión
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Balance Section - Solo para Admin */}
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Resumen Administrativo
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-emerald-50 rounded-lg">
-                <p className="text-2xl font-bold text-emerald-600">
-                  {investments?.length || 0}
-                </p>
-                <p className="text-sm text-muted-foreground">Inversiones Activas</p>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">
-                  {investmentRequests?.length || 0}
-                </p>
-                <p className="text-sm text-muted-foreground">Solicitudes Pendientes</p>
-              </div>
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <p className="text-2xl font-bold text-orange-600">
-                  {userProfiles?.length || 0}
-                </p>
-                <p className="text-sm text-muted-foreground">Usuarios Registrados</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Notifications */}
-      {unreadNotifications && unreadNotifications.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notificaciones Recientes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {unreadNotifications.slice(0, 3).map((notification) => (
-              <div key={notification.id} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                <div className="flex-1">
-                  <h4 className="font-medium">{notification.title}</h4>
-                  <p className="text-sm text-muted-foreground">{notification.message}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {new Date(notification.created_at).toLocaleDateString('es-MX')}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Recent Investments - Para usuarios */}
-      {!isAdmin && userInvestments && userInvestments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Mis Inversiones Recientes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {userInvestments.slice(0, 3).map((investment) => {
-                const species = plantSpecies?.find(s => s.id === investment.species_id);
-                const currentYear = new Date().getFullYear();
-                const maturationProgress = species ? 
-                  Math.min(100, ((currentYear - investment.plantation_year) / species.maturation_years) * 100) : 0;
-
-                return (
-                  <div key={investment.id} className="p-4 border rounded-lg space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium">
-                          {species?.name || 'Especie desconocida'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {investment.plant_count.toLocaleString()} plantas • Plantado en {investment.plantation_year}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">
-                          {formatCurrency(investment.total_amount)}
-                        </p>
-                        <Badge variant={
-                          investment.status === 'active' ? 'default' :
-                          investment.status === 'pending' ? 'secondary' :
-                          'outline'
-                        }>
-                          {investment.status === 'active' ? 'Activa' :
-                           investment.status === 'pending' ? 'Pendiente' :
-                           'Completada'}
-                        </Badge>
-                      </div>
+          <CardContent className="space-y-6">
+            {investments.map((investment) => {
+              const yearsGrown = currentYear - investment.plantation_year;
+              const maturationYears = investment.plant_species?.maturation_years || 8;
+              const progress = Math.min((yearsGrown / maturationYears) * 100, 100);
+              
+              return (
+                <div key={investment.id} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="font-medium">{investment.plant_species?.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {investment.plant_count.toLocaleString()} plantas • Establecido en {investment.plantation_year}
+                      </p>
                     </div>
-                    
-                    {/* Barra de progreso hacia la madurez */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progreso hacia cosecha</span>
-                        <span>{maturationProgress.toFixed(0)}%</span>
-                      </div>
-                      <Progress value={maturationProgress} className="h-2" />
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{Math.round(progress)}%</p>
                       <p className="text-xs text-muted-foreground">
-                        Cosecha estimada: {investment.expected_harvest_year}
+                        {yearsGrown} de {maturationYears} años
                       </p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                  <Progress value={progress} className="h-2" />
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}
+
+      {/* Investment Request Dialog */}
+      <Dialog open={showInvestmentRequestDialog} onOpenChange={setShowInvestmentRequestDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Solicitar Nueva Inversión</DialogTitle>
+            <DialogDescription>
+              Envía una solicitud para una nueva inversión forestal. Nuestro equipo revisará tu solicitud y se pondrá en contacto contigo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="user-name">Nombre completo</Label>
+                <Input 
+                  id="user-name" 
+                  value={requestData.user_name}
+                  onChange={(e) => setRequestData({...requestData, user_name: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="user-phone">Teléfono</Label>
+                <Input 
+                  id="user-phone" 
+                  value={requestData.user_phone}
+                  onChange={(e) => setRequestData({...requestData, user_phone: e.target.value})}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="species">Especie</Label>
+              <Select value={requestData.species_name} onValueChange={(value) => setRequestData({...requestData, species_name: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una especie" />
+                </SelectTrigger>
+                <SelectContent>
+                  {plantSpecies?.map((species) => (
+                    <SelectItem key={species.id} value={species.name}>
+                      {species.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="plant-count">Cantidad de plantas</Label>
+                <Input 
+                  id="plant-count" 
+                  type="number"
+                  value={requestData.plant_count}
+                  onChange={(e) => setRequestData({...requestData, plant_count: parseInt(e.target.value) || 0})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="establishment-year">Año de establecimiento</Label>
+                <Input 
+                  id="establishment-year" 
+                  type="number"
+                  value={requestData.establishment_year}
+                  onChange={(e) => setRequestData({...requestData, establishment_year: parseInt(e.target.value) || new Date().getFullYear()})}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="weight-per-plant">Peso por planta (kg)</Label>
+                <Input 
+                  id="weight-per-plant" 
+                  type="number"
+                  step="0.01"
+                  value={requestData.weight_per_plant}
+                  onChange={(e) => setRequestData({...requestData, weight_per_plant: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price-per-kg">Precio por kg</Label>
+                <Input 
+                  id="price-per-kg" 
+                  type="number"
+                  step="0.01"
+                  value={requestData.price_per_kg}
+                  onChange={(e) => setRequestData({...requestData, price_per_kg: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="total-investment">Inversión total</Label>
+                <Input 
+                  id="total-investment" 
+                  type="number"
+                  step="0.01"
+                  value={requestData.total_investment}
+                  onChange={(e) => setRequestData({...requestData, total_investment: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowInvestmentRequestDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmitRequest}>
+              Enviar Solicitud
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
