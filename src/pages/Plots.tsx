@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { MapPin, ExternalLink, Camera, Thermometer, Droplets, Mountain } from 'lucide-react';
 
 const Plots = () => {
@@ -34,11 +35,57 @@ const Plots = () => {
     }
   });
 
+  const { data: investments } = useQuery({
+    queryKey: ['investments-plots'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('investments')
+        .select('*');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: plantSpecies } = useQuery({
+    queryKey: ['plant-species-plots'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plant_species')
+        .select('*');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const openInGoogleMaps = (coordinates: string) => {
-    // Asumiendo que las coordenadas están en formato "lat,lng"
     const cleanCoords = coordinates.replace(/[^\d.,-]/g, '');
     const url = `https://www.google.com/maps?q=${cleanCoords}`;
     window.open(url, '_blank');
+  };
+
+  const getPlotProgress = (plotId: string) => {
+    const plotInvestments = investments?.filter(inv => inv.plot_id === plotId) || [];
+    if (plotInvestments.length === 0) return 0;
+
+    const currentYear = new Date().getFullYear();
+    const totalProgress = plotInvestments.reduce((sum, inv) => {
+      const species = plantSpecies?.find(s => s.id === inv.species_id);
+      if (!species) return sum;
+      
+      const progress = Math.min(100, ((currentYear - inv.plantation_year) / species.maturation_years) * 100);
+      return sum + progress;
+    }, 0);
+
+    return Math.round(totalProgress / plotInvestments.length);
+  };
+
+  const getNextHarvest = (plotId: string) => {
+    const plotInvestments = investments?.filter(inv => inv.plot_id === plotId) || [];
+    if (plotInvestments.length === 0) return null;
+
+    return Math.min(...plotInvestments.map(inv => inv.expected_harvest_year));
   };
 
   if (isLoading) {
@@ -65,6 +112,8 @@ const Plots = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {plots?.map((plot) => {
           const recentPhotos = plotPhotos?.filter(photo => photo.plot_id === plot.id) || [];
+          const plotProgress = getPlotProgress(plot.id);
+          const nextHarvest = getNextHarvest(plot.id);
           
           return (
             <Card key={plot.id} className="overflow-hidden">
@@ -95,6 +144,22 @@ const Plots = () => {
                     <p>{plot.available_plants.toLocaleString()} de {plot.total_plants.toLocaleString()}</p>
                   </div>
                 </div>
+
+                {/* Progreso hacia la madurez */}
+                {plotProgress > 0 && (
+                  <div className="space-y-2 pt-3 border-t">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="font-medium">Progreso hacia cosecha</span>
+                      <span>{plotProgress}%</span>
+                    </div>
+                    <Progress value={plotProgress} className="h-2" />
+                    {nextHarvest && (
+                      <p className="text-xs text-muted-foreground">
+                        Próxima cosecha estimada: {nextHarvest}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Condiciones ambientales */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t">

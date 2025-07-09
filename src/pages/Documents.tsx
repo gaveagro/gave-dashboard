@@ -60,6 +60,16 @@ const Documents = () => {
       return;
     }
 
+    // Solo admin puede subir fotos de dron
+    if (isDronePhoto && !isAdmin) {
+      toast({
+        title: "Error",
+        description: "Solo los administradores pueden subir fotos de dron",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setUploading(true);
     try {
       const fileExt = selectedFile.name.split('.').pop();
@@ -209,30 +219,32 @@ const Documents = () => {
           </CardTitle>
           <CardDescription>
             {isDronePhoto ? 
-              'Sube fotos aéreas de las parcelas' : 
+              'Sube fotos aéreas de las parcelas (solo administradores)' : 
               'Sube contratos, identificaciones y otros documentos importantes'
             }
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-4 mb-4">
-            <Button
-              variant={!isDronePhoto ? 'default' : 'outline'}
-              onClick={() => setIsDronePhoto(false)}
-              size="sm"
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Documento
-            </Button>
-            <Button
-              variant={isDronePhoto ? 'default' : 'outline'}
-              onClick={() => setIsDronePhoto(true)}
-              size="sm"
-            >
-              <Camera className="h-4 w-4 mr-2" />
-              Foto de Dron
-            </Button>
-          </div>
+          {isAdmin && (
+            <div className="flex gap-4 mb-4">
+              <Button
+                variant={!isDronePhoto ? 'default' : 'outline'}
+                onClick={() => setIsDronePhoto(false)}
+                size="sm"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Documento
+              </Button>
+              <Button
+                variant={isDronePhoto ? 'default' : 'outline'}
+                onClick={() => setIsDronePhoto(true)}
+                size="sm"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Foto de Dron
+              </Button>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -355,7 +367,7 @@ const Documents = () => {
                     >
                       <Download className="h-4 w-4" />
                     </Button>
-                    {(isAdmin || doc.user_id === user?.id) && (
+                    {isAdmin && (
                       <Button
                         variant="outline"
                         size="sm"

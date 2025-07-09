@@ -1,9 +1,10 @@
+
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { 
   Leaf, 
   TrendingUp, 
@@ -12,7 +13,10 @@ import {
   ExternalLink,
   Bell,
   FileText,
-  Calculator
+  Calculator,
+  Users,
+  TreePine,
+  DollarSign
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,11 +30,13 @@ const Dashboard = () => {
     queryKey: ['investments', user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data, error } = await supabase
-        .from('investments')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      let query = supabase.from('investments').select('*');
+      
+      if (!isAdmin) {
+        query = query.eq('user_id', user.id);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -90,6 +96,29 @@ const Dashboard = () => {
     enabled: isAdmin,
   });
 
+  // Cálculos para usuarios
+  const userInvestments = investments?.filter(inv => inv.user_id === user?.id) || [];
+  const totalPlants = userInvestments.reduce((sum, inv) => sum + inv.plant_count, 0);
+  const totalInvested = userInvestments.reduce((sum, inv) => sum + inv.total_amount, 0);
+  const totalCarbonCapture = userInvestments.reduce((sum, inv) => {
+    const species = plantSpecies?.find(s => s.id === inv.species_id);
+    return sum + (species?.carbon_capture_per_plant || 0) * inv.plant_count;
+  }, 0);
+
+  // Próxima cosecha
+  const nextHarvest = userInvestments.reduce((earliest, inv) => {
+    return !earliest || inv.expected_harvest_year < earliest ? inv.expected_harvest_year : earliest;
+  }, null as number | null);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
   if (!user || !profile) {
     return (
       <div className="container mx-auto py-6">
@@ -118,6 +147,79 @@ const Dashboard = () => {
           {isAdmin ? 'Administrador' : 'Inversionista'}
         </Badge>
       </div>
+
+      {/* User Investment Summary - Solo para usuarios */}
+      {!isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TreePine className="h-4 w-4 text-green-600" />
+                Mis Plantas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {totalPlants.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                plantas establecidas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-blue-600" />
+                Inversión Total
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {formatCurrency(totalInvested)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                invertido hasta ahora
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Leaf className="h-4 w-4 text-emerald-600" />
+                CO2 Capturado
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-600">
+                {totalCarbonCapture.toFixed(1)} kg
+              </div>
+              <p className="text-xs text-muted-foreground">
+                durante toda la vida
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-orange-600" />
+                Próxima Cosecha
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {nextHarvest || 'N/A'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                año estimado
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -215,7 +317,7 @@ const Dashboard = () => {
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
                 <p className="text-2xl font-bold text-orange-600">
-                  {Object.keys(userProfiles || {}).length}
+                  {userProfiles?.length || 0}
                 </p>
                 <p className="text-sm text-muted-foreground">Usuarios Registrados</p>
               </div>
@@ -250,43 +352,60 @@ const Dashboard = () => {
       )}
 
       {/* Recent Investments - Para usuarios */}
-      {!isAdmin && investments && investments.length > 0 && (
+      {!isAdmin && userInvestments && userInvestments.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Mis Inversiones Recientes</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {investments.slice(0, 3).map((investment) => (
-                <div key={investment.id} className="flex justify-between items-center p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">
-                      {plantSpecies?.find(s => s.id === investment.species_id)?.name || 'Especie desconocida'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {investment.plant_count.toLocaleString()} plantas • {investment.plantation_year}
-                    </p>
+              {userInvestments.slice(0, 3).map((investment) => {
+                const species = plantSpecies?.find(s => s.id === investment.species_id);
+                const currentYear = new Date().getFullYear();
+                const maturationProgress = species ? 
+                  Math.min(100, ((currentYear - investment.plantation_year) / species.maturation_years) * 100) : 0;
+
+                return (
+                  <div key={investment.id} className="p-4 border rounded-lg space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">
+                          {species?.name || 'Especie desconocida'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {investment.plant_count.toLocaleString()} plantas • Plantado en {investment.plantation_year}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">
+                          {formatCurrency(investment.total_amount)}
+                        </p>
+                        <Badge variant={
+                          investment.status === 'active' ? 'default' :
+                          investment.status === 'pending' ? 'secondary' :
+                          'outline'
+                        }>
+                          {investment.status === 'active' ? 'Activa' :
+                           investment.status === 'pending' ? 'Pendiente' :
+                           'Completada'}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    {/* Barra de progreso hacia la madurez */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Progreso hacia cosecha</span>
+                        <span>{maturationProgress.toFixed(0)}%</span>
+                      </div>
+                      <Progress value={maturationProgress} className="h-2" />
+                      <p className="text-xs text-muted-foreground">
+                        Cosecha estimada: {investment.expected_harvest_year}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold">
-                      {new Intl.NumberFormat('es-MX', {
-                        style: 'currency',
-                        currency: 'MXN',
-                        minimumFractionDigits: 0
-                      }).format(investment.total_amount)}
-                    </p>
-                    <Badge variant={
-                      investment.status === 'active' ? 'default' :
-                      investment.status === 'pending' ? 'secondary' :
-                      'outline'
-                    }>
-                      {investment.status === 'active' ? 'Activa' :
-                       investment.status === 'pending' ? 'Pendiente' :
-                       'Completada'}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
