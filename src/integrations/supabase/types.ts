@@ -61,6 +61,60 @@ export type Database = {
           },
         ]
       }
+      investment_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          establishment_year: number
+          id: string
+          plant_count: number
+          price_per_kg: number
+          species_name: string
+          status: string
+          total_investment: number
+          updated_at: string
+          user_email: string
+          user_id: string
+          user_name: string
+          user_phone: string | null
+          weight_per_plant: number
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          establishment_year: number
+          id?: string
+          plant_count: number
+          price_per_kg: number
+          species_name: string
+          status?: string
+          total_investment: number
+          updated_at?: string
+          user_email: string
+          user_id: string
+          user_name: string
+          user_phone?: string | null
+          weight_per_plant: number
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          establishment_year?: number
+          id?: string
+          plant_count?: number
+          price_per_kg?: number
+          species_name?: string
+          status?: string
+          total_investment?: number
+          updated_at?: string
+          user_email?: string
+          user_id?: string
+          user_name?: string
+          user_phone?: string | null
+          weight_per_plant?: number
+        }
+        Relationships: []
+      }
       investments: {
         Row: {
           created_at: string

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -179,6 +180,30 @@ export const InvestmentSimulator: React.FC = () => {
 
     setLoading(true);
     try {
+      // Guardar solicitud en la base de datos
+      const { data: requestData, error: dbError } = await supabase
+        .from('investment_requests')
+        .insert({
+          user_id: user.id,
+          user_email: profile.email,
+          user_name: profile.name || profile.email,
+          user_phone: profile.phone,
+          plant_count: numberOfPlants,
+          species_name: selectedSpecies,
+          establishment_year: parseInt(selectedYear),
+          total_investment: results.totalInvestment,
+          weight_per_plant: weightPerPlant[0],
+          price_per_kg: selectedPricePerKg[0],
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      // Enviar notificación por email
       const response = await supabase.functions.invoke('send-investment-notification', {
         body: {
           userEmail: profile.email,
@@ -194,7 +219,8 @@ export const InvestmentSimulator: React.FC = () => {
       });
 
       if (response.error) {
-        throw response.error;
+        console.error('Error sending email notification:', response.error);
+        // No fallar si el email no se envía, la solicitud ya está guardada
       }
 
       toast({
@@ -202,7 +228,7 @@ export const InvestmentSimulator: React.FC = () => {
         description: "Hemos recibido tu interés en esta inversión. Nos pondremos en contacto contigo pronto.",
       });
     } catch (error) {
-      console.error('Error sending investment notification:', error);
+      console.error('Error sending investment request:', error);
       toast({
         title: "Error",
         description: "No se pudo enviar la solicitud. Intenta nuevamente.",

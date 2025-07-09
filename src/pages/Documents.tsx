@@ -1,456 +1,384 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useLanguage } from '@/contexts/LanguageContext';
+
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, Download, Calendar, User, Upload, Eye, Plus } from 'lucide-react';
-
-interface Document {
-  id: string;
-  document_name: string;
-  document_type: string;
-  document_url: string;
-  contract_type?: string;
-  file_size?: number;
-  created_at: string;
-  user_id: string;
-  investment_id?: string;
-}
+import { 
+  FileText, 
+  Upload, 
+  Download, 
+  Trash2, 
+  Eye,
+  Camera,
+  AlertCircle
+} from 'lucide-react';
 
 const Documents = () => {
-  const { t } = useLanguage();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploadingContract, setUploadingContract] = useState(false);
+  const queryClient = useQueryClient();
+  const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedUserId, setSelectedUserId] = useState("");
-  const [documentName, setDocumentName] = useState("");
-  const [users, setUsers] = useState<any[]>([]);
+  const [documentType, setDocumentType] = useState('');
+  const [documentName, setDocumentName] = useState('');
+  const [contractType, setContractType] = useState('');
+  const [isDronePhoto, setIsDronePhoto] = useState(false);
 
-  useEffect(() => {
-    fetchDocuments();
-    if (profile?.role === 'admin') {
-      fetchUsers();
-    }
-  }, [profile]);
+  const isAdmin = profile?.role === 'admin';
 
-  const fetchUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id, name, email')
-        .eq('role', 'investor')
-        .order('name');
-
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    }
-  };
-
-  const fetchDocuments = async () => {
-    try {
+  const { data: documents, isLoading } = useQuery({
+    queryKey: ['documents'],
+    queryFn: async () => {
       let query = supabase.from('documents').select('*');
       
-      // Si es admin, mostrar todos los documentos, si no, solo los del usuario
-      if (profile?.role !== 'admin') {
-        query = query.eq('user_id', profile?.user_id);
+      if (!isAdmin) {
+        query = query.eq('user_id', user?.id);
       }
       
       const { data, error } = await query.order('created_at', { ascending: false });
-
+      
       if (error) throw error;
-      setDocuments(data || []);
-    } catch (error) {
-      console.error('Error fetching documents:', error);
+      return data;
+    },
+    enabled: !!user
+  });
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || !documentType || !documentName || !user) {
       toast({
         title: "Error",
-        description: "No se pudieron cargar los documentos",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 50 * 1024 * 1024) { // 50MB limit
-        toast({
-          title: "Error",
-          description: "El archivo es demasiado grande. Máximo 50MB.",
-          variant: "destructive"
-        });
-        return;
-      }
-      setSelectedFile(file);
-      setDocumentName(file.name.replace(/\.[^/.]+$/, "")); // Remove extension
-    }
-  };
-
-  const uploadContract = async () => {
-    if (!selectedFile || !selectedUserId || !documentName) {
-      toast({
-        title: "Error",
-        description: "Todos los campos son requeridos",
+        description: "Por favor completa todos los campos requeridos",
         variant: "destructive"
       });
       return;
     }
 
-    setUploadingContract(true);
+    setUploading(true);
     try {
-      // Upload file to storage
-      const fileName = `${profile?.user_id}/${Date.now()}_${selectedFile.name}`;
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const bucketName = isDronePhoto ? 'drone-photos' : 'contracts';
+
       const { error: uploadError } = await supabase.storage
-        .from('contracts')
+        .from(bucketName)
         .upload(fileName, selectedFile);
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('contracts')
+        .from(bucketName)
         .getPublicUrl(fileName);
 
-      // Save document record
-      const { error: docError } = await supabase
+      const { error: dbError } = await supabase
         .from('documents')
         .insert({
-          user_id: selectedUserId,
+          user_id: user.id,
           document_name: documentName,
-          document_type: 'contract',
+          document_type: documentType,
+          contract_type: isDronePhoto ? null : contractType,
           document_url: publicUrl,
-          contract_type: 'contrato',
           file_size: selectedFile.size,
-          uploaded_by: profile?.user_id
+          uploaded_by: user.id
         });
 
-      if (docError) throw docError;
+      if (dbError) throw dbError;
 
       toast({
-        title: "Contrato subido",
-        description: "El contrato se ha subido exitosamente"
+        title: "Éxito",
+        description: `${isDronePhoto ? 'Foto' : 'Documento'} subido correctamente`
       });
 
       // Reset form
       setSelectedFile(null);
-      setSelectedUserId("");
-      setDocumentName("");
+      setDocumentType('');
+      setDocumentName('');
+      setContractType('');
+      setIsDronePhoto(false);
       
       // Refresh documents
-      fetchDocuments();
-    } catch (error) {
-      console.error('Error uploading contract:', error);
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+
+    } catch (error: any) {
+      console.error('Error uploading file:', error);
       toast({
         title: "Error",
-        description: "No se pudo subir el contrato",
+        description: error.message || "Error al subir el archivo",
         variant: "destructive"
       });
     } finally {
-      setUploadingContract(false);
+      setUploading(false);
     }
   };
 
-  const downloadDocument = async (doc: Document) => {
+  const handleDeleteDocument = async (documentId: string, documentUrl: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este documento?')) return;
+
     try {
-      const response = await fetch(doc.document_url);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = doc.document_name;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading document:', error);
+      // Extract file path from URL
+      const urlParts = documentUrl.split('/');
+      const bucketName = urlParts.includes('drone-photos') ? 'drone-photos' : 'contracts';
+      const filePath = urlParts.slice(-2).join('/'); // Get last two parts (user_id/filename)
+
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from(bucketName)
+        .remove([filePath]);
+
+      if (storageError) {
+        console.error('Storage deletion error:', storageError);
+        // Continue with database deletion even if storage fails
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', documentId);
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: "Éxito",
+        description: "Documento eliminado correctamente"
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+
+    } catch (error: any) {
+      console.error('Error deleting document:', error);
       toast({
         title: "Error",
-        description: "No se pudo descargar el documento",
+        description: "Error al eliminar el documento",
         variant: "destructive"
       });
     }
   };
 
-  const getDocumentIcon = (type: string) => {
-    return <FileText className="h-5 w-5" />;
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-profit/10 text-profit border-profit/20';
-      case 'pending':
-        return 'bg-accent/10 text-accent border-accent/20';
-      default:
-        return 'bg-muted/10 text-muted-foreground border-muted/20';
-    }
+  const downloadDocument = (url: string, name: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB'];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const contractTypes = [
-    { value: 'compraventa', label: 'Contrato de Compraventa' },
-    { value: 'participacion', label: 'Contrato de Participación' },
-    { value: 'mantenimiento', label: 'Contrato de Mantenimiento' },
-    { value: 'cosecha', label: 'Contrato de Cosecha' },
-    { value: 'otros', label: 'Otros' }
-  ];
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Cargando documentos...</div>
+      <div className="container mx-auto py-6">
+        <Card>
+          <CardContent className="pt-6">
+            <p>Cargando documentos...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      {/* Header */}
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold bg-gradient-agave bg-clip-text text-transparent">
-          {t('nav.documents')}
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          {t('language') === 'es' ? 'Documentos relacionados con tus inversiones y contratos' : 'Documents related to your investments and contracts'}
+    <div className="container mx-auto py-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Documentos</h1>
+        <p className="text-muted-foreground">
+          Gestiona tus documentos y contratos de inversión
         </p>
       </div>
 
-      <Tabs defaultValue="all" className="space-y-6">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="all">Todos los Documentos</TabsTrigger>
-            <TabsTrigger value="contracts">Contratos</TabsTrigger>
-            <TabsTrigger value="reports">Reportes</TabsTrigger>
-          </TabsList>
-          
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-agave hover:opacity-90">
-                <Plus className="h-4 w-4 mr-2" />
-                Subir Contrato
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Subir Nuevo Contrato</DialogTitle>
-                <DialogDescription>
-                  Sube documentos relacionados con tus inversiones
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label>Nombre del Documento</Label>
-                  <Input
-                    value={documentName}
-                    onChange={(e) => setDocumentName(e.target.value)}
-                    placeholder="Ej: Contrato Inversión Parcela Norte"
-                  />
-                </div>
-                {profile?.role === 'admin' && (
-                  <div>
-                    <Label>Usuario</Label>
-                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar usuario" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.user_id} value={user.user_id}>
-                            {user.name} ({user.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                <div>
-                  <Label>Archivo</Label>
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center">
-                    <Input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      id="file-upload"
-                    />
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        {selectedFile ? selectedFile.name : 'Seleccionar archivo'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        PDF, JPG, PNG - Máximo 50MB
-                      </p>
-                    </label>
-                  </div>
-                </div>
-                <Button 
-                  onClick={uploadContract} 
-                  className="w-full" 
-                  disabled={uploadingContract || !selectedFile || !selectedUserId || !documentName}
-                >
-                  {uploadingContract ? 'Subiendo...' : 'Subir Contrato'}
-                </Button>
+      {/* Upload Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Subir {isDronePhoto ? 'Foto de Dron' : 'Documento'}
+          </CardTitle>
+          <CardDescription>
+            {isDronePhoto ? 
+              'Sube fotos aéreas de las parcelas' : 
+              'Sube contratos, identificaciones y otros documentos importantes'
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-4 mb-4">
+            <Button
+              variant={!isDronePhoto ? 'default' : 'outline'}
+              onClick={() => setIsDronePhoto(false)}
+              size="sm"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Documento
+            </Button>
+            <Button
+              variant={isDronePhoto ? 'default' : 'outline'}
+              onClick={() => setIsDronePhoto(true)}
+              size="sm"
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              Foto de Dron
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="file">Archivo</Label>
+              <Input
+                id="file"
+                type="file"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                accept={isDronePhoto ? 'image/*' : '.pdf,.jpg,.jpeg,.png,.doc,.docx'}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="name">Nombre del documento</Label>
+              <Input
+                id="name"
+                value={documentName}
+                onChange={(e) => setDocumentName(e.target.value)}
+                placeholder={isDronePhoto ? "Ej: Parcela Norte - Enero 2024" : "Ej: Contrato de Inversión"}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="type">Tipo</Label>
+              <Select value={documentType} onValueChange={setDocumentType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona el tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {isDronePhoto ? (
+                    <>
+                      <SelectItem value="drone-photo">Foto de Dron</SelectItem>
+                      <SelectItem value="aerial-view">Vista Aérea</SelectItem>
+                      <SelectItem value="progress-photo">Foto de Progreso</SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="contract">Contrato</SelectItem>
+                      <SelectItem value="identification">Identificación</SelectItem>
+                      <SelectItem value="tax-id">RFC/Identificación Fiscal</SelectItem>
+                      <SelectItem value="payment-proof">Comprobante de Pago</SelectItem>
+                      <SelectItem value="other">Otro</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {!isDronePhoto && documentType === 'contract' && (
+              <div className="space-y-2">
+                <Label htmlFor="contract-type">Tipo de Contrato</Label>
+                <Select value={contractType} onValueChange={setContractType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona tipo de contrato" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="investment">Contrato de Inversión</SelectItem>
+                    <SelectItem value="partnership">Contrato de Sociedad</SelectItem>
+                    <SelectItem value="service">Contrato de Servicios</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+            )}
+          </div>
 
-        <TabsContent value="all" className="space-y-4">
-          {documents.length > 0 ? (
-            documents.map((doc) => (
-              <Card key={doc.id} className="animate-fade-in border-l-4 border-l-primary">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-primary/10 rounded-lg">
-                        {getDocumentIcon(doc.document_type)}
+          <Button onClick={handleFileUpload} disabled={uploading || !selectedFile}>
+            {uploading ? 'Subiendo...' : `Subir ${isDronePhoto ? 'Foto' : 'Documento'}`}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Documents List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            {isDronePhoto ? 'Fotos de Dron' : 'Mis Documentos'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {documents && documents.length > 0 ? (
+            <div className="space-y-3">
+              {documents.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      {doc.document_type.includes('photo') || doc.document_type.includes('drone') ? (
+                        <Camera className="h-5 w-5 text-blue-500" />
+                      ) : (
+                        <FileText className="h-5 w-5 text-gray-500" />
+                      )}
+                      <div>
+                        <h4 className="font-medium">{doc.document_name}</h4>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <Badge variant="outline">{doc.document_type}</Badge>
+                          {doc.contract_type && (
+                            <Badge variant="secondary">{doc.contract_type}</Badge>
+                          )}
+                          {doc.file_size && (
+                            <span>{formatFileSize(doc.file_size)}</span>
+                          )}
+                          <span>{new Date(doc.created_at).toLocaleDateString('es-MX')}</span>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <CardTitle className="text-lg">{doc.document_name}</CardTitle>
-                        <CardDescription>
-                          {doc.contract_type && `Tipo: ${contractTypes.find(t => t.value === doc.contract_type)?.label || doc.contract_type}`}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <Badge className="bg-profit/10 text-profit border-profit/20">
-                      Activo
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Fecha:</span>
-                      <span>{new Date(doc.created_at).toLocaleDateString('es-MX')}</span>
-                    </div>
-                    
-                    {doc.file_size && (
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Tamaño:</span>
-                        <span>{formatFileSize(doc.file_size)}</span>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Tipo:</span>
-                      <span>{doc.document_type === 'contract' ? 'Contrato' : 'Reporte'}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2 border-t">
-                    <Button 
-                      size="sm" 
-                      className="bg-gradient-agave hover:opacity-90"
-                      onClick={() => downloadDocument(doc)}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Descargar
-                    </Button>
-                    <Button 
-                      variant="outline" 
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => window.open(doc.document_url, '_blank')}
                     >
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver
+                      <Eye className="h-4 w-4" />
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadDocument(doc.document_url, doc.document_name)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    {(isAdmin || doc.user_id === user?.id) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteDocument(doc.id, doc.document_url)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <Card className="animate-fade-in">
-              <CardContent className="p-8 text-center">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No hay documentos disponibles</h3>
-                <p className="text-muted-foreground">
-                  Los documentos relacionados con tus inversiones aparecerán aquí una vez que sean subidos.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="contracts" className="space-y-4">
-          {documents.filter(doc => doc.document_type === 'contract').map((doc) => (
-            <Card key={doc.id} className="animate-fade-in border-l-4 border-l-primary">
-              {/* Same card content as above */}
-            </Card>
-          ))}
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-4">
-          {documents.filter(doc => doc.document_type === 'report').map((doc) => (
-            <Card key={doc.id} className="animate-fade-in border-l-4 border-l-primary">
-              {/* Same card content as above */}
-            </Card>
-          ))}
-        </TabsContent>
-      </Tabs>
-
-      {/* Information Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="animate-fade-in bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
-          <CardHeader>
-            <CardTitle className="text-primary">Información sobre Contratos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Los contratos se almacenan de forma segura y están disponibles solo para ti y los administradores. 
-              Puedes subir documentos relacionados con tus inversiones para tener todo organizado en un solo lugar.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-fade-in bg-gradient-to-r from-secondary/5 to-accent/5 border-secondary/20">
-          <CardHeader>
-            <CardTitle className="text-secondary">Almacenamiento en Supabase</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm">Límite por archivo:</span>
-                <span className="text-sm font-medium">50MB</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Formatos admitidos:</span>
-                <span className="text-sm font-medium">PDF, JPG, PNG</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Almacenamiento total:</span>
-                <span className="text-sm font-medium">1GB (Plan gratuito)</span>
-              </div>
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          ) : (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No hay documentos</h3>
+              <p className="text-muted-foreground">
+                Sube tu primer documento usando el formulario de arriba.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

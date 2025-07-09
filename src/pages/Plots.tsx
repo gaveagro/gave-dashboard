@@ -1,370 +1,182 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Leaf, Info, TrendingUp, MapPin, Camera, ExternalLink } from 'lucide-react';
-import PlotMap from '@/components/PlotMap';
-import { useState, useEffect } from 'react';
+
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { MapPin, ExternalLink, Camera, Thermometer, Droplets, Mountain } from 'lucide-react';
 
 const Plots = () => {
-  const [selectedPlot, setSelectedPlot] = useState<number | null>(null);
-  const [plots, setPlots] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    fetchPlots();
-  }, []);
-
-  const fetchPlots = async () => {
-    try {
+  const { data: plots, isLoading } = useQuery({
+    queryKey: ['plots'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('plots')
         .select('*')
         .order('name');
-
+      
       if (error) throw error;
-      
-      // Transformar datos para compatibilidad
-      const transformedPlots = data.map(plot => ({
-        id: plot.id,
-        name: plot.name,
-        location: plot.location,
-        coordinates: plot.coordinates,
-        latitude: plot.latitude,
-        longitude: plot.longitude,
-        area: plot.area,
-        totalPlants: plot.total_plants,
-        availablePlants: plot.available_plants,
-        species: ['Espadín', 'Salmiana'], // Datos por defecto
-        soilType: plot.soil_type,
-        elevation: plot.elevation,
-        lastUpdate: plot.updated_at,
-        status: plot.status,
-        rainfall: plot.rainfall,
-        temperature: plot.temperature,
-        dronePhotos: [
-          { year: 2024, url: '/placeholder-drone.jpg', description: 'Levantamiento aéreo 2024' }
-        ]
-      }));
-      
-      setPlots(transformedPlots);
-    } catch (error) {
-      console.error('Error fetching plots:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las parcelas",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
+      return data;
     }
-  };
-  
-  const formatNumber = (num: number, decimals: number = 0) => {
-    return new Intl.NumberFormat('es-MX', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
-    }).format(num);
-  };
+  });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Activa':
-        return 'bg-profit/10 text-profit border-profit/20';
-      case 'En desarrollo':
-        return 'bg-accent/10 text-accent border-accent/20';
-      case 'Preparación':
-        return 'bg-secondary/10 text-secondary border-secondary/20';
-      default:
-        return 'bg-muted/10 text-muted-foreground border-muted/20';
+  const { data: plotPhotos } = useQuery({
+    queryKey: ['plot-photos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plot_photos')
+        .select('*')
+        .order('year', { ascending: false });
+      
+      if (error) throw error;
+      return data;
     }
+  });
+
+  const openInGoogleMaps = (coordinates: string) => {
+    // Asumiendo que las coordenadas están en formato "lat,lng"
+    const cleanCoords = coordinates.replace(/[^\d.,-]/g, '');
+    const url = `https://www.google.com/maps?q=${cleanCoords}`;
+    window.open(url, '_blank');
   };
 
-  const getAvailabilityPercentage = (available: number, total: number) => {
-    return ((available / total) * 100).toFixed(1);
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Cargando parcelas...</div>
+      <div className="container mx-auto py-6">
+        <Card>
+          <CardContent className="pt-6">
+            <p>Cargando parcelas...</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
-      {/* Header */}
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold bg-gradient-agave bg-clip-text text-transparent">
-          Parcelas de Cultivo
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Información detallada sobre nuestras parcelas de agave
+    <div className="container mx-auto py-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">Parcelas</h1>
+        <p className="text-muted-foreground">
+          Información detallada sobre nuestras parcelas de cultivo
         </p>
       </div>
 
-      {/* Resumen General */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="animate-fade-in">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Info className="h-4 w-4 text-primary" />
-              <div className="text-sm text-muted-foreground">Total Parcelas</div>
-            </div>
-            <div className="text-2xl font-bold text-primary mt-1">
-              {plots.length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-fade-in">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-secondary" />
-              <div className="text-sm text-muted-foreground">Área Total</div>
-            </div>
-            <div className="text-2xl font-bold text-secondary mt-1">
-              {formatNumber(plots.reduce((acc, plot) => acc + plot.area, 0), 1)} ha
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-fade-in">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-investment" />
-              <div className="text-sm text-muted-foreground">Total Plantas</div>
-            </div>
-            <div className="text-2xl font-bold text-investment mt-1">
-              {formatNumber(plots.reduce((acc, plot) => acc + plot.totalPlants, 0))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-fade-in">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-profit" />
-              <div className="text-sm text-muted-foreground">Disponibles</div>
-            </div>
-            <div className="text-2xl font-bold text-profit mt-1">
-              {formatNumber(plots.reduce((acc, plot) => acc + plot.availablePlants, 0))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Lista de Parcelas */}
-      <div className="space-y-6">
-        <h2 className="text-xl font-semibold">Información Detallada de Parcelas</h2>
-        
-        {plots.map((plot) => (
-          <Card key={plot.id} className="animate-fade-in border-l-4 border-l-primary">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2">
-                    <Leaf className="h-5 w-5 text-primary" />
-                    {plot.name}
-                  </CardTitle>
-                   <CardDescription>
-                     {plot.location} • {plot.coordinates}
-                   </CardDescription>
-                </div>
-                <Badge className={getStatusColor(plot.status)}>
-                  {plot.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="space-y-6">
-              {/* Información Básica */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Área Total</div>
-                  <div className="text-lg font-bold text-primary">
-                    {formatNumber(plot.area, 1)} hectáreas
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Elevación: {formatNumber(plot.elevation)} m
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Capacidad Total</div>
-                  <div className="text-lg font-bold text-investment">
-                    {formatNumber(plot.totalPlants)} plantas
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Densidad: {formatNumber(plot.totalPlants / plot.area)} plantas/ha
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Disponibles</div>
-                  <div className="text-lg font-bold text-profit">
-                    {formatNumber(plot.availablePlants)} plantas
-                  </div>
-                  <div className="text-xs text-profit">
-                    {getAvailabilityPercentage(plot.availablePlants, plot.totalPlants)}% disponible
-                  </div>
-                </div>
-              </div>
-
-              {/* Especies Cultivadas */}
-              <div className="border-t pt-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Leaf className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Especies Cultivadas</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {plot.species.map((species, index) => (
-                    <Badge key={index} variant="outline" className="bg-secondary/10">
-                      {species}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* Condiciones Ambientales */}
-              <div className="border-t pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {plots?.map((plot) => {
+          const recentPhotos = plotPhotos?.filter(photo => photo.plot_id === plot.id) || [];
+          
+          return (
+            <Card key={plot.id} className="overflow-hidden">
+              <CardHeader>
+                <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-medium text-muted-foreground mb-1">Tipo de Suelo</div>
-                    <div>{plot.soilType}</div>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5 text-primary" />
+                      {plot.name}
+                    </CardTitle>
+                    <CardDescription>{plot.location}</CardDescription>
                   </div>
-                  
+                  <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
+                    {plot.status}
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                {/* Información básica */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <div className="font-medium text-muted-foreground mb-1">Precipitación</div>
-                    <div>{formatNumber(plot.rainfall)} mm/año</div>
+                    <span className="font-medium">Área:</span>
+                    <p>{plot.area} hectáreas</p>
                   </div>
-                  
                   <div>
-                    <div className="font-medium text-muted-foreground mb-1">Temperatura</div>
-                    <div>{plot.temperature}</div>
-                  </div>
-                  
-                  <div>
-                    <div className="font-medium text-muted-foreground mb-1">Última Actualización</div>
-                    <div>{new Date(plot.lastUpdate).toLocaleDateString('es-MX')}</div>
+                    <span className="font-medium">Plantas disponibles:</span>
+                    <p>{plot.available_plants.toLocaleString()} de {plot.total_plants.toLocaleString()}</p>
                   </div>
                 </div>
-              </div>
 
-              {/* Progreso de Disponibilidad */}
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium">Disponibilidad de Plantas</div>
-                  <div className="text-sm text-muted-foreground">
-                    {plot.availablePlants} de {plot.totalPlants} disponibles
-                  </div>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="bg-gradient-agave h-2 rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${getAvailabilityPercentage(plot.availablePlants, plot.totalPlants)}%`
-                    }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Mapa y Fotografías */}
-              <div className="border-t pt-4 space-y-4">
-                {/* Mapa */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Ubicación</span>
+                {/* Condiciones ambientales */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t">
+                  {plot.temperature && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Thermometer className="h-4 w-4 text-orange-500" />
+                      <span>{plot.temperature}</span>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`https://www.google.com/maps?q=${plot.latitude},${plot.longitude}`, '_blank')}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Ver en Google Maps
-                    </Button>
-                  </div>
-                  <PlotMap 
-                    latitude={plot.latitude} 
-                    longitude={plot.longitude} 
-                    name={plot.name}
-                  />
+                  )}
+                  {plot.rainfall && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Droplets className="h-4 w-4 text-blue-500" />
+                      <span>{plot.rainfall}mm</span>
+                    </div>
+                  )}
+                  {plot.elevation && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mountain className="h-4 w-4 text-gray-500" />
+                      <span>{plot.elevation}m</span>
+                    </div>
+                  )}
+                  {plot.soil_type && (
+                    <div className="text-sm">
+                      <span className="font-medium">Suelo:</span>
+                      <p>{plot.soil_type}</p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Fotografías Aéreas */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Camera className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">Fotografías Aéreas</span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {plot.dronePhotos.map((photo, index) => (
-                      <Card key={index} className="overflow-hidden">
-                        <div className="aspect-video bg-muted/20 flex items-center justify-center border-b">
-                          <div className="text-center p-4">
-                            <Camera className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                            <div className="text-sm font-medium">Foto Aérea {photo.year}</div>
-                            <div className="text-xs text-muted-foreground">{photo.description}</div>
+                {/* Fotos recientes */}
+                {recentPhotos.length > 0 && (
+                  <div className="pt-3 border-t">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Camera className="h-4 w-4" />
+                      <span className="text-sm font-medium">Fotos recientes</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {recentPhotos.slice(0, 3).map((photo) => (
+                        <div key={photo.id} className="relative aspect-square">
+                          <img
+                            src={photo.photo_url}
+                            alt={photo.description || `Foto de ${plot.name}`}
+                            className="w-full h-full object-cover rounded"
+                          />
+                          <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
+                            {photo.year}
                           </div>
                         </div>
-                        <CardContent className="p-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Año {photo.year}</span>
-                            <Button variant="outline" size="sm">
-                              Ver Completa
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                      ))}
+                    </div>
                   </div>
+                )}
+
+                {/* Acciones */}
+                <div className="pt-3 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openInGoogleMaps(plot.coordinates)}
+                    className="w-full"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Ver en Google Maps
+                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      {/* Información Adicional */}
-      <Card className="animate-fade-in bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
-        <CardHeader>
-          <CardTitle className="text-primary">
-            Agricultura Regenerativa
-          </CardTitle>
-          <CardDescription>
-            Nuestro compromiso con prácticas sostenibles y regeneración del suelo
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground leading-relaxed">
-            Nuestras parcelas están diseñadas siguiendo principios de agricultura regenerativa, 
-            promoviendo la biodiversidad, mejorando la estructura del suelo y maximizando la captura de carbono. 
-            Cada parcela es monitoreada constantemente para asegurar las mejores condiciones de crecimiento 
-            para nuestras plantas de agave.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-primary">100%</div>
-              <div className="text-xs text-muted-foreground">Agricultura orgánica</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-secondary">24/7</div>
-              <div className="text-xs text-muted-foreground">Monitoreo climático</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-contrast">GPS</div>
-              <div className="text-xs text-muted-foreground">Rastreo por planta</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {(!plots || plots.length === 0) && (
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No hay parcelas disponibles</h3>
+            <p className="text-muted-foreground">
+              Las parcelas se mostrarán aquí una vez que sean agregadas por el administrador.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
