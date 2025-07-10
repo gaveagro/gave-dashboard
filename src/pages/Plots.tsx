@@ -1,14 +1,20 @@
-
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { MapPin, ExternalLink, Camera, Thermometer, Droplets, Mountain } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MapPin, ExternalLink, Camera, Thermometer, Droplets, Mountain, Upload, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const Plots = () => {
+  const { profile } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const { data: plots, isLoading } = useQuery({
     queryKey: ['plots'],
     queryFn: async () => {
@@ -58,6 +64,149 @@ const Plots = () => {
       return data;
     }
   });
+
+  const deletePlotMutation = useMutation({
+    mutationFn: async (plotId: string) => {
+      // First delete all photos associated with the plot
+      const { data: photos } = await supabase
+        .from('plot_photos')
+        .select('photo_url')
+        .eq('plot_id', plotId);
+
+      if (photos) {
+        for (const photo of photos) {
+          const fileName = photo.photo_url.split('/').pop();
+          if (fileName) {
+            await supabase.storage
+              .from('drone-photos')
+              .remove([fileName]);
+          }
+        }
+      }
+
+      // Delete plot photos records
+      await supabase
+        .from('plot_photos')
+        .delete()
+        .eq('plot_id', plotId);
+
+      // Delete the plot
+      const { error } = await supabase
+        .from('plots')
+        .delete()
+        .eq('id', plotId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Parcela eliminada",
+        description: "La parcela y sus fotos han sido eliminadas correctamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['plots'] });
+      queryClient.invalidateQueries({ queryKey: ['plot-photos'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la parcela.",
+        variant: "destructive"
+      });
+      console.error('Error deleting plot:', error);
+    }
+  });
+
+  const deletePhotoMutation = useMutation({
+    mutationFn: async (photo: any) => {
+      // Delete from storage
+      const fileName = photo.photo_url.split('/').pop();
+      if (fileName) {
+        await supabase.storage
+          .from('drone-photos')
+          .remove([fileName]);
+      }
+
+      // Delete record
+      const { error } = await supabase
+        .from('plot_photos')
+        .delete()
+        .eq('id', photo.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Foto eliminada",
+        description: "La foto ha sido eliminada correctamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['plot-photos'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la foto.",
+        variant: "destructive"
+      });
+      console.error('Error deleting photo:', error);
+    }
+  });
+
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async ({ plotId, file, year, description }: { 
+      plotId: string; 
+      file: File; 
+      year: number; 
+      description?: string; 
+    }) => {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${plotId}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('drone-photos')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('drone-photos')
+        .getPublicUrl(fileName);
+
+      const { error: insertError } = await supabase
+        .from('plot_photos')
+        .insert({
+          plot_id: plotId,
+          photo_url: data.publicUrl,
+          year,
+          description,
+          taken_date: new Date().toISOString().split('T')[0]
+        });
+
+      if (insertError) throw insertError;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Foto subida",
+        description: "La foto ha sido subida correctamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['plot-photos'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "No se pudo subir la foto.",
+        variant: "destructive"
+      });
+      console.error('Error uploading photo:', error);
+    }
+  });
+
+  const handlePhotoUpload = async (plotId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const year = new Date().getFullYear();
+    uploadPhotoMutation.mutate({ plotId, file, year });
+  };
 
   const openInGoogleMaps = (coordinates: string) => {
     const cleanCoords = coordinates.replace(/[^\d.,-]/g, '');
@@ -132,9 +281,21 @@ const Plots = () => {
                     </CardTitle>
                     <CardDescription>{plot.location}</CardDescription>
                   </div>
-                  <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
-                    {plot.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
+                      {plot.status}
+                    </Badge>
+                    {profile?.role === 'admin' && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deletePlotMutation.mutate(plot.id)}
+                        disabled={deletePlotMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               
@@ -147,7 +308,7 @@ const Plots = () => {
                   </div>
                   <div>
                     <span className="font-medium">Plantas establecidas:</span>
-                    <p>{plantsEstablished.toLocaleString()} de {plot.total_plants.toLocaleString()}</p>
+                    <p>{plantsEstablished.toLocaleString()}</p>
                   </div>
                 </div>
 
@@ -189,6 +350,22 @@ const Plots = () => {
                   )}
                 </div>
 
+                {/* Admin photo upload */}
+                {profile?.role === 'admin' && (
+                  <div className="pt-3 border-t">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Upload className="h-4 w-4" />
+                      <span className="text-sm font-medium">Subir foto con dron</span>
+                    </div>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handlePhotoUpload(plot.id, e)}
+                      disabled={uploadPhotoMutation.isPending}
+                    />
+                  </div>
+                )}
+
                 {/* Fotos recientes */}
                 {recentPhotos.length > 0 && (
                   <div className="pt-3 border-t">
@@ -198,7 +375,7 @@ const Plots = () => {
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {recentPhotos.slice(0, 3).map((photo) => (
-                        <div key={photo.id} className="relative aspect-square">
+                        <div key={photo.id} className="relative aspect-square group">
                           <img
                             src={photo.photo_url}
                             alt={photo.description || `Foto de ${plot.name}`}
@@ -207,6 +384,17 @@ const Plots = () => {
                           <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
                             {photo.year}
                           </div>
+                          {profile?.role === 'admin' && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => deletePhotoMutation.mutate(photo)}
+                              disabled={deletePhotoMutation.isPending}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
                         </div>
                       ))}
                     </div>
