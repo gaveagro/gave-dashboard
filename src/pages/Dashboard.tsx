@@ -11,13 +11,12 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { TreePine, Coins, Leaf, Calendar, Plus } from 'lucide-react';
+import { TreePine, Coins, Leaf, Calendar, Plus, TrendingUp, BarChart3, Sprout } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 
 const Dashboard = () => {
@@ -31,9 +30,7 @@ const Dashboard = () => {
     plant_count: 0,
     species_name: '',
     establishment_year: new Date().getFullYear(),
-    total_investment: 0,
-    weight_per_plant: 0,
-    price_per_kg: 0
+    total_investment: 0
   });
 
   // Fetch user's investments
@@ -78,7 +75,9 @@ const Dashboard = () => {
         .from('investment_requests')
         .insert([{
           user_id: user?.id,
-          ...requestData
+          ...requestData,
+          weight_per_plant: 0, // Set default value
+          price_per_kg: 0      // Set default value
         }]);
 
       if (error) throw error;
@@ -101,9 +100,7 @@ const Dashboard = () => {
         plant_count: 0,
         species_name: '',
         establishment_year: new Date().getFullYear(),
-        total_investment: 0,
-        weight_per_plant: 0,
-        price_per_kg: 0
+        total_investment: 0
       });
 
     } catch (error: any) {
@@ -137,6 +134,14 @@ const Dashboard = () => {
     return closest;
   }, null as any);
 
+  // Calculate average progress
+  const averageProgress = investments?.length ? investments.reduce((sum, inv) => {
+    const yearsGrown = currentYear - inv.plantation_year;
+    const maturationYears = inv.plant_species?.maturation_years || 8;
+    const progress = Math.min((yearsGrown / maturationYears) * 100, 100);
+    return sum + progress;
+  }, 0) / investments.length : 0;
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
@@ -147,127 +152,211 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Bienvenido a tu panel de inversiones forestales
+    <div className="container mx-auto py-8 space-y-8">
+      {/* Header Section */}
+      <div className="flex justify-between items-start">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            Tu Portafolio Forestal
+          </h1>
+          <p className="text-xl text-muted-foreground">
+            Invierte en el futuro del planeta, cosecha prosperidad
           </p>
         </div>
-        <Button onClick={() => setShowInvestmentRequestDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button 
+          onClick={() => setShowInvestmentRequestDialog(true)}
+          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 text-lg"
+          size="lg"
+        >
+          <Plus className="h-5 w-5 mr-2" />
           Nueva Inversión
         </Button>
       </div>
 
-      {/* Summary Cards */}
+      {/* Enhanced Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
+        <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Plantas Totales
+            <CardTitle className="text-sm font-medium text-green-700 dark:text-green-300">
+              Plantas Establecidas
             </CardTitle>
-            <TreePine className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-full">
+              <TreePine className="h-5 w-5 text-green-600 dark:text-green-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalPlants.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              plantas establecidas
+            <div className="text-3xl font-bold text-green-700 dark:text-green-300">
+              {totalPlants.toLocaleString()}
+            </div>
+            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+              árboles creciendo para ti
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">
               Inversión Total
             </CardTitle>
-            <Coins className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+              <Coins className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalInvestment)}</div>
-            <p className="text-xs text-muted-foreground">
-              invertido hasta la fecha
+            <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">
+              {formatCurrency(totalInvestment)}
+            </div>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+              capital comprometido
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
               CO₂ Secuestrado
             </CardTitle>
-            <Leaf className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-full">
+              <Leaf className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCO2Captured.toLocaleString()} kg</div>
-            <p className="text-xs text-muted-foreground">
-              hasta la fecha
+            <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">
+              {totalCO2Captured.toLocaleString()} kg
+            </div>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+              impacto ambiental positivo
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-orange-500 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
+            <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">
               Próxima Cosecha
             </CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-full">
+              <Calendar className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-3xl font-bold text-orange-700 dark:text-orange-300">
               {nextHarvest ? nextHarvest.expected_harvest_year : 'N/A'}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {nextHarvest ? `${nextHarvest.plant_count.toLocaleString()} plantas` : 'Sin inversiones'}
+            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+              {nextHarvest ? `${nextHarvest.plant_count.toLocaleString()} plantas` : 'Sin inversiones activas'}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Investments Progress */}
+      {/* Progress Overview */}
       {investments && investments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Progreso de Inversiones</CardTitle>
-            <CardDescription>
-              Estado de maduración de tus plantas por especie
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {investments.map((investment) => {
-              const yearsGrown = currentYear - investment.plantation_year;
-              const maturationYears = investment.plant_species?.maturation_years || 8;
-              const progress = Math.min((yearsGrown / maturationYears) * 100, 100);
-              
-              return (
-                <div key={investment.id} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h4 className="font-medium">{investment.plant_species?.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {investment.plant_count.toLocaleString()} plantas • Establecido en {investment.plantation_year}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">{Math.round(progress)}%</p>
-                      <p className="text-xs text-muted-foreground">
-                        {yearsGrown} de {maturationYears} años
-                      </p>
-                    </div>
-                  </div>
-                  <Progress value={progress} className="h-2" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Overall Progress Card */}
+          <Card className="lg:col-span-1 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                <BarChart3 className="h-5 w-5" />
+                Progreso General
+              </CardTitle>
+              <CardDescription>
+                Estado promedio de maduración
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-center">
+                <div className="text-5xl font-bold text-purple-700 dark:text-purple-300 mb-2">
+                  {Math.round(averageProgress)}%
                 </div>
-              );
-            })}
+                <p className="text-sm text-purple-600 dark:text-purple-400">
+                  madurez promedio
+                </p>
+              </div>
+              <Progress value={averageProgress} className="h-3" />
+            </CardContent>
+          </Card>
+
+          {/* Detailed Investment Progress */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sprout className="h-5 w-5 text-green-600" />
+                Progreso por Inversión
+              </CardTitle>
+              <CardDescription>
+                Estado de maduración de tus plantaciones
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {investments.map((investment) => {
+                const yearsGrown = currentYear - investment.plantation_year;
+                const maturationYears = investment.plant_species?.maturation_years || 8;
+                const progress = Math.min((yearsGrown / maturationYears) * 100, 100);
+                
+                return (
+                  <div key={investment.id} className="space-y-3 p-4 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <h4 className="font-semibold text-green-800 dark:text-green-200">
+                          {investment.plant_species?.name}
+                        </h4>
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          {investment.plant_count.toLocaleString()} plantas • Establecido en {investment.plantation_year}
+                        </p>
+                        <p className="text-xs text-green-500 dark:text-green-500">
+                          Inversión: {formatCurrency(investment.total_amount)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+                          {Math.round(progress)}%
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-400">
+                          {yearsGrown} de {maturationYears} años
+                        </p>
+                      </div>
+                    </div>
+                    <Progress value={progress} className="h-3" />
+                    {progress >= 100 && (
+                      <div className="flex items-center gap-1 text-green-700 dark:text-green-300">
+                        <TrendingUp className="h-4 w-4" />
+                        <span className="text-sm font-medium">¡Listo para cosecha!</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {investments && investments.length === 0 && (
+        <Card className="bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-900 dark:to-slate-900">
+          <CardContent className="py-12 text-center">
+            <TreePine className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-2xl font-semibold mb-2">Comienza tu Viaje Forestal</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Aún no tienes inversiones. ¡Empieza hoy y contribuye al cuidado del medio ambiente mientras generas rendimientos!
+            </p>
+            <Button 
+              onClick={() => setShowInvestmentRequestDialog(true)}
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              size="lg"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Mi Primera Inversión
+            </Button>
           </CardContent>
         </Card>
       )}
 
       {/* Investment Request Dialog */}
       <Dialog open={showInvestmentRequestDialog} onOpenChange={setShowInvestmentRequestDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Solicitar Nueva Inversión</DialogTitle>
             <DialogDescription>
@@ -328,37 +417,15 @@ const Dashboard = () => {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="weight-per-plant">Peso por planta (kg)</Label>
-                <Input 
-                  id="weight-per-plant" 
-                  type="number"
-                  step="0.01"
-                  value={requestData.weight_per_plant}
-                  onChange={(e) => setRequestData({...requestData, weight_per_plant: parseFloat(e.target.value) || 0})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price-per-kg">Precio por kg</Label>
-                <Input 
-                  id="price-per-kg" 
-                  type="number"
-                  step="0.01"
-                  value={requestData.price_per_kg}
-                  onChange={(e) => setRequestData({...requestData, price_per_kg: parseFloat(e.target.value) || 0})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="total-investment">Inversión total</Label>
-                <Input 
-                  id="total-investment" 
-                  type="number"
-                  step="0.01"
-                  value={requestData.total_investment}
-                  onChange={(e) => setRequestData({...requestData, total_investment: parseFloat(e.target.value) || 0})}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="total-investment">Inversión total</Label>
+              <Input 
+                id="total-investment" 
+                type="number"
+                step="0.01"
+                value={requestData.total_investment}
+                onChange={(e) => setRequestData({...requestData, total_investment: parseFloat(e.target.value) || 0})}
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2">

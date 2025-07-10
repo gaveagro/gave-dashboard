@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,11 +10,13 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { MapPin, ExternalLink, Camera, Thermometer, Droplets, Mountain, Upload, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import PhotoModal from '@/components/PhotoModal';
 
 const Plots = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; description?: string; year?: number } | null>(null);
 
   const { data: plots, isLoading } = useQuery({
     queryKey: ['plots'],
@@ -379,7 +382,12 @@ const Plots = () => {
                           <img
                             src={photo.photo_url}
                             alt={photo.description || `Foto de ${plot.name}`}
-                            className="w-full h-full object-cover rounded"
+                            className="w-full h-full object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => setSelectedPhoto({
+                              url: photo.photo_url,
+                              description: photo.description,
+                              year: photo.year
+                            })}
                           />
                           <div className="absolute bottom-1 left-1 bg-black bg-opacity-50 text-white text-xs px-1 rounded">
                             {photo.year}
@@ -389,7 +397,10 @@ const Plots = () => {
                               variant="destructive"
                               size="sm"
                               className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => deletePhotoMutation.mutate(photo)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deletePhotoMutation.mutate(photo);
+                              }}
                               disabled={deletePhotoMutation.isPending}
                             >
                               <Trash2 className="h-3 w-3" />
@@ -430,6 +441,15 @@ const Plots = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Photo Modal */}
+      <PhotoModal
+        isOpen={!!selectedPhoto}
+        onClose={() => setSelectedPhoto(null)}
+        photoUrl={selectedPhoto?.url || ''}
+        description={selectedPhoto?.description}
+        year={selectedPhoto?.year}
+      />
     </div>
   );
 };

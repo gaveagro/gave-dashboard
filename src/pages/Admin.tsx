@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Plus, Send, DollarSign, TrendingUp, RotateCcw } from 'lucide-react';
+import { Users, Plus, Send, DollarSign, TrendingUp, RotateCcw, MapPin, Trash2 } from 'lucide-react';
 
 const Admin = () => {
   const { profile } = useAuth();
@@ -33,6 +33,30 @@ const Admin = () => {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationTarget, setNotificationTarget] = useState<'all' | 'specific'>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+
+  // Document upload states
+  const [documentUserId, setDocumentUserId] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [documentType, setDocumentType] = useState('');
+  const [documentName, setDocumentName] = useState('');
+  const [contractType, setContractType] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  // Plot states
+  const [showCreatePlotDialog, setShowCreatePlotDialog] = useState(false);
+  const [newPlotData, setNewPlotData] = useState({
+    name: '',
+    location: '',
+    coordinates: '',
+    area: '',
+    total_plants: '',
+    available_plants: '',
+    temperature: '',
+    rainfall: '',
+    elevation: '',
+    latitude: '',
+    longitude: ''
+  });
 
   const { data: users } = useQuery({
     queryKey: ['admin-users'],
@@ -67,7 +91,7 @@ const Admin = () => {
         .select(`
           *,
           plant_species (name),
-          profiles (name, email)
+          profiles!investments_user_id_fkey (name, email)
         `)
         .order('created_at', { ascending: false });
       
@@ -76,8 +100,23 @@ const Admin = () => {
     }
   });
 
+  const { data: plots } = useQuery({
+    queryKey: ['admin-plots'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plots')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: { email: string; name: string; role: 'admin' | 'investor' }) => {
+      // Use the service role key for admin operations
       const { data, error } = await supabase.auth.admin.createUser({
         email: userData.email,
         email_confirm: false,
@@ -109,9 +148,144 @@ const Admin = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
     },
     onError: (error) => {
+      console.error('Error creating user:', error);
       toast({
         title: "Error",
-        description: `No se pudo crear el usuario: ${error.message}`,
+        description: `No se pudo crear el usuario. Verifica que tengas permisos de administrador.`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Upload document mutation
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedFile || !documentType || !documentName || !documentUserId) {
+        throw new Error('Por favor completa todos los campos requeridos');
+      }
+
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${documentUserId}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('contracts')
+        .upload(fileName, selectedFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('contracts')
+        .getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase
+        .from('documents')
+        .insert({
+          user_id: documentUserId,
+          document_name: documentName,
+          document_type: documentType,
+          contract_type: documentType === 'contract' ? contractType : null,
+          document_url: publicUrl,
+          file_size: selectedFile.size,
+          uploaded_by: profile?.user_id
+        });
+
+      if (dbError) throw dbError;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Éxito",
+        description: "Documento subido correctamente"
+      });
+      setSelectedFile(null);
+      setDocumentType('');
+      setDocumentName('');
+      setContractType('');
+      setDocumentUserId('');
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+    onError: (error: any) => {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Error al subir el archivo",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Create plot mutation
+  const createPlotMutation = useMutation({
+    mutationFn: async (plotData: any) => {
+      const { error } = await supabase
+        .from('plots')
+        .insert({
+          name: plotData.name,
+          location: plotData.location,
+          coordinates: plotData.coordinates,
+          area: parseFloat(plotData.area),
+          total_plants: parseInt(plotData.total_plants) || 0,
+          available_plants: parseInt(plotData.available_plants) || 0,
+          temperature: plotData.temperature || null,
+          rainfall: plotData.rainfall ? parseInt(plotData.rainfall) : null,
+          elevation: plotData.elevation ? parseInt(plotData.elevation) : null,
+          latitude: plotData.latitude ? parseFloat(plotData.latitude) : null,
+          longitude: plotData.longitude ? parseFloat(plotData.longitude) : null,
+          status: 'Activa'
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Parcela creada",
+        description: "La parcela ha sido creada exitosamente."
+      });
+      setShowCreatePlotDialog(false);
+      setNewPlotData({
+        name: '',
+        location: '',
+        coordinates: '',
+        area: '',
+        total_plants: '',
+        available_plants: '',
+        temperature: '',
+        rainfall: '',
+        elevation: '',
+        latitude: '',
+        longitude: ''
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-plots'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `No se pudo crear la parcela: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete plot mutation
+  const deletePlotMutation = useMutation({
+    mutationFn: async (plotId: string) => {
+      const { error } = await supabase
+        .from('plots')
+        .delete()
+        .eq('id', plotId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Parcela eliminada",
+        description: "La parcela ha sido eliminada exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-plots'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `No se pudo eliminar la parcela: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -280,6 +454,23 @@ const Admin = () => {
     });
   };
 
+  const handleUploadDocument = () => {
+    uploadDocumentMutation.mutate();
+  };
+
+  const handleCreatePlot = () => {
+    if (!newPlotData.name || !newPlotData.location || !newPlotData.area) {
+      toast({
+        title: "Error",
+        description: "Por favor completa los campos requeridos (nombre, ubicación, área).",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    createPlotMutation.mutate(newPlotData);
+  };
+
   const updateUserEmail = async (userId: string, newEmail: string) => {
     try {
       const { error } = await supabase.auth.admin.updateUserById(userId, {
@@ -325,18 +516,21 @@ const Admin = () => {
       <div>
         <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
         <p className="text-muted-foreground">
-          Gestiona usuarios, inversiones y notificaciones
+          Gestiona usuarios, inversiones, parcelas y notificaciones
         </p>
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="investments">Inversiones</TabsTrigger>
+          <TabsTrigger value="plots">Parcelas</TabsTrigger>
+          <TabsTrigger value="documents">Documentos</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
           <TabsTrigger value="stats">Estadísticas</TabsTrigger>
         </TabsList>
 
+        {/* Users Tab */}
         <TabsContent value="users" className="space-y-6">
           <Card>
             <CardHeader>
@@ -459,6 +653,7 @@ const Admin = () => {
           </Card>
         </TabsContent>
 
+        {/* Investments Tab */}
         <TabsContent value="investments" className="space-y-6">
           <Card>
             <CardHeader>
@@ -571,6 +766,290 @@ const Admin = () => {
           </Card>
         </TabsContent>
 
+        {/* Plots Tab */}
+        <TabsContent value="plots" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Agregar Nueva Parcela
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => setShowCreatePlotDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nueva Parcela
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5" />
+                Parcelas Existentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {plots?.map((plot) => (
+                  <div key={plot.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-semibold">{plot.name}</h3>
+                      <p className="text-sm text-muted-foreground">{plot.location}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Área: {plot.area} ha | Plantas: {plot.total_plants}
+                      </p>
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => deletePlotMutation.mutate(plot.id)}
+                      disabled={deletePlotMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Create Plot Dialog */}
+          <Dialog open={showCreatePlotDialog} onOpenChange={setShowCreatePlotDialog}>
+            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Crear Nueva Parcela</DialogTitle>
+                <DialogDescription>
+                  Completa la información de la nueva parcela
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-name">Nombre *</Label>
+                    <Input 
+                      id="plot-name" 
+                      value={newPlotData.name}
+                      onChange={(e) => setNewPlotData({...newPlotData, name: e.target.value})}
+                      placeholder="Nombre de la parcela"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-location">Ubicación *</Label>
+                    <Input 
+                      id="plot-location" 
+                      value={newPlotData.location}
+                      onChange={(e) => setNewPlotData({...newPlotData, location: e.target.value})}
+                      placeholder="Ciudad, Estado"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="plot-coordinates">Coordenadas Google Maps</Label>
+                  <Input 
+                    id="plot-coordinates" 
+                    value={newPlotData.coordinates}
+                    onChange={(e) => setNewPlotData({...newPlotData, coordinates: e.target.value})}
+                    placeholder="19.4326, -99.1332"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-area">Área (ha) *</Label>
+                    <Input 
+                      id="plot-area" 
+                      type="number"
+                      step="0.01"
+                      value={newPlotData.area}
+                      onChange={(e) => setNewPlotData({...newPlotData, area: e.target.value})}
+                      placeholder="10.5"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-total-plants">Plantas Totales</Label>
+                    <Input 
+                      id="plot-total-plants" 
+                      type="number"
+                      value={newPlotData.total_plants}
+                      onChange={(e) => setNewPlotData({...newPlotData, total_plants: e.target.value})}
+                      placeholder="1000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-available-plants">Plantas Disponibles</Label>
+                    <Input 
+                      id="plot-available-plants" 
+                      type="number"
+                      value={newPlotData.available_plants}
+                      onChange={(e) => setNewPlotData({...newPlotData, available_plants: e.target.value})}
+                      placeholder="500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-temperature">Temperatura Promedio</Label>
+                    <Input 
+                      id="plot-temperature" 
+                      value={newPlotData.temperature}
+                      onChange={(e) => setNewPlotData({...newPlotData, temperature: e.target.value})}
+                      placeholder="22°C"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-rainfall">Precipitación (mm)</Label>
+                    <Input 
+                      id="plot-rainfall" 
+                      type="number"
+                      value={newPlotData.rainfall}
+                      onChange={(e) => setNewPlotData({...newPlotData, rainfall: e.target.value})}
+                      placeholder="800"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-elevation">Elevación (m)</Label>
+                    <Input 
+                      id="plot-elevation" 
+                      type="number"
+                      value={newPlotData.elevation}
+                      onChange={(e) => setNewPlotData({...newPlotData, elevation: e.target.value})}
+                      placeholder="1500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-latitude">Latitud</Label>
+                    <Input 
+                      id="plot-latitude" 
+                      type="number"
+                      step="any"
+                      value={newPlotData.latitude}
+                      onChange={(e) => setNewPlotData({...newPlotData, latitude: e.target.value})}
+                      placeholder="19.4326"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="plot-longitude">Longitud</Label>
+                    <Input 
+                      id="plot-longitude" 
+                      type="number"
+                      step="any"
+                      value={newPlotData.longitude}
+                      onChange={(e) => setNewPlotData({...newPlotData, longitude: e.target.value})}
+                      placeholder="-99.1332"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowCreatePlotDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreatePlot} disabled={createPlotMutation.isPending}>
+                  {createPlotMutation.isPending ? 'Creando...' : 'Crear Parcela'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        {/* Documents Tab */}
+        <TabsContent value="documents" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Subir Documento para Usuario
+              </CardTitle>
+              <CardDescription>
+                Solo administradores pueden subir documentos
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="document-user">Usuario</Label>
+                  <Select value={documentUserId} onValueChange={setDocumentUserId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar usuario" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users?.map((user) => (
+                        <SelectItem key={user.id} value={user.user_id}>
+                          {user.name} ({user.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="document-file">Archivo</Label>
+                  <Input
+                    id="document-file"
+                    type="file"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="document-name">Nombre del documento</Label>
+                  <Input
+                    id="document-name"
+                    value={documentName}
+                    onChange={(e) => setDocumentName(e.target.value)}
+                    placeholder="Ej: Contrato de Inversión"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="document-type">Tipo</Label>
+                  <Select value={documentType} onValueChange={setDocumentType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona el tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contract">Contrato</SelectItem>
+                      <SelectItem value="identification">Identificación</SelectItem>
+                      <SelectItem value="tax-id">RFC/Identificación Fiscal</SelectItem>
+                      <SelectItem value="payment-proof">Comprobante de Pago</SelectItem>
+                      <SelectItem value="report">Reporte</SelectItem>
+                      <SelectItem value="other">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {documentType === 'contract' && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="contract-type">Tipo de Contrato</Label>
+                    <Select value={contractType} onValueChange={setContractType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona tipo de contrato" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="investment">Contrato de Inversión</SelectItem>
+                        <SelectItem value="partnership">Contrato de Sociedad</SelectItem>
+                        <SelectItem value="service">Contrato de Servicios</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <Button 
+                onClick={handleUploadDocument} 
+                disabled={uploading || !selectedFile || !documentUserId || !documentName || !documentType}
+              >
+                {uploading ? 'Subiendo...' : 'Subir Documento'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
           <Card>
             <CardHeader>
@@ -645,6 +1124,7 @@ const Admin = () => {
           </Card>
         </TabsContent>
 
+        {/* Stats Tab */}
         <TabsContent value="stats" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card>
