@@ -90,7 +90,8 @@ const Admin = () => {
         .from('investments')
         .select(`
           *,
-          plant_species (name)
+          plant_species (name),
+          profiles!investments_user_id_fkey (name, email)
         `)
         .order('created_at', { ascending: false });
       
@@ -747,7 +748,7 @@ const Admin = () => {
                 {investments?.map((investment) => (
                   <div key={investment.id} className="flex items-center justify-between p-4 border rounded-lg">
                      <div>
-                       <h3 className="font-semibold">Usuario ID: {investment.user_id}</h3>
+                       <h3 className="font-semibold">{investment.profiles?.name || investment.profiles?.email || 'Usuario Desconocido'}</h3>
                       <p className="text-sm text-muted-foreground">
                         {investment.plant_count} plantas de {investment.plant_species?.name}
                       </p>
