@@ -12,7 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { TreePine, Coins, Leaf, Calendar, Plus, TrendingUp, BarChart3, Sprout } from 'lucide-react';
+import { TreePine, Coins, Leaf, Calendar, Plus, TrendingUp, BarChart3, Sprout, Bell } from 'lucide-react';
+import NotificationsPanel from '@/components/NotificationsPanel';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -400,6 +401,9 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Notifications Panel */}
+      <NotificationsPanel />
 
       {/* Investment Request Dialog */}
       <Dialog open={showInvestmentRequestDialog} onOpenChange={setShowInvestmentRequestDialog}>

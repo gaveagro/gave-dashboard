@@ -44,6 +44,8 @@ const Admin = () => {
 
   // Plot states
   const [showCreatePlotDialog, setShowCreatePlotDialog] = useState(false);
+  const [showEditPlotDialog, setShowEditPlotDialog] = useState(false);
+  const [editingPlot, setEditingPlot] = useState<any>(null);
   const [newPlotData, setNewPlotData] = useState({
     name: '',
     location: '',
@@ -125,29 +127,79 @@ const Admin = () => {
     }
   });
 
+  // Fetch investment requests
+  const { data: investmentRequests } = useQuery({
+    queryKey: ['admin-investment-requests'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('investment_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch notifications for admin management
+  const { data: allNotifications } = useQuery({
+    queryKey: ['admin-notifications'],
+    queryFn: async () => {
+      const { data: notifications, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+
+      // Get user profiles separately
+      const userIds = [...new Set(notifications?.map(n => n.user_id))];
+      const { data: userProfiles } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .in('user_id', userIds);
+
+      // Join the data
+      return notifications?.map(notification => ({
+        ...notification,
+        user_profile: userProfiles?.find(p => p.user_id === notification.user_id)
+      }));
+    }
+  });
+
+  // Fetch plant prices
+  const { data: plantPrices } = useQuery({
+    queryKey: ['admin-plant-prices'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plant_prices')
+        .select(`
+          *,
+          plant_species (name)
+        `)
+        .order('year', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: { email: string; name: string; role: 'admin' | 'investor' }) => {
-      // Use the service role key for admin operations
-      const { data, error } = await supabase.auth.admin.createUser({
+      // Create profile directly without using admin API which requires service role
+      const { data: newUser, error: signUpError } = await supabase.auth.signUp({
         email: userData.email,
-        email_confirm: false,
-        user_metadata: { name: userData.name }
+        password: Math.random().toString(36).slice(-8) + 'Aa1!', // Generate temporary password
+        options: {
+          data: { name: userData.name }
+        }
       });
 
-      if (error) throw error;
+      if (signUpError) throw signUpError;
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          user_id: data.user.id,
-          email: userData.email,
-          name: userData.name,
-          role: userData.role
-        });
-
-      if (profileError) throw profileError;
-      return data;
+      // The profile will be created automatically via the trigger
+      return newUser;
     },
     onSuccess: () => {
       toast({
@@ -303,6 +355,43 @@ const Admin = () => {
     }
   });
 
+  // Update plot mutation
+  const updatePlotMutation = useMutation({
+    mutationFn: async ({ plotId, plotData }: { plotId: string; plotData: any }) => {
+      const { error } = await supabase
+        .from('plots')
+        .update({
+          name: plotData.name,
+          location: plotData.location,
+          coordinates: plotData.coordinates,
+          area: parseFloat(plotData.area),
+          total_plants: parseInt(plotData.total_plants) || 0,
+          temperature: plotData.temperature || null,
+          rainfall: plotData.rainfall ? parseInt(plotData.rainfall) : null,
+          elevation: plotData.elevation ? parseInt(plotData.elevation) : null,
+          latitude: plotData.latitude ? parseFloat(plotData.latitude) : null,
+          longitude: plotData.longitude ? parseFloat(plotData.longitude) : null,
+        })
+        .eq('id', plotId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Parcela actualizada",
+        description: "La parcela ha sido actualizada exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-plots'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `No se pudo actualizar la parcela: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
   const sendPasswordResetMutation = useMutation({
     mutationFn: async (email: string) => {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -414,11 +503,64 @@ const Admin = () => {
       setNotificationMessage('');
       setNotificationTarget('all');
       setSelectedUsers([]);
+      queryClient.invalidateQueries({ queryKey: ['admin-notifications'] });
     },
     onError: (error) => {
       toast({
         title: "Error",
         description: `No se pudo enviar la notificación: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete investment mutation
+  const deleteInvestmentMutation = useMutation({
+    mutationFn: async (investmentId: string) => {
+      const { error } = await supabase
+        .from('investments')
+        .delete()
+        .eq('id', investmentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Inversión eliminada",
+        description: "La inversión ha sido eliminada exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-investments'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `No se pudo eliminar la inversión: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete notification mutation
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (notificationId: string) => {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Notificación eliminada",
+        description: "La notificación ha sido eliminada exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-notifications'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `No se pudo eliminar la notificación: ${error.message}`,
         variant: "destructive"
       });
     }
@@ -533,9 +675,11 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="investments">Inversiones</TabsTrigger>
+          <TabsTrigger value="requests">Solicitudes</TabsTrigger>
+          <TabsTrigger value="species">Especies</TabsTrigger>
           <TabsTrigger value="plots">Parcelas</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
@@ -770,12 +914,106 @@ const Admin = () => {
                         Año: {investment.plantation_year} | Total: ${investment.total_amount.toLocaleString()}
                       </p>
                     </div>
-                    <Badge variant={investment.status === 'active' ? 'default' : 'secondary'}>
-                      {investment.status}
+                     <div className="flex items-center gap-2">
+                       <Badge variant={investment.status === 'active' ? 'default' : 'secondary'}>
+                         {investment.status}
+                       </Badge>
+                       <Button
+                         variant="destructive"
+                         size="sm"
+                         onClick={() => deleteInvestmentMutation.mutate(investment.id)}
+                         disabled={deleteInvestmentMutation.isPending}
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                     </div>
+                   </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Investment Requests Tab */}
+        <TabsContent value="requests" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Solicitudes de Inversión</CardTitle>
+              <CardDescription>
+                Revisa y gestiona las solicitudes de nuevas inversiones
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {investmentRequests?.map((request) => (
+                  <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-semibold">{request.user_name}</h3>
+                      <p className="text-sm text-muted-foreground">{request.user_email}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {request.plant_count} plantas de {request.species_name}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Año: {request.establishment_year} | Total: ${request.total_investment.toLocaleString()}
+                      </p>
+                    </div>
+                    <Badge variant={request.status === 'pending' ? 'outline' : request.status === 'approved' ? 'default' : 'destructive'}>
+                      {request.status}
                     </Badge>
                   </div>
-                 );
-                })}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Species Management Tab */}
+        <TabsContent value="species" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Gestión de Especies y Precios</CardTitle>
+              <CardDescription>
+                Administra especies de plantas y sus precios por año
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Especies Disponibles</h3>
+                  <div className="space-y-4">
+                    {plantSpecies?.map((species) => (
+                      <div key={species.id} className="p-4 border rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-semibold">{species.name}</h4>
+                            <p className="text-sm text-muted-foreground">{species.scientific_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Maduración: {species.maturation_years} años | 
+                              Peso: {species.min_weight_kg}-{species.max_weight_kg} kg
+                            </p>
+                            {species.carbon_capture_per_plant && (
+                              <p className="text-sm text-muted-foreground">
+                                Captura CO₂: {species.carbon_capture_per_plant} t por planta
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4">
+                          <h5 className="font-medium mb-2">Precios por Año</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            {plantPrices?.filter(price => price.species_id === species.id).map((price) => (
+                              <div key={price.id} className="text-sm">
+                                {price.year}: ${price.price_per_plant}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -812,18 +1050,43 @@ const Admin = () => {
                     <div>
                       <h3 className="font-semibold">{plot.name}</h3>
                       <p className="text-sm text-muted-foreground">{plot.location}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Área: {plot.area} ha | Plantas: {plot.total_plants}
-                      </p>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deletePlotMutation.mutate(plot.id)}
-                      disabled={deletePlotMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                       <p className="text-sm text-muted-foreground">
+                         Área: {plot.area} ha | Plantas: {plot.total_plants}
+                       </p>
+                     </div>
+                     <div className="flex gap-2">
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={() => {
+                           setEditingPlot(plot);
+                           setNewPlotData({
+                             name: plot.name,
+                             location: plot.location,
+                             coordinates: plot.coordinates || '',
+                             area: plot.area.toString(),
+                             total_plants: plot.total_plants.toString(),
+                             available_plants: plot.available_plants.toString(),
+                             temperature: plot.temperature || '',
+                             rainfall: plot.rainfall?.toString() || '',
+                             elevation: plot.elevation?.toString() || '',
+                             latitude: plot.latitude?.toString() || '',
+                             longitude: plot.longitude?.toString() || ''
+                           });
+                           setShowEditPlotDialog(true);
+                         }}
+                       >
+                         Editar
+                       </Button>
+                       <Button
+                         variant="destructive"
+                         size="sm"
+                         onClick={() => deletePlotMutation.mutate(plot.id)}
+                         disabled={deletePlotMutation.isPending}
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                     </div>
                   </div>
                 ))}
               </div>
@@ -964,6 +1227,143 @@ const Admin = () => {
                 </Button>
                 <Button onClick={handleCreatePlot} disabled={createPlotMutation.isPending}>
                   {createPlotMutation.isPending ? 'Creando...' : 'Crear Parcela'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Plot Dialog */}
+          <Dialog open={showEditPlotDialog} onOpenChange={setShowEditPlotDialog}>
+            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Editar Parcela</DialogTitle>
+                <DialogDescription>
+                  Modifica la información de la parcela
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-name">Nombre *</Label>
+                    <Input 
+                      id="edit-plot-name" 
+                      value={newPlotData.name}
+                      onChange={(e) => setNewPlotData({...newPlotData, name: e.target.value})}
+                      placeholder="Nombre de la parcela"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-location">Ubicación *</Label>
+                    <Input 
+                      id="edit-plot-location" 
+                      value={newPlotData.location}
+                      onChange={(e) => setNewPlotData({...newPlotData, location: e.target.value})}
+                      placeholder="Ciudad, Estado"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-plot-coordinates">Coordenadas Google Maps</Label>
+                  <Input 
+                    id="edit-plot-coordinates" 
+                    value={newPlotData.coordinates}
+                    onChange={(e) => setNewPlotData({...newPlotData, coordinates: e.target.value})}
+                    placeholder="19.4326, -99.1332"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-area">Área (ha) *</Label>
+                    <Input 
+                      id="edit-plot-area" 
+                      type="number"
+                      step="0.01"
+                      value={newPlotData.area}
+                      onChange={(e) => setNewPlotData({...newPlotData, area: e.target.value})}
+                      placeholder="10.5"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-total-plants">Plantas Totales</Label>
+                    <Input 
+                      id="edit-plot-total-plants" 
+                      type="number"
+                      value={newPlotData.total_plants}
+                      onChange={(e) => setNewPlotData({...newPlotData, total_plants: e.target.value})}
+                      placeholder="1000"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-temperature">Temperatura Promedio</Label>
+                    <Input 
+                      id="edit-plot-temperature" 
+                      value={newPlotData.temperature}
+                      onChange={(e) => setNewPlotData({...newPlotData, temperature: e.target.value})}
+                      placeholder="22°C"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-rainfall">Precipitación (mm)</Label>
+                    <Input 
+                      id="edit-plot-rainfall" 
+                      type="number"
+                      value={newPlotData.rainfall}
+                      onChange={(e) => setNewPlotData({...newPlotData, rainfall: e.target.value})}
+                      placeholder="800"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-elevation">Elevación (m)</Label>
+                    <Input 
+                      id="edit-plot-elevation" 
+                      type="number"
+                      value={newPlotData.elevation}
+                      onChange={(e) => setNewPlotData({...newPlotData, elevation: e.target.value})}
+                      placeholder="1500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-latitude">Latitud</Label>
+                    <Input 
+                      id="edit-plot-latitude" 
+                      type="number"
+                      step="any"
+                      value={newPlotData.latitude}
+                      onChange={(e) => setNewPlotData({...newPlotData, latitude: e.target.value})}
+                      placeholder="19.4326"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-plot-longitude">Longitud</Label>
+                    <Input 
+                      id="edit-plot-longitude" 
+                      type="number"
+                      step="any"
+                      value={newPlotData.longitude}
+                      onChange={(e) => setNewPlotData({...newPlotData, longitude: e.target.value})}
+                      placeholder="-99.1332"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowEditPlotDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (editingPlot) {
+                      updatePlotMutation.mutate({ plotId: editingPlot.id, plotData: newPlotData });
+                      setShowEditPlotDialog(false);
+                    }
+                  }} 
+                  disabled={updatePlotMutation.isPending}
+                >
+                  {updatePlotMutation.isPending ? 'Actualizando...' : 'Actualizar Parcela'}
                 </Button>
               </div>
             </DialogContent>
@@ -1137,6 +1537,44 @@ const Admin = () => {
               </Button>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Notificaciones Enviadas</CardTitle>
+              <CardDescription>
+                Administra las notificaciones que han sido enviadas
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {allNotifications?.map((notification) => (
+                  <div key={notification.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-semibold">{notification.title}</h3>
+                      <p className="text-sm text-muted-foreground">{notification.message}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Para: {notification.user_profile?.name || notification.user_profile?.email} | 
+                        Enviado: {new Date(notification.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={notification.read ? 'default' : 'outline'}>
+                        {notification.read ? 'Leída' : 'No leída'}
+                      </Badge>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteNotificationMutation.mutate(notification.id)}
+                        disabled={deleteNotificationMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Stats Tab */}
@@ -1179,6 +1617,52 @@ const Admin = () => {
               <CardContent>
                 <div className="text-2xl font-bold">
                   {investments?.reduce((sum, inv) => sum + inv.plant_count, 0).toLocaleString() || 0}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Breakdown by Species and Year */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Plantas por Especie</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {plantSpecies?.map((species) => {
+                    const speciesInvestments = investments?.filter(inv => inv.species_id === species.id) || [];
+                    const totalPlants = speciesInvestments.reduce((sum, inv) => sum + inv.plant_count, 0);
+                    return totalPlants > 0 ? (
+                      <div key={species.id} className="flex justify-between items-center">
+                        <span className="text-sm">{species.name}</span>
+                        <span className="font-semibold">{totalPlants.toLocaleString()}</span>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Plantas por Año de Establecimiento</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {investments && Object.entries(
+                    investments.reduce((acc, inv) => {
+                      acc[inv.plantation_year] = (acc[inv.plantation_year] || 0) + inv.plant_count;
+                      return acc;
+                    }, {} as Record<number, number>)
+                  )
+                  .sort(([a], [b]) => Number(b) - Number(a))
+                  .map(([year, count]) => (
+                    <div key={year} className="flex justify-between items-center">
+                      <span className="text-sm">{year}</span>
+                      <span className="font-semibold">{count.toLocaleString()}</span>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
