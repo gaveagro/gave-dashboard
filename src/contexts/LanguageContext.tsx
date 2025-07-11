@@ -276,6 +276,14 @@ const translations = {
     'common.language': 'Language',
     'common.spanish': 'Español',
     'common.english': 'English',
+
+    // Reports
+    'reports.title': 'Reports',
+    'reports.description': 'Growth and performance analysis of your investments',
+    
+    // Investments 
+    'investments.title': 'My Investments',
+    'investments.description': 'View and track your forest investments',
   }
 };
 

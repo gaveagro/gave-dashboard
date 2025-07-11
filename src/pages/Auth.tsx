@@ -8,13 +8,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const Auth = () => {
   const { user, signIn } = useAuth();
+  const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   if (user) {
     return <Navigate to="/" replace />;
@@ -34,6 +38,33 @@ const Auth = () => {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('Por favor ingresa tu correo electrónico primero');
+      return;
+    }
+
+    setResetLoading(true);
+    setError('');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Correo de restablecimiento enviado",
+        description: "Revisa tu correo para restablecer tu contraseña",
+      });
+    } catch (err: any) {
+      setError(err.message || 'Error al enviar correo de restablecimiento');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -84,6 +115,18 @@ const Auth = () => {
               Iniciar Sesión
             </Button>
           </form>
+
+          <div className="mt-4 text-center">
+            <Button 
+              variant="link" 
+              onClick={handleResetPassword}
+              disabled={resetLoading}
+              className="text-sm"
+            >
+              {resetLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              ¿Olvidaste tu contraseña?
+            </Button>
+          </div>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>¿No tienes acceso?</p>
