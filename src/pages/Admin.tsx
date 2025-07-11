@@ -799,14 +799,6 @@ const Admin = () => {
     }
   });
 
-  const updateUserEmail = async (userId: string, newEmail: string) => {
-    try {
-      const { error } = await supabase.auth.admin.updateUserById(userId, {
-        email: newEmail
-      });
-
-      if (error) throw error;
-
   // Species management mutations
   const createSpeciesMutation = useMutation({
     mutationFn: async (speciesData: any) => {
