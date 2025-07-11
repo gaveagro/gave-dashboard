@@ -211,42 +211,114 @@ const Admin = () => {
     }
   });
 
-  // Create user mutation
+  // Species management states
+  const [showSpeciesDialog, setShowSpeciesDialog] = useState(false);
+  const [editingSpecies, setEditingSpecies] = useState<any>(null);
+  const [newSpeciesData, setNewSpeciesData] = useState({
+    name: '',
+    scientific_name: '',
+    description: '',
+    maturation_years: '',
+    min_weight_kg: '',
+    max_weight_kg: '',
+    carbon_capture_per_plant: ''
+  });
+
+  // Create user mutation with auto-confirmation
   const createUserMutation = useMutation({
-    mutationFn: async (userData: { email: string; name: string; role: 'admin' | 'investor' }) => {
-      // Create the profile directly since we can't create auth users from client
-      const randomId = crypto.randomUUID();
-      
-      const { data: profile, error: profileError } = await supabase
+    mutationFn: async ({ email, name, role }: { email: string; name: string; role: string }) => {
+      // Create user with admin_created metadata to trigger auto-confirmation
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password: 'TempPassword123!', // Temporary password - user should reset
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          name,
+          admin_created: true
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Create profile
+      const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
-          user_id: randomId,
-          email: userData.email,
-          name: userData.name,
-          role: userData.role
-        })
-        .select()
-        .single();
+        .insert([{
+          user_id: authData.user.id,
+          email,
+          name,
+          role: role as 'admin' | 'investor'
+        }]);
 
       if (profileError) throw profileError;
       
-      return profile;
+      return authData;
     },
     onSuccess: () => {
       toast({
         title: "Usuario creado",
-        description: "El usuario ha sido creado exitosamente."
+        description: "El usuario ha sido creado exitosamente. Se debe restablecer la contraseña.",
       });
       setNewUserEmail('');
       setNewUserName('');
       setNewUserRole('investor');
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      refetchUsers();
     },
     onError: (error: any) => {
-      console.error('Error creating user:', error);
       toast({
         title: "Error",
-        description: error.message || "No se pudo crear el usuario.",
+        description: error.message || "Error al crear usuario",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Upload report mutation
+  const uploadReportMutation = useMutation({
+    mutationFn: async () => {
+      if (!reportFile || !reportName) {
+        throw new Error('Por favor selecciona un archivo y proporciona un nombre');
+      }
+
+      const fileExt = reportFile.name.split('.').pop();
+      const fileName = `reports/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('drone-photos')
+        .upload(fileName, reportFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('drone-photos')
+        .getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase
+        .from('documents')
+        .insert({
+          user_id: profile?.user_id || '',
+          document_name: reportName,
+          document_type: 'report',
+          document_url: publicUrl,
+          file_size: reportFile.size,
+          uploaded_by: profile?.user_id
+        });
+
+      if (dbError) throw dbError;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Reporte subido",
+        description: "El reporte ha sido subido exitosamente."
+      });
+      setReportFile(null);
+      setReportName('');
+      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al subir el reporte",
         variant: "destructive"
       });
     }
@@ -396,8 +468,8 @@ const Admin = () => {
           location: plotData.location,
           coordinates: plotData.coordinates,
           area: parseFloat(plotData.area),
-                  total_plants: parseInt(plotData.total_plants) || 0,
-                  available_plants: parseInt(plotData.total_plants) || 0,
+          total_plants: parseInt(plotData.total_plants) || 0,
+          available_plants: parseInt(plotData.available_plants) || 0,
           temperature: plotData.temperature || null,
           rainfall: plotData.rainfall ? parseInt(plotData.rainfall) : null,
           elevation: plotData.elevation ? parseInt(plotData.elevation) : null,
@@ -686,56 +758,6 @@ const Admin = () => {
     }
   });
 
-  // Upload report mutation
-  const uploadReportMutation = useMutation({
-    mutationFn: async () => {
-      if (!reportFile || !reportName) {
-        throw new Error('Por favor completa todos los campos requeridos');
-      }
-
-      const fileExt = reportFile.name.split('.').pop();
-      const fileName = `reports/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('contracts')
-        .upload(fileName, reportFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('contracts')
-        .getPublicUrl(fileName);
-
-      const { error: dbError } = await supabase
-        .from('documents')
-        .insert({
-          user_id: profile?.user_id || '',
-          document_name: reportName,
-          document_type: 'report',
-          document_url: publicUrl,
-          file_size: reportFile.size,
-          uploaded_by: profile?.user_id
-        });
-
-      if (dbError) throw dbError;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Reporte subido",
-        description: "El reporte ha sido subido exitosamente."
-      });
-      setReportFile(null);
-      setReportName('');
-      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: `Error al subir el reporte: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
 
   // Delete report mutation
   const deleteReportMutation = useMutation({
@@ -785,6 +807,86 @@ const Admin = () => {
 
       if (error) throw error;
 
+  // Species management mutations
+  const createSpeciesMutation = useMutation({
+    mutationFn: async (speciesData: any) => {
+      const { error } = await supabase
+        .from('plant_species')
+        .insert({
+          name: speciesData.name,
+          scientific_name: speciesData.scientific_name,
+          description: speciesData.description,
+          maturation_years: parseInt(speciesData.maturation_years),
+          min_weight_kg: parseInt(speciesData.min_weight_kg),
+          max_weight_kg: parseInt(speciesData.max_weight_kg),
+          carbon_capture_per_plant: parseFloat(speciesData.carbon_capture_per_plant) || 0.5
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Especie creada",
+        description: "La especie ha sido creada exitosamente."
+      });
+      setShowSpeciesDialog(false);
+      setNewSpeciesData({
+        name: '',
+        scientific_name: '',
+        description: '',
+        maturation_years: '',
+        min_weight_kg: '',
+        max_weight_kg: '',
+        carbon_capture_per_plant: ''
+      });
+      queryClient.invalidateQueries({ queryKey: ['plant-species-admin'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al crear la especie",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const updateSpeciesMutation = useMutation({
+    mutationFn: async ({ id, speciesData }: { id: string, speciesData: any }) => {
+      const { error } = await supabase
+        .from('plant_species')
+        .update({
+          name: speciesData.name,
+          scientific_name: speciesData.scientific_name,
+          description: speciesData.description,
+          maturation_years: parseInt(speciesData.maturation_years),
+          min_weight_kg: parseInt(speciesData.min_weight_kg),
+          max_weight_kg: parseInt(speciesData.max_weight_kg),
+          carbon_capture_per_plant: parseFloat(speciesData.carbon_capture_per_plant) || 0.5
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Especie actualizada",
+        description: "La especie ha sido actualizada exitosamente."
+      });
+      setShowSpeciesDialog(false);
+      setEditingSpecies(null);
+      queryClient.invalidateQueries({ queryKey: ['plant-species-admin'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al actualizar la especie",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const updateUserEmail = async (userId: string, newEmail: string) => {
+    try {
       await supabase
         .from('profiles')
         .update({ email: newEmail })

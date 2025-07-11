@@ -241,8 +241,8 @@ const Plots = () => {
   };
 
   const getPlantsEstablished = (plotId: string) => {
-    const plot = plots?.find(p => p.id === plotId);
-    return plot?.total_plants || 0;
+    const plotInvestments = investments?.filter(inv => inv.plot_id === plotId) || [];
+    return plotInvestments.reduce((sum, inv) => sum + inv.plant_count, 0);
   };
 
   if (isLoading) {

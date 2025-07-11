@@ -300,35 +300,11 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Progress Overview */}
+      {/* Progress Overview - Only Progress by Investment */}
       {investments && investments.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Overall Progress Card */}
-          <Card className="lg:col-span-1 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950 dark:to-pink-950">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
-                <BarChart3 className="h-5 w-5" />
-                {t('dashboard.generalProgress')}
-              </CardTitle>
-              <CardDescription>
-                {t('dashboard.avgMaturation')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center">
-                <div className="text-5xl font-bold text-purple-700 dark:text-purple-300 mb-2">
-                  {Math.round(averageProgress)}%
-                </div>
-                <p className="text-sm text-purple-600 dark:text-purple-400">
-                  {t('dashboard.avgMaturity')}
-                </p>
-              </div>
-              <Progress value={averageProgress} className="h-3" />
-            </CardContent>
-          </Card>
-
+        <div className="grid grid-cols-1 gap-6">
           {/* Detailed Investment Progress */}
-          <Card className="lg:col-span-2">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sprout className="h-5 w-5 text-green-600" />

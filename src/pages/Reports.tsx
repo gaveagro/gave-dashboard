@@ -32,7 +32,14 @@ const Reports = () => {
   });
 
   const handleDownload = (documentUrl: string, documentName: string) => {
-    window.open(documentUrl, '_blank');
+    // For files stored in Supabase Storage, create a download link
+    const link = document.createElement('a');
+    link.href = documentUrl;
+    link.download = documentName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (isLoading) {
@@ -78,7 +85,7 @@ const Reports = () => {
                       onClick={() => handleDownload(report.document_url, report.document_name)}
                     >
                       <Download className="h-4 w-4 mr-2" />
-                      Descargar
+                      Ver/Descargar
                     </Button>
                   </div>
                 </div>
