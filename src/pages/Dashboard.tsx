@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   Card,
   CardContent,
@@ -21,6 +22,7 @@ import { useToast } from "@/hooks/use-toast"
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [showInvestmentRequestDialog, setShowInvestmentRequestDialog] = useState(false);
   const [requestData, setRequestData] = useState({
@@ -56,7 +58,7 @@ const Dashboard = () => {
     enabled: !!user?.id,
   });
 
-  // Fetch plant species for the request form
+  // Fetch plant species and prices for the request form
   const { data: plantSpecies } = useQuery({
     queryKey: ['plant-species'],
     queryFn: async () => {
@@ -69,27 +71,72 @@ const Dashboard = () => {
     },
   });
 
+  const { data: plantPrices } = useQuery({
+    queryKey: ['plant-prices'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plant_prices')
+        .select(`
+          *,
+          plant_species (name)
+        `);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Calculate total investment based on plants and price per plant
+  React.useEffect(() => {
+    if (requestData.plant_count && requestData.species_name && requestData.establishment_year) {
+      const priceKey = plantPrices?.find(p => 
+        p.plant_species.name === requestData.species_name && 
+        p.year === requestData.establishment_year
+      );
+      if (priceKey) {
+        const calculatedTotal = requestData.plant_count * priceKey.price_per_plant;
+        setRequestData(prev => ({ ...prev, total_investment: calculatedTotal }));
+      }
+    }
+  }, [requestData.plant_count, requestData.species_name, requestData.establishment_year, plantPrices]);
+
   const handleSubmitRequest = async () => {
     try {
+      // Calculate final investment if not already done
+      let finalTotal = requestData.total_investment;
+      if (requestData.plant_count && requestData.species_name && requestData.establishment_year) {
+        const priceKey = plantPrices?.find(p => 
+          p.plant_species.name === requestData.species_name && 
+          p.year === requestData.establishment_year
+        );
+        if (priceKey) {
+          finalTotal = requestData.plant_count * priceKey.price_per_plant;
+        }
+      }
+
       const { error } = await supabase
         .from('investment_requests')
         .insert([{
           user_id: user?.id,
           ...requestData,
-          weight_per_plant: 0, // Set default value
-          price_per_kg: 0      // Set default value
+          total_investment: finalTotal,
+          weight_per_plant: 50, // Default weight
+          price_per_kg: 12      // Default price per kg
         }]);
 
       if (error) throw error;
 
       // Send notification email
       await supabase.functions.invoke('send-investment-notification', {
-        body: requestData
+        body: {
+          ...requestData,
+          total_investment: finalTotal
+        }
       });
 
       toast({
-        title: "Solicitud enviada",
-        description: "Tu solicitud de inversión ha sido enviada correctamente"
+        title: t('dashboard.requestSent'),
+        description: t('dashboard.requestSuccess')
       });
 
       setShowInvestmentRequestDialog(false);
@@ -157,10 +204,10 @@ const Dashboard = () => {
       <div className="flex justify-between items-start">
         <div className="space-y-2">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            Tu Portafolio Forestal
+            {t('dashboard.portfolio')}
           </h1>
           <p className="text-xl text-muted-foreground">
-            Invierte en el futuro del planeta, cosecha prosperidad
+            {t('dashboard.portfolioDesc')}
           </p>
         </div>
         <Button 
@@ -169,7 +216,7 @@ const Dashboard = () => {
           size="lg"
         >
           <Plus className="h-5 w-5 mr-2" />
-          Nueva Inversión
+          {t('dashboard.newInvestment')}
         </Button>
       </div>
 
@@ -178,7 +225,7 @@ const Dashboard = () => {
         <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-green-700 dark:text-green-300">
-              Plantas Establecidas
+              {t('dashboard.establishedPlants')}
             </CardTitle>
             <div className="p-2 bg-green-100 dark:bg-green-900 rounded-full">
               <TreePine className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -189,7 +236,7 @@ const Dashboard = () => {
               {totalPlants.toLocaleString()}
             </div>
             <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-              árboles creciendo para ti
+              {t('dashboard.agavesGrowing')}
             </p>
           </CardContent>
         </Card>
@@ -197,7 +244,7 @@ const Dashboard = () => {
         <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">
-              Inversión Total
+              {t('dashboard.totalInvestment')}
             </CardTitle>
             <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
               <Coins className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -208,7 +255,7 @@ const Dashboard = () => {
               {formatCurrency(totalInvestment)}
             </div>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-              capital comprometido
+              {t('dashboard.investedCapital')}
             </p>
           </CardContent>
         </Card>
@@ -216,7 +263,7 @@ const Dashboard = () => {
         <Card className="border-l-4 border-l-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-              CO₂ Secuestrado
+              {t('dashboard.co2Captured')}
             </CardTitle>
             <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-full">
               <Leaf className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -227,7 +274,7 @@ const Dashboard = () => {
               {totalCO2Captured.toLocaleString()} kg
             </div>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-              impacto ambiental positivo
+              {t('dashboard.positiveImpact')}
             </p>
           </CardContent>
         </Card>
@@ -235,7 +282,7 @@ const Dashboard = () => {
         <Card className="border-l-4 border-l-orange-500 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">
-              Próxima Cosecha
+              {t('dashboard.nextHarvest')}
             </CardTitle>
             <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-full">
               <Calendar className="h-5 w-5 text-orange-600 dark:text-orange-400" />
@@ -246,7 +293,7 @@ const Dashboard = () => {
               {nextHarvest ? nextHarvest.expected_harvest_year : 'N/A'}
             </div>
             <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-              {nextHarvest ? `${nextHarvest.plant_count.toLocaleString()} plantas` : 'Sin inversiones activas'}
+              {nextHarvest ? `${nextHarvest.plant_count.toLocaleString()} plantas` : t('dashboard.noActiveInvestments')}
             </p>
           </CardContent>
         </Card>
@@ -260,10 +307,10 @@ const Dashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
                 <BarChart3 className="h-5 w-5" />
-                Progreso General
+                {t('dashboard.generalProgress')}
               </CardTitle>
               <CardDescription>
-                Estado promedio de maduración
+                {t('dashboard.avgMaturation')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -272,7 +319,7 @@ const Dashboard = () => {
                   {Math.round(averageProgress)}%
                 </div>
                 <p className="text-sm text-purple-600 dark:text-purple-400">
-                  madurez promedio
+                  {t('dashboard.avgMaturity')}
                 </p>
               </div>
               <Progress value={averageProgress} className="h-3" />
@@ -284,10 +331,10 @@ const Dashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sprout className="h-5 w-5 text-green-600" />
-                Progreso por Inversión
+                {t('dashboard.progressByInvestment')}
               </CardTitle>
               <CardDescription>
-                Estado de maduración de tus plantaciones
+                {t('dashboard.maturationStatus')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -319,11 +366,11 @@ const Dashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <Progress value={progress} className="h-3" />
+                    <Progress value={progress} className="h-3 [&>div]:bg-gradient-to-r [&>div]:from-emerald-500 [&>div]:to-teal-500" />
                     {progress >= 100 && (
                       <div className="flex items-center gap-1 text-green-700 dark:text-green-300">
                         <TrendingUp className="h-4 w-4" />
-                        <span className="text-sm font-medium">¡Listo para cosecha!</span>
+                        <span className="text-sm font-medium">{t('dashboard.readyForHarvest')}</span>
                       </div>
                     )}
                   </div>
@@ -338,9 +385,9 @@ const Dashboard = () => {
         <Card className="bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-900 dark:to-slate-900">
           <CardContent className="py-12 text-center">
             <TreePine className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-2xl font-semibold mb-2">Comienza tu Viaje Forestal</h3>
+            <h3 className="text-2xl font-semibold mb-2">{t('dashboard.startForestJourney')}</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Aún no tienes inversiones. ¡Empieza hoy y contribuye al cuidado del medio ambiente mientras generas rendimientos!
+              {t('dashboard.noInvestmentsDesc')}
             </p>
             <Button 
               onClick={() => setShowInvestmentRequestDialog(true)}
@@ -348,7 +395,7 @@ const Dashboard = () => {
               size="lg"
             >
               <Plus className="h-5 w-5 mr-2" />
-              Mi Primera Inversión
+              {t('dashboard.firstInvestment')}
             </Button>
           </CardContent>
         </Card>
@@ -358,15 +405,15 @@ const Dashboard = () => {
       <Dialog open={showInvestmentRequestDialog} onOpenChange={setShowInvestmentRequestDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Solicitar Nueva Inversión</DialogTitle>
+            <DialogTitle>{t('dashboard.requestNewInvestment')}</DialogTitle>
             <DialogDescription>
-              Envía una solicitud para una nueva inversión forestal. Nuestro equipo revisará tu solicitud y se pondrá en contacto contigo.
+              {t('dashboard.newInvestmentDesc')}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="user-name">Nombre completo</Label>
+                <Label htmlFor="user-name">{t('dashboard.fullName')}</Label>
                 <Input 
                   id="user-name" 
                   value={requestData.user_name}
@@ -374,7 +421,7 @@ const Dashboard = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="user-phone">Teléfono</Label>
+                <Label htmlFor="user-phone">{t('dashboard.phone')}</Label>
                 <Input 
                   id="user-phone" 
                   value={requestData.user_phone}
@@ -383,10 +430,10 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="species">Especie</Label>
+              <Label htmlFor="species">{t('dashboard.species')}</Label>
               <Select value={requestData.species_name} onValueChange={(value) => setRequestData({...requestData, species_name: value})}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una especie" />
+                  <SelectValue placeholder={t('dashboard.selectSpecies')} />
                 </SelectTrigger>
                 <SelectContent>
                   {plantSpecies?.map((species) => (
@@ -399,7 +446,7 @@ const Dashboard = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="plant-count">Cantidad de plantas</Label>
+                <Label htmlFor="plant-count">{t('dashboard.plantCount')}</Label>
                 <Input 
                   id="plant-count" 
                   type="number"
@@ -408,7 +455,7 @@ const Dashboard = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="establishment-year">Año de establecimiento</Label>
+                <Label htmlFor="establishment-year">{t('dashboard.establishmentYear')}</Label>
                 <Input 
                   id="establishment-year" 
                   type="number"
@@ -418,22 +465,26 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="total-investment">Inversión total</Label>
+              <Label htmlFor="total-investment">{t('dashboard.totalInvestmentAmount')}</Label>
               <Input 
                 id="total-investment" 
                 type="number"
                 step="0.01"
                 value={requestData.total_investment}
-                onChange={(e) => setRequestData({...requestData, total_investment: parseFloat(e.target.value) || 0})}
+                disabled
+                className="bg-muted"
               />
+              <p className="text-xs text-muted-foreground">
+                Calculado automáticamente: {requestData.plant_count} plantas × precio por planta
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setShowInvestmentRequestDialog(false)}>
-              Cancelar
+              {t('dashboard.cancel')}
             </Button>
             <Button onClick={handleSubmitRequest}>
-              Enviar Solicitud
+              {t('dashboard.sendRequest')}
             </Button>
           </div>
         </DialogContent>

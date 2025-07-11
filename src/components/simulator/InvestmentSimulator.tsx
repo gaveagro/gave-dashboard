@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Calculator, TrendingUp, Clock, Leaf, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -55,6 +56,7 @@ interface InvestmentResults {
 
 export const InvestmentSimulator: React.FC = () => {
   const { user, profile } = useAuth();
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [selectedSpecies, setSelectedSpecies] = useState<string>('Espadín');
   const [selectedYear, setSelectedYear] = useState<string>('2025');
@@ -171,8 +173,8 @@ export const InvestmentSimulator: React.FC = () => {
   const handleProceedWithInvestment = async () => {
     if (!user || !profile) {
       toast({
-        title: "Acceso requerido",
-        description: "Debes iniciar sesión para proceder con la inversión",
+        title: t('simulator.accessRequired'),
+        description: t('simulator.loginRequired'),
         variant: "destructive"
       });
       return;
@@ -224,14 +226,14 @@ export const InvestmentSimulator: React.FC = () => {
       }
 
       toast({
-        title: "Solicitud enviada",
-        description: "Hemos recibido tu interés en esta inversión. Nos pondremos en contacto contigo pronto.",
+        title: t('simulator.requestSent'),
+        description: t('simulator.requestDesc'),
       });
     } catch (error) {
       console.error('Error sending investment request:', error);
       toast({
         title: "Error",
-        description: "No se pudo enviar la solicitud. Intenta nuevamente.",
+        description: t('simulator.requestError'),
         variant: "destructive"
       });
     } finally {
@@ -244,10 +246,10 @@ export const InvestmentSimulator: React.FC = () => {
       {/* Header */}
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold bg-gradient-agave bg-clip-text text-transparent">
-          Simulador de Inversión Gavé
+          {t('simulator.title')}
         </h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Calcula el retorno de tu inversión en plantaciones de agave para producción de mezcal
+          {t('simulator.description')}
         </p>
       </div>
 
@@ -257,19 +259,19 @@ export const InvestmentSimulator: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5 text-primary" />
-              Configuración de Inversión
+              {t('simulator.configTitle')}
             </CardTitle>
             <CardDescription>
-              Ajusta los parámetros para calcular tu inversión
+              {t('simulator.configDesc')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Selector de Especie */}
             <div className="space-y-2">
-              <Label htmlFor="species">Especie de Agave</Label>
+              <Label htmlFor="species">{t('simulator.species')}</Label>
               <Select value={selectedSpecies} onValueChange={setSelectedSpecies}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una especie" />
+                  <SelectValue placeholder={t('simulator.selectSpecies')} />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.entries(speciesData).map(([name, data]) => (
@@ -289,10 +291,10 @@ export const InvestmentSimulator: React.FC = () => {
 
             {/* Año de Establecimiento */}
             <div className="space-y-2">
-              <Label htmlFor="year">Año de Establecimiento</Label>
+              <Label htmlFor="year">{t('simulator.year')}</Label>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un año" />
+                  <SelectValue placeholder={t('simulator.selectYear')} />
                 </SelectTrigger>
                 <SelectContent>
                   {Object.keys(plantPrices)
@@ -316,7 +318,7 @@ export const InvestmentSimulator: React.FC = () => {
 
             {/* Número de Plantas */}
             <div className="space-y-2">
-              <Label htmlFor="plants">Número de Plantas</Label>
+              <Label htmlFor="plants">{t('simulator.plants')}</Label>
               <Input
                 id="plants"
                 type="number"
@@ -327,13 +329,13 @@ export const InvestmentSimulator: React.FC = () => {
                 className="text-lg font-medium"
               />
               <p className="text-sm text-muted-foreground">
-                Mínimo 1, máximo 1,000 plantas
+                {t('simulator.plantsRange')}
               </p>
             </div>
 
             {/* Peso Esperado por Planta */}
             <div className="space-y-4">
-              <Label>Peso Esperado por Planta</Label>
+              <Label>{t('simulator.weightPerPlant')}</Label>
               <div className="px-3">
                 <Slider
                   value={weightPerPlant}
@@ -347,7 +349,7 @@ export const InvestmentSimulator: React.FC = () => {
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>{speciesData[selectedSpecies as keyof typeof speciesData].weightRange.min} kg</span>
                 <span className="font-medium text-primary text-lg">
-                  {formatNumber(weightPerPlant[0])} kg por planta
+                  {formatNumber(weightPerPlant[0])} {t('simulator.weightPerPlantUnit')}
                 </span>
                 <span>{speciesData[selectedSpecies as keyof typeof speciesData].weightRange.max} kg</span>
               </div>
@@ -355,7 +357,7 @@ export const InvestmentSimulator: React.FC = () => {
 
             {/* Precio Esperado por Kg */}
             <div className="space-y-4">
-              <Label>Precio Esperado por Kg de Agave</Label>
+              <Label>{t('simulator.pricePerKg')}</Label>
               <div className="px-3">
                 <Slider
                   value={selectedPricePerKg}
@@ -369,7 +371,7 @@ export const InvestmentSimulator: React.FC = () => {
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>$0 MXN</span>
                 <span className="font-medium text-primary text-lg">
-                  {formatCurrency(selectedPricePerKg[0])} por kg
+                  {formatCurrency(selectedPricePerKg[0])} {t('simulator.pricePerKgUnit')}
                 </span>
                 <span>$50 MXN</span>
               </div>
@@ -384,7 +386,7 @@ export const InvestmentSimulator: React.FC = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-investment flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Inversión Inicial
+                {t('simulator.initialInvestment')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -402,7 +404,7 @@ export const InvestmentSimulator: React.FC = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-profit flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Retorno Final
+                {t('simulator.finalReturn')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -410,7 +412,7 @@ export const InvestmentSimulator: React.FC = () => {
                 {formatCurrency(results.finalReturn)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Inversión + 65% de utilidades
+                {t('simulator.returnDesc')}
               </p>
             </CardContent>
           </Card>
@@ -420,7 +422,7 @@ export const InvestmentSimulator: React.FC = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-roi flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Ganancia Neta
+                {t('simulator.netProfit')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -438,16 +440,16 @@ export const InvestmentSimulator: React.FC = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-accent flex items-center gap-2">
                 <Leaf className="h-5 w-5" />
-                Desglose de Cosecha
+                {t('simulator.harvestBreakdown')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Peso total:</span>
+                <span className="text-sm text-muted-foreground">{t('simulator.totalWeight')}</span>
                 <span className="font-medium">{formatNumber(results.totalYield)} kg</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Valor bruto:</span>
+                <span className="text-sm text-muted-foreground">{t('simulator.grossValue')}</span>
                 <span className="font-medium">{formatCurrency(results.grossRevenue)}</span>
               </div>
               <div className="flex justify-between">
@@ -465,15 +467,15 @@ export const InvestmentSimulator: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              Tiempo de Maduración
+              {t('simulator.maturationTime')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {speciesData[selectedSpecies as keyof typeof speciesData].maturationYears} años
+              {speciesData[selectedSpecies as keyof typeof speciesData].maturationYears} {t('simulator.years')}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Cosecha estimada: {results.maturationDate.toLocaleDateString('es-MX', { 
+              {t('simulator.harvestDate')}: {results.maturationDate.toLocaleDateString('es-MX', { 
                 year: 'numeric', 
                 month: 'long' 
               })}
@@ -500,13 +502,13 @@ export const InvestmentSimulator: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Leaf className="h-4 w-4" />
-              Impacto Ambiental
+              {t('simulator.environmentalImpact')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNumber(results.totalCarbonCapture, 1)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Toneladas CO₂ capturadas
+              {t('simulator.carbonCapture')}
             </p>
           </CardContent>
         </Card>
@@ -520,7 +522,7 @@ export const InvestmentSimulator: React.FC = () => {
           onClick={handleProceedWithInvestment}
           disabled={loading}
         >
-          {loading ? 'Enviando solicitud...' : 'Proceder con esta Inversión'}
+          {loading ? 'Enviando solicitud...' : t('simulator.proceed')}
         </Button>
         <p className="text-sm text-muted-foreground mt-2">
           * Los cálculos son estimaciones basadas en condiciones promedio de cultivo
