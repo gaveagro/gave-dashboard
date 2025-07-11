@@ -90,10 +90,22 @@ const Admin = () => {
         .from('investments')
         .select(`
           *,
-          plant_species (name),
-          profiles!investments_user_id_fkey (name, email)
+          plant_species (name)
         `)
         .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch profiles separately to join with investments
+  const { data: profiles } = useQuery({
+    queryKey: ['admin-profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, name, email');
       
       if (error) throw error;
       return data;
@@ -745,10 +757,12 @@ const Admin = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {investments?.map((investment) => (
-                  <div key={investment.id} className="flex items-center justify-between p-4 border rounded-lg">
+                {investments?.map((investment) => {
+                  const userProfile = profiles?.find(p => p.user_id === investment.user_id);
+                  return (
+                    <div key={investment.id} className="flex items-center justify-between p-4 border rounded-lg">
                      <div>
-                       <h3 className="font-semibold">{investment.profiles?.name || investment.profiles?.email || 'Usuario Desconocido'}</h3>
+                       <h3 className="font-semibold">{userProfile?.name || userProfile?.email || `Usuario ID: ${investment.user_id}`}</h3>
                       <p className="text-sm text-muted-foreground">
                         {investment.plant_count} plantas de {investment.plant_species?.name}
                       </p>
@@ -760,7 +774,8 @@ const Admin = () => {
                       {investment.status}
                     </Badge>
                   </div>
-                ))}
+                 );
+                })}
               </div>
             </CardContent>
           </Card>
