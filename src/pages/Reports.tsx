@@ -2,6 +2,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   Card,
   CardContent,
@@ -14,6 +15,7 @@ import { FileText, Download, Calendar } from 'lucide-react';
 import { Badge } from "@/components/ui/badge"
 
 const Reports = () => {
+  const { t } = useLanguage();
   // Fetch reports (documents with type 'report')
   const { data: reports, isLoading } = useQuery({
     queryKey: ['reports'],
@@ -44,9 +46,9 @@ const Reports = () => {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Reportes</h1>
+        <h1 className="text-3xl font-bold">{t('reports.title')}</h1>
         <p className="text-muted-foreground">
-          Consulta los reportes anuales y documentos oficiales
+          {t('reports.description')}
         </p>
       </div>
 

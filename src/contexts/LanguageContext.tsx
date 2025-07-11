@@ -128,6 +128,14 @@ const translations = {
     'common.language': 'Idioma',
     'common.spanish': 'Español',
     'common.english': 'English',
+    
+    // Reports
+    'reports.title': 'Reportes',
+    'reports.description': 'Análisis de crecimiento y rendimiento de tus inversiones',
+    
+    // Investments 
+    'investments.title': 'Mis Inversiones',
+    'investments.description': 'Visualiza y rastrea tus inversiones forestales',
   },
   en: {
     // Navigation
@@ -282,7 +290,20 @@ export function useLanguage() {
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>('es');
+  const [language, setLanguage] = useState<Language>(() => {
+    // Try to get language from localStorage, default to 'es'
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('language') as Language) || 'es';
+    }
+    return 'es';
+  });
+
+  // Save language to localStorage when it changes
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('language', language);
+    }
+  }, [language]);
 
   const t = (key: string): string => {
     return translations[language][key as keyof typeof translations[typeof language]] || key;

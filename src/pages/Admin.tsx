@@ -60,7 +60,7 @@ const Admin = () => {
     longitude: ''
   });
 
-  const { data: users } = useQuery({
+  const { data: users, refetch: refetchUsers } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -84,6 +84,7 @@ const Admin = () => {
       return data;
     }
   });
+
 
   const { data: investments } = useQuery({
     queryKey: ['admin-investments'],
@@ -210,6 +211,8 @@ const Admin = () => {
       setNewUserName('');
       setNewUserRole('investor');
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      // Force refetch to ensure immediate update
+      setTimeout(() => refetchUsers(), 1000);
     },
     onError: (error) => {
       console.error('Error creating user:', error);
@@ -365,7 +368,8 @@ const Admin = () => {
           location: plotData.location,
           coordinates: plotData.coordinates,
           area: parseFloat(plotData.area),
-          total_plants: parseInt(plotData.total_plants) || 0,
+                  total_plants: parseInt(plotData.total_plants) || 0,
+                  available_plants: parseInt(plotData.total_plants) || 0,
           temperature: plotData.temperature || null,
           rainfall: plotData.rainfall ? parseInt(plotData.rainfall) : null,
           elevation: plotData.elevation ? parseInt(plotData.elevation) : null,

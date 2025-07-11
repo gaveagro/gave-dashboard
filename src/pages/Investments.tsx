@@ -4,8 +4,10 @@ import { Leaf, Clock, TrendingUp } from 'lucide-react';
 import { InvestmentChart } from '@/components/InvestmentChart';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const Investments = () => {
+  const { t } = useLanguage();
   const [userInvestments, setUserInvestments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -80,10 +82,10 @@ const Investments = () => {
       {/* Header */}
       <div className="space-y-4">
         <h1 className="text-3xl font-bold bg-gradient-agave bg-clip-text text-transparent">
-          Mis Inversiones
+          {t('investments.title')}
         </h1>
         <p className="text-muted-foreground text-lg">
-          Gestiona y monitorea tus inversiones en plantaciones de agave
+          {t('investments.description')}
         </p>
       </div>
 
