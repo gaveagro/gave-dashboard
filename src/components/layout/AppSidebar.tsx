@@ -29,56 +29,54 @@ import {
 } from "@/components/ui/sidebar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
+import LanguageToggle from "@/components/LanguageToggle"
 import { useAuth } from "@/contexts/AuthContext"
+import { useLanguage } from "@/contexts/LanguageContext"
 import { supabase } from "@/integrations/supabase/client"
 import { useNavigate, useLocation } from "react-router-dom"
 
-// Menu items.
-const items = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: Home,
-  },
-  {
-    title: "Mis Inversiones",
-    url: "/investments",
-    icon: TrendingUp,
-  },
-  {
-    title: "Parcelas",
-    url: "/plots",
-    icon: MapPin,
-  },
-  {
-    title: "Documentos",
-    url: "/documents",
-    icon: FileText,
-  },
-  {
-    title: "Reportes",
-    url: "/reports",
-    icon: ClipboardList,
-  },
-  {
-    title: "Simulador",
-    url: "/simulator",
-    icon: Calculator,
-  },
-]
-
-const adminItems = [
-  {
-    title: "Panel Admin",
-    url: "/admin",
-    icon: Users,
-  },
-]
-
 export function AppSidebar() {
   const { user, profile } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Menu items.
+  const items = [
+    {
+      title: t('nav.dashboard'),
+      url: "/dashboard",
+      icon: Home,
+    },
+    {
+      title: t('nav.investments'),
+      url: "/investments",
+      icon: TrendingUp,
+    },
+    {
+      title: t('nav.plots'),
+      url: "/plots",
+      icon: MapPin,
+    },
+    {
+      title: t('nav.reports'),
+      url: "/reports",
+      icon: ClipboardList,
+    },
+    {
+      title: t('nav.simulator'),
+      url: "/simulator",
+      icon: Calculator,
+    },
+  ]
+
+  const adminItems = [
+    {
+      title: t('nav.admin'),
+      url: "/admin",
+      icon: Users,
+    },
+  ]
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -113,6 +111,9 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <LanguageToggle />
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

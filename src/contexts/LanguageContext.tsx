@@ -15,7 +15,7 @@ const translations = {
     'nav.simulator': 'Simulador',
     'nav.investments': 'Mis Inversiones',
     'nav.plots': 'Parcelas',
-    'nav.documents': 'Mis Documentos',
+    'nav.reports': 'Reportes',
     'nav.admin': 'Administración',
     
     // Dashboard
@@ -143,7 +143,7 @@ const translations = {
     'nav.simulator': 'Simulator',
     'nav.investments': 'My Investments',
     'nav.plots': 'Plots',
-    'nav.documents': 'My Documents',
+    'nav.reports': 'Reports',
     'nav.admin': 'Administration',
     
     // Dashboard

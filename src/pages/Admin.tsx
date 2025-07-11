@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Plus, Send, DollarSign, TrendingUp, RotateCcw, MapPin, Trash2 } from 'lucide-react';
+import { Users, Plus, Send, DollarSign, TrendingUp, RotateCcw, MapPin, Trash2, Upload, Download, Eye, Edit, FileText } from 'lucide-react';
 
 const Admin = () => {
   const { profile } = useAuth();
@@ -46,6 +46,17 @@ const Admin = () => {
   const [showCreatePlotDialog, setShowCreatePlotDialog] = useState(false);
   const [showEditPlotDialog, setShowEditPlotDialog] = useState(false);
   const [editingPlot, setEditingPlot] = useState<any>(null);
+  
+  // Price editing states
+  const [editingPrice, setEditingPrice] = useState<any>(null);
+  const [showPriceDialog, setShowPriceDialog] = useState(false);
+  const [newPriceValue, setNewPriceValue] = useState('');
+  
+  // Report states
+  const [reportFile, setReportFile] = useState<File | null>(null);
+  const [reportName, setReportName] = useState('');
+  const [reportUploading, setReportUploading] = useState(false);
+
   const [newPlotData, setNewPlotData] = useState({
     name: '',
     location: '',
@@ -185,22 +196,41 @@ const Admin = () => {
     }
   });
 
+  // Fetch reports
+  const { data: reports } = useQuery({
+    queryKey: ['admin-reports'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .eq('document_type', 'report')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: { email: string; name: string; role: 'admin' | 'investor' }) => {
-      // Create profile directly without using admin API which requires service role
-      const { data: newUser, error: signUpError } = await supabase.auth.signUp({
-        email: userData.email,
-        password: Math.random().toString(36).slice(-8) + 'Aa1!', // Generate temporary password
-        options: {
-          data: { name: userData.name }
-        }
-      });
+      // Create the profile directly since we can't create auth users from client
+      const randomId = crypto.randomUUID();
+      
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: randomId,
+          email: userData.email,
+          name: userData.name,
+          role: userData.role
+        })
+        .select()
+        .single();
 
-      if (signUpError) throw signUpError;
-
-      // The profile will be created automatically via the trigger
-      return newUser;
+      if (profileError) throw profileError;
+      
+      return profile;
     },
     onSuccess: () => {
       toast({
@@ -211,14 +241,12 @@ const Admin = () => {
       setNewUserName('');
       setNewUserRole('investor');
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      // Force refetch to ensure immediate update
-      setTimeout(() => refetchUsers(), 1000);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error creating user:', error);
       toast({
         title: "Error",
-        description: `No se pudo crear el usuario. Verifica que tengas permisos de administrador.`,
+        description: error.message || "No se pudo crear el usuario.",
         variant: "destructive"
       });
     }
@@ -629,6 +657,126 @@ const Admin = () => {
     createPlotMutation.mutate(newPlotData);
   };
 
+  // Update price mutation
+  const updatePriceMutation = useMutation({
+    mutationFn: async ({ priceId, newPrice }: { priceId: string; newPrice: number }) => {
+      const { error } = await supabase
+        .from('plant_prices')
+        .update({ price_per_plant: newPrice })
+        .eq('id', priceId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Precio actualizado",
+        description: "El precio ha sido actualizado exitosamente."
+      });
+      setShowPriceDialog(false);
+      setEditingPrice(null);
+      setNewPriceValue('');
+      queryClient.invalidateQueries({ queryKey: ['admin-plant-prices'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: `No se pudo actualizar el precio: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Upload report mutation
+  const uploadReportMutation = useMutation({
+    mutationFn: async () => {
+      if (!reportFile || !reportName) {
+        throw new Error('Por favor completa todos los campos requeridos');
+      }
+
+      const fileExt = reportFile.name.split('.').pop();
+      const fileName = `reports/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('contracts')
+        .upload(fileName, reportFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('contracts')
+        .getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase
+        .from('documents')
+        .insert({
+          user_id: profile?.user_id || '',
+          document_name: reportName,
+          document_type: 'report',
+          document_url: publicUrl,
+          file_size: reportFile.size,
+          uploaded_by: profile?.user_id
+        });
+
+      if (dbError) throw dbError;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Reporte subido",
+        description: "El reporte ha sido subido exitosamente."
+      });
+      setReportFile(null);
+      setReportName('');
+      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: `Error al subir el reporte: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete report mutation
+  const deleteReportMutation = useMutation({
+    mutationFn: async ({ reportId, documentUrl }: { reportId: string; documentUrl: string }) => {
+      // Extract file path from URL
+      const urlParts = documentUrl.split('/');
+      const filePath = urlParts.slice(-2).join('/');
+
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('contracts')
+        .remove([filePath]);
+
+      if (storageError) {
+        console.error('Storage deletion error:', storageError);
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', reportId);
+
+      if (dbError) throw dbError;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Reporte eliminado",
+        description: "El reporte ha sido eliminado exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: `Error al eliminar el reporte: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
   const updateUserEmail = async (userId: string, newEmail: string) => {
     try {
       const { error } = await supabase.auth.admin.updateUserById(userId, {
@@ -679,13 +827,13 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="investments">Inversiones</TabsTrigger>
           <TabsTrigger value="requests">Solicitudes</TabsTrigger>
           <TabsTrigger value="species">Especies</TabsTrigger>
           <TabsTrigger value="plots">Parcelas</TabsTrigger>
-          <TabsTrigger value="documents">Documentos</TabsTrigger>
+          <TabsTrigger value="reports">Reportes</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
           <TabsTrigger value="stats">Estadísticas</TabsTrigger>
         </TabsList>
@@ -983,6 +1131,32 @@ const Admin = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
+                {/* Plant Prices List */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Precios por Especie y Año</h3>
+                  {plantPrices?.map((price) => (
+                    <div key={price.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <span className="font-medium">{price.plant_species?.name}</span>
+                        <span className="text-muted-foreground ml-2">({price.year})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">${price.price_per_plant}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingPrice(price);
+                            setNewPriceValue(price.price_per_plant.toString());
+                            setShowPriceDialog(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Especies Disponibles</h3>
                   <div className="space-y-4">
@@ -1372,98 +1546,156 @@ const Admin = () => {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Edit Price Dialog */}
+          <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Precio</DialogTitle>
+                <DialogDescription>
+                  Actualizar precio para {editingPrice?.plant_species?.name} ({editingPrice?.year})
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="new-price">Nuevo Precio</Label>
+                  <Input
+                    id="new-price"
+                    type="number"
+                    value={newPriceValue}
+                    onChange={(e) => setNewPriceValue(e.target.value)}
+                    placeholder="Precio por planta"
+                  />
+                </div>
+                <Button
+                  onClick={() => updatePriceMutation.mutate({
+                    priceId: editingPrice?.id || '',
+                    newPrice: parseFloat(newPriceValue)
+                  })}
+                  disabled={!newPriceValue || updatePriceMutation.isPending}
+                >
+                  {updatePriceMutation.isPending ? 'Actualizando...' : 'Actualizar Precio'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
-        {/* Documents Tab */}
-        <TabsContent value="documents" className="space-y-6">
+        {/* Reports Tab */}
+        <TabsContent value="reports" className="space-y-6">
+          {/* Upload Report Section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Subir Documento para Usuario
+                <Upload className="h-5 w-5" />
+                Subir Reporte
               </CardTitle>
               <CardDescription>
-                Solo administradores pueden subir documentos
+                Sube reportes anuales y documentos oficiales
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="document-user">Usuario</Label>
-                  <Select value={documentUserId} onValueChange={setDocumentUserId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar usuario" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users?.map((user) => (
-                        <SelectItem key={user.id} value={user.user_id}>
-                          {user.name} ({user.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="document-file">Archivo</Label>
+                  <Label htmlFor="report-file">Archivo</Label>
                   <Input
-                    id="document-file"
+                    id="report-file"
                     type="file"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    onChange={(e) => setReportFile(e.target.files?.[0] || null)}
+                    accept=".pdf,.doc,.docx"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="document-name">Nombre del documento</Label>
+                  <Label htmlFor="report-name">Nombre del reporte</Label>
                   <Input
-                    id="document-name"
-                    value={documentName}
-                    onChange={(e) => setDocumentName(e.target.value)}
-                    placeholder="Ej: Contrato de Inversión"
+                    id="report-name"
+                    value={reportName}
+                    onChange={(e) => setReportName(e.target.value)}
+                    placeholder="Ej: Reporte Anual 2024"
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="document-type">Tipo</Label>
-                  <Select value={documentType} onValueChange={setDocumentType}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona el tipo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="contract">Contrato</SelectItem>
-                      <SelectItem value="identification">Identificación</SelectItem>
-                      <SelectItem value="tax-id">RFC/Identificación Fiscal</SelectItem>
-                      <SelectItem value="payment-proof">Comprobante de Pago</SelectItem>
-                      <SelectItem value="report">Reporte</SelectItem>
-                      <SelectItem value="other">Otro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {documentType === 'contract' && (
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="contract-type">Tipo de Contrato</Label>
-                    <Select value={contractType} onValueChange={setContractType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona tipo de contrato" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="investment">Contrato de Inversión</SelectItem>
-                        <SelectItem value="partnership">Contrato de Sociedad</SelectItem>
-                        <SelectItem value="service">Contrato de Servicios</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </div>
 
               <Button 
-                onClick={handleUploadDocument} 
-                disabled={uploading || !selectedFile || !documentUserId || !documentName || !documentType}
+                onClick={() => uploadReportMutation.mutate()} 
+                disabled={reportUploading || !reportFile || !reportName}
               >
-                {uploading ? 'Subiendo...' : 'Subir Documento'}
+                {reportUploading ? 'Subiendo...' : 'Subir Reporte'}
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Reports List */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Reportes Existentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {reports && reports.length > 0 ? (
+                <div className="space-y-3">
+                  {reports.map((report) => (
+                    <div key={report.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-gray-500" />
+                          <div>
+                            <h4 className="font-medium">{report.document_name}</h4>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <span>{new Date(report.created_at).toLocaleDateString('es-MX')}</span>
+                              {report.file_size && (
+                                <span>{(report.file_size / 1024 / 1024).toFixed(2)} MB</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(report.document_url, '_blank')}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = report.document_url;
+                            link.download = report.document_name;
+                            link.target = '_blank';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteReportMutation.mutate({ 
+                            reportId: report.id, 
+                            documentUrl: report.document_url 
+                          })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">
+                  No hay reportes disponibles
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
