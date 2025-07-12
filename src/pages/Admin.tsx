@@ -224,35 +224,19 @@ const Admin = () => {
     carbon_capture_per_plant: ''
   });
 
-  // Create user mutation with auto-confirmation
+  // Create user mutation using database function
   const createUserMutation = useMutation({
-    mutationFn: async ({ email, name, role }: { email: string; name: string; role: string }) => {
-      // Create user with admin_created metadata to trigger auto-confirmation
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password: 'TempPassword123!', // Temporary password - user should reset
-        email_confirm: true, // Auto-confirm email
-        user_metadata: {
-          name,
-          admin_created: true
-        }
+    mutationFn: async ({ email, name, role }: { email: string; name: string; role: 'admin' | 'investor' }) => {
+      const { data, error } = await supabase.rpc('create_user_with_profile', {
+        user_email: email,
+        user_name: name,
+        user_role: role
       });
 
-      if (authError) throw authError;
-
-      // Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          user_id: authData.user.id,
-          email,
-          name,
-          role: role as 'admin' | 'investor'
-        }]);
-
-      if (profileError) throw profileError;
+      if (error) throw error;
+      if (!(data as any)?.success) throw new Error((data as any)?.error);
       
-      return authData;
+      return data;
     },
     onSuccess: () => {
       toast({
@@ -799,6 +783,31 @@ const Admin = () => {
     }
   });
 
+  // Create price mutation
+  const createPriceMutation = useMutation({
+    mutationFn: async (priceData: { species_id: string; year: number; price_per_plant: number }) => {
+      const { error } = await supabase
+        .from('plant_prices')
+        .insert(priceData);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Precio añadido",
+        description: "El precio ha sido añadido exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-plant-prices'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al añadir el precio",
+        variant: "destructive"
+      });
+    }
+  });
+
   // Species management mutations
   const createSpeciesMutation = useMutation({
     mutationFn: async (speciesData: any) => {
@@ -1227,7 +1236,30 @@ const Admin = () => {
               <div className="space-y-6">
                 {/* Plant Prices List */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Precios por Especie y Año</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Precios por Especie y Año</h3>
+                    <Button 
+                      onClick={() => {
+                        // For now, let's add a simple form in a dialog
+                        const year = prompt('Año:');
+                        const speciesId = prompt('ID de Especie (temporal):');
+                        const price = prompt('Precio por planta:');
+                        
+                        if (year && speciesId && price) {
+                          createPriceMutation.mutate({
+                            species_id: speciesId,
+                            year: parseInt(year),
+                            price_per_plant: parseFloat(price)
+                          });
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Añadir Precio
+                    </Button>
+                  </div>
                   {plantPrices?.map((price) => (
                     <div key={price.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
@@ -1252,7 +1284,28 @@ const Admin = () => {
                   ))}
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Especies Disponibles</h3>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold">Especies Disponibles</h3>
+                    <Button 
+                      onClick={() => {
+                        setEditingSpecies(null);
+                        setNewSpeciesData({
+                          name: '',
+                          scientific_name: '',
+                          description: '',
+                          maturation_years: '',
+                          min_weight_kg: '',
+                          max_weight_kg: '',
+                          carbon_capture_per_plant: ''
+                        });
+                        setShowSpeciesDialog(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nueva Especie
+                    </Button>
+                  </div>
+                  
                   <div className="space-y-4">
                     {plantSpecies?.map((species) => (
                       <div key={species.id} className="p-4 border rounded-lg">
@@ -1270,6 +1323,25 @@ const Admin = () => {
                               </p>
                             )}
                           </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingSpecies(species);
+                              setNewSpeciesData({
+                                name: species.name,
+                                scientific_name: species.scientific_name || '',
+                                description: species.description || '',
+                                maturation_years: species.maturation_years.toString(),
+                                min_weight_kg: species.min_weight_kg.toString(),
+                                max_weight_kg: species.max_weight_kg.toString(),
+                                carbon_capture_per_plant: species.carbon_capture_per_plant?.toString() || ''
+                              });
+                              setShowSpeciesDialog(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         </div>
                         
                         <div className="mt-4">
@@ -1669,6 +1741,128 @@ const Admin = () => {
                   disabled={!newPriceValue || updatePriceMutation.isPending}
                 >
                   {updatePriceMutation.isPending ? 'Actualizando...' : 'Actualizar Precio'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Species Dialog */}
+          <Dialog open={showSpeciesDialog} onOpenChange={setShowSpeciesDialog}>
+            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingSpecies ? 'Editar Especie' : 'Nueva Especie'}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingSpecies ? 'Actualizar datos de la especie' : 'Añadir nueva especie de planta'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="species-name">Nombre *</Label>
+                    <Input 
+                      id="species-name" 
+                      value={newSpeciesData.name}
+                      onChange={(e) => setNewSpeciesData({...newSpeciesData, name: e.target.value})}
+                      placeholder="Nombre común"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="species-scientific">Nombre Científico</Label>
+                    <Input 
+                      id="species-scientific" 
+                      value={newSpeciesData.scientific_name}
+                      onChange={(e) => setNewSpeciesData({...newSpeciesData, scientific_name: e.target.value})}
+                      placeholder="Nombre científico"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="species-description">Descripción</Label>
+                  <Textarea 
+                    id="species-description" 
+                    value={newSpeciesData.description}
+                    onChange={(e) => setNewSpeciesData({...newSpeciesData, description: e.target.value})}
+                    placeholder="Descripción de la especie"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="species-maturation">Años de Maduración *</Label>
+                    <Input 
+                      id="species-maturation" 
+                      type="number"
+                      value={newSpeciesData.maturation_years}
+                      onChange={(e) => setNewSpeciesData({...newSpeciesData, maturation_years: e.target.value})}
+                      placeholder="Años"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="species-min-weight">Peso Min (kg) *</Label>
+                    <Input 
+                      id="species-min-weight" 
+                      type="number"
+                      value={newSpeciesData.min_weight_kg}
+                      onChange={(e) => setNewSpeciesData({...newSpeciesData, min_weight_kg: e.target.value})}
+                      placeholder="Peso mínimo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="species-max-weight">Peso Max (kg) *</Label>
+                    <Input 
+                      id="species-max-weight" 
+                      type="number"
+                      value={newSpeciesData.max_weight_kg}
+                      onChange={(e) => setNewSpeciesData({...newSpeciesData, max_weight_kg: e.target.value})}
+                      placeholder="Peso máximo"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="species-carbon">Captura de CO₂ (t por planta)</Label>
+                  <Input 
+                    id="species-carbon" 
+                    type="number"
+                    step="0.01"
+                    value={newSpeciesData.carbon_capture_per_plant}
+                    onChange={(e) => setNewSpeciesData({...newSpeciesData, carbon_capture_per_plant: e.target.value})}
+                    placeholder="Toneladas de CO₂"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowSpeciesDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    const speciesData = {
+                      ...newSpeciesData,
+                      maturation_years: parseInt(newSpeciesData.maturation_years),
+                      min_weight_kg: parseInt(newSpeciesData.min_weight_kg),
+                      max_weight_kg: parseInt(newSpeciesData.max_weight_kg),
+                      carbon_capture_per_plant: newSpeciesData.carbon_capture_per_plant ? parseFloat(newSpeciesData.carbon_capture_per_plant) : null
+                    };
+
+                    if (editingSpecies) {
+                      updateSpeciesMutation.mutate({
+                        id: editingSpecies.id,
+                        speciesData
+                      });
+                    } else {
+                      createSpeciesMutation.mutate(speciesData);
+                    }
+                  }}
+                  disabled={!newSpeciesData.name || !newSpeciesData.maturation_years || !newSpeciesData.min_weight_kg || !newSpeciesData.max_weight_kg}
+                >
+                  {editingSpecies ? 
+                    (updateSpeciesMutation.isPending ? 'Actualizando...' : 'Actualizar Especie') :
+                    (createSpeciesMutation.isPending ? 'Creando...' : 'Crear Especie')
+                  }
                 </Button>
               </div>
             </DialogContent>

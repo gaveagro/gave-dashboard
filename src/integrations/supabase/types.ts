@@ -418,6 +418,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_user_with_profile: {
+        Args: {
+          user_email: string
+          user_name: string
+          user_role?: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _user_id: string

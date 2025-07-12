@@ -32,14 +32,8 @@ const Reports = () => {
   });
 
   const handleDownload = (documentUrl: string, documentName: string) => {
-    // For files stored in Supabase Storage, create a download link
-    const link = document.createElement('a');
-    link.href = documentUrl;
-    link.download = documentName;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Simply open the file in a new tab for viewing
+    window.open(documentUrl, '_blank');
   };
 
   if (isLoading) {
