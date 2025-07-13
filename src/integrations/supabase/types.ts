@@ -424,6 +424,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bulk_import_users: {
+        Args: { users_data: Json }
+        Returns: Json
+      }
       create_user_with_profile: {
         Args:
           | {
@@ -437,6 +441,15 @@ export type Database = {
               user_role?: Database["public"]["Enums"]["app_role"]
               user_balance?: number
             }
+        Returns: Json
+      }
+      create_user_with_profile_v2: {
+        Args: {
+          user_email: string
+          user_name: string
+          user_role?: Database["public"]["Enums"]["app_role"]
+          user_balance?: number
+        }
         Returns: Json
       }
       has_role: {

@@ -15,7 +15,7 @@ const translations = {
     'nav.simulator': 'Simulador',
     'nav.investments': 'Mis Inversiones',
     'nav.plots': 'Parcelas',
-    'nav.reports': 'Reportes',
+    
     'nav.admin': 'Administración',
     
     // Dashboard
@@ -129,9 +129,6 @@ const translations = {
     'common.spanish': 'Español',
     'common.english': 'English',
     
-    // Reports
-    'reports.title': 'Reportes',
-    'reports.description': 'Análisis de crecimiento y rendimiento de tus inversiones',
     
     // Investments 
     'investments.title': 'Mis Inversiones',
@@ -143,7 +140,7 @@ const translations = {
     'nav.simulator': 'Simulator',
     'nav.investments': 'My Investments',
     'nav.plots': 'Plots',
-    'nav.reports': 'Reports',
+    
     'nav.admin': 'Administration',
     
     // Dashboard
@@ -277,9 +274,6 @@ const translations = {
     'common.spanish': 'Español',
     'common.english': 'English',
 
-    // Reports
-    'reports.title': 'Reports',
-    'reports.description': 'Growth and performance analysis of your investments',
     
     // Investments 
     'investments.title': 'My Investments',

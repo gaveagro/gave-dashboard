@@ -59,11 +59,6 @@ export function AppSidebar() {
       icon: MapPin,
     },
     {
-      title: t('nav.reports'),
-      url: "/reports",
-      icon: ClipboardList,
-    },
-    {
       title: t('nav.simulator'),
       url: "/simulator",
       icon: Calculator,

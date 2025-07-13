@@ -13,7 +13,6 @@ import Dashboard from "./pages/Dashboard";
 import Investments from "./pages/Investments";
 import Plots from "./pages/Plots";
 
-import Reports from "./pages/Reports";
 import Profile from "./pages/Profile";
 import Simulator from "./pages/Simulator";
 import Admin from "./pages/Admin";
@@ -37,8 +36,6 @@ function App() {
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="investments" element={<Investments />} />
                   <Route path="plots" element={<Plots />} />
-                  
-                  <Route path="reports" element={<Reports />} />
                   <Route path="profile" element={<Profile />} />
                   <Route path="simulator" element={<Simulator />} />
                   <Route path="admin" element={<Admin />} />
