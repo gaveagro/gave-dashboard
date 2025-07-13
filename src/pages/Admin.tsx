@@ -22,6 +22,7 @@ const Admin = () => {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'investor'>('investor');
+  const [newUserBalance, setNewUserBalance] = useState('0');
 
   const [newInvestmentUserId, setNewInvestmentUserId] = useState('');
   const [newInvestmentSpecies, setNewInvestmentSpecies] = useState('');
@@ -52,10 +53,10 @@ const Admin = () => {
   const [showPriceDialog, setShowPriceDialog] = useState(false);
   const [newPriceValue, setNewPriceValue] = useState('');
   
-  // Report states
-  const [reportFile, setReportFile] = useState<File | null>(null);
-  const [reportName, setReportName] = useState('');
-  const [reportUploading, setReportUploading] = useState(false);
+  // Species price management states
+  const [showSpeciesPricesDialog, setShowSpeciesPricesDialog] = useState(false);
+  const [selectedSpeciesForPrices, setSelectedSpeciesForPrices] = useState<any>(null);
+  const [speciesPrices, setSpeciesPrices] = useState<{year: number, price: number}[]>([]);
 
   const [newPlotData, setNewPlotData] = useState({
     name: '',
@@ -226,11 +227,12 @@ const Admin = () => {
 
   // Create user mutation using database function
   const createUserMutation = useMutation({
-    mutationFn: async ({ email, name, role }: { email: string; name: string; role: 'admin' | 'investor' }) => {
+    mutationFn: async ({ email, name, role, balance }: { email: string; name: string; role: 'admin' | 'investor'; balance: number }) => {
       const { data, error } = await supabase.rpc('create_user_with_profile', {
         user_email: email,
         user_name: name,
-        user_role: role
+        user_role: role,
+        user_balance: balance
       });
 
       if (error) throw error;
@@ -246,6 +248,7 @@ const Admin = () => {
       setNewUserEmail('');
       setNewUserName('');
       setNewUserRole('investor');
+      setNewUserBalance('0');
       refetchUsers();
     },
     onError: (error: any) => {
@@ -257,52 +260,34 @@ const Admin = () => {
     }
   });
 
-  // Upload report mutation
-  const uploadReportMutation = useMutation({
-    mutationFn: async () => {
-      if (!reportFile || !reportName) {
-        throw new Error('Por favor selecciona un archivo y proporciona un nombre');
-      }
+  // Add multiple prices for a species
+  const addSpeciesPricesMutation = useMutation({
+    mutationFn: async ({ speciesId, prices }: { speciesId: string; prices: {year: number, price: number}[] }) => {
+      const priceInserts = prices.map(p => ({
+        species_id: speciesId,
+        year: p.year,
+        price_per_plant: p.price
+      }));
 
-      const fileExt = reportFile.name.split('.').pop();
-      const fileName = `reports/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('drone-photos')
-        .upload(fileName, reportFile);
+      const { error } = await supabase
+        .from('plant_prices')
+        .upsert(priceInserts, { onConflict: 'species_id, year' });
 
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('drone-photos')
-        .getPublicUrl(fileName);
-
-      const { error: dbError } = await supabase
-        .from('documents')
-        .insert({
-          user_id: profile?.user_id || '',
-          document_name: reportName,
-          document_type: 'report',
-          document_url: publicUrl,
-          file_size: reportFile.size,
-          uploaded_by: profile?.user_id
-        });
-
-      if (dbError) throw dbError;
+      if (error) throw error;
     },
     onSuccess: () => {
       toast({
-        title: "Reporte subido",
-        description: "El reporte ha sido subido exitosamente."
+        title: "Precios actualizados",
+        description: "Los precios de la especie han sido actualizados exitosamente."
       });
-      setReportFile(null);
-      setReportName('');
-      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-plant-prices'] });
+      setShowSpeciesPricesDialog(false);
+      setSpeciesPrices([]);
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Error al subir el reporte",
+        description: error.message || "Error al actualizar precios",
         variant: "destructive"
       });
     }
@@ -660,7 +645,8 @@ const Admin = () => {
     createUserMutation.mutate({
       email: newUserEmail,
       name: newUserName,
-      role: newUserRole
+      role: newUserRole,
+      balance: parseFloat(newUserBalance) || 0
     });
   };
 
@@ -737,6 +723,32 @@ const Admin = () => {
       toast({
         title: "Error",
         description: `No se pudo actualizar el precio: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete price mutation
+  const deletePriceMutation = useMutation({
+    mutationFn: async (priceId: string) => {
+      const { error } = await supabase
+        .from('plant_prices')
+        .delete()
+        .eq('id', priceId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Precio eliminado",
+        description: "El precio ha sido eliminado exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-plant-prices'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al eliminar el precio",
         variant: "destructive"
       });
     }
@@ -930,13 +942,12 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="investments">Inversiones</TabsTrigger>
           <TabsTrigger value="requests">Solicitudes</TabsTrigger>
           <TabsTrigger value="species">Especies</TabsTrigger>
           <TabsTrigger value="plots">Parcelas</TabsTrigger>
-          <TabsTrigger value="reports">Reportes</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
           <TabsTrigger value="stats">Estadísticas</TabsTrigger>
         </TabsList>
@@ -982,6 +993,17 @@ const Admin = () => {
                       <SelectItem value="admin">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <Label htmlFor="balance">Balance Inicial (MXN)</Label>
+                  <Input
+                    id="balance"
+                    type="number"
+                    step="0.01"
+                    value={newUserBalance}
+                    onChange={(e) => setNewUserBalance(e.target.value)}
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
               <Button 
@@ -1341,6 +1363,18 @@ const Admin = () => {
                             }}
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSpeciesForPrices(species);
+                              setSpeciesPrices([]);
+                              setShowSpeciesPricesDialog(true);
+                            }}
+                          >
+                            ${/* Precio icon */}
+                            <DollarSign className="h-4 w-4" />
                           </Button>
                         </div>
                         
@@ -1823,15 +1857,18 @@ const Admin = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="species-carbon">Captura de CO₂ (t por planta)</Label>
+                  <Label htmlFor="species-carbon">Captura de CO₂ (kg por planta en todo el ciclo)</Label>
                   <Input 
                     id="species-carbon" 
                     type="number"
-                    step="0.01"
-                    value={newSpeciesData.carbon_capture_per_plant}
-                    onChange={(e) => setNewSpeciesData({...newSpeciesData, carbon_capture_per_plant: e.target.value})}
-                    placeholder="Toneladas de CO₂"
+                    step="0.1"
+                    value={newSpeciesData.carbon_capture_per_plant ? (parseFloat(newSpeciesData.carbon_capture_per_plant) * 1000).toString() : '72'}
+                    onChange={(e) => setNewSpeciesData({...newSpeciesData, carbon_capture_per_plant: (parseFloat(e.target.value) / 1000).toString()})}
+                    placeholder="72 kg (estándar)"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Basado en: 72 kg por planta en 6 años = 12 kg/año por planta
+                  </p>
                 </div>
               </div>
               <div className="flex justify-end space-x-2">
@@ -1867,126 +1904,114 @@ const Admin = () => {
               </div>
             </DialogContent>
           </Dialog>
-        </TabsContent>
 
-        {/* Reports Tab */}
-        <TabsContent value="reports" className="space-y-6">
-          {/* Upload Report Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Subir Reporte
-              </CardTitle>
-              <CardDescription>
-                Sube reportes anuales y documentos oficiales
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Species Prices Dialog */}
+          <Dialog open={showSpeciesPricesDialog} onOpenChange={setShowSpeciesPricesDialog}>
+            <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Gestionar Precios - {selectedSpeciesForPrices?.name}</DialogTitle>
+                <DialogDescription>
+                  Añade, edita o elimina precios por año de establecimiento para esta especie
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {/* Current prices */}
                 <div className="space-y-2">
-                  <Label htmlFor="report-file">Archivo</Label>
-                  <Input
-                    id="report-file"
-                    type="file"
-                    onChange={(e) => setReportFile(e.target.files?.[0] || null)}
-                    accept=".pdf,.doc,.docx"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="report-name">Nombre del reporte</Label>
-                  <Input
-                    id="report-name"
-                    value={reportName}
-                    onChange={(e) => setReportName(e.target.value)}
-                    placeholder="Ej: Reporte Anual 2024"
-                  />
-                </div>
-              </div>
-
-              <Button 
-                onClick={() => uploadReportMutation.mutate()} 
-                disabled={reportUploading || !reportFile || !reportName}
-              >
-                {reportUploading ? 'Subiendo...' : 'Subir Reporte'}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Reports List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Reportes Existentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {reports && reports.length > 0 ? (
-                <div className="space-y-3">
-                  {reports.map((report) => (
-                    <div key={report.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-gray-500" />
-                          <div>
-                            <h4 className="font-medium">{report.document_name}</h4>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>{new Date(report.created_at).toLocaleDateString('es-MX')}</span>
-                              {report.file_size && (
-                                <span>{(report.file_size / 1024 / 1024).toFixed(2)} MB</span>
-                              )}
-                            </div>
-                          </div>
+                  <Label>Precios Actuales:</Label>
+                  <div className="max-h-40 overflow-y-auto border rounded-lg p-2">
+                    {plantPrices?.filter(p => p.species_id === selectedSpeciesForPrices?.id).length > 0 ? 
+                      plantPrices?.filter(p => p.species_id === selectedSpeciesForPrices?.id).map((price) => (
+                        <div key={price.id} className="flex justify-between items-center p-2 border-b">
+                          <span>Año {price.year}: ${price.price_per_plant.toLocaleString()}</span>
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => deletePriceMutation.mutate(price.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </div>
+                      )) : (
+                        <p className="text-muted-foreground text-center py-4">Sin precios configurados</p>
+                      )
+                    }
+                  </div>
+                </div>
 
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(report.document_url, '_blank')}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                {/* Add new prices */}
+                <div className="space-y-2">
+                  <Label>Añadir Nuevos Precios:</Label>
+                  <div className="space-y-2">
+                    {speciesPrices.map((price, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <Input
+                          type="number"
+                          placeholder="Año"
+                          value={price.year}
+                          onChange={(e) => {
+                            const newPrices = [...speciesPrices];
+                            newPrices[index].year = parseInt(e.target.value) || 0;
+                            setSpeciesPrices(newPrices);
+                          }}
+                        />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Precio por planta"
+                          value={price.price}
+                          onChange={(e) => {
+                            const newPrices = [...speciesPrices];
+                            newPrices[index].price = parseFloat(e.target.value) || 0;
+                            setSpeciesPrices(newPrices);
+                          }}
+                        />
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = report.document_url;
-                            link.download = report.document_name;
-                            link.target = '_blank';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
+                            const newPrices = speciesPrices.filter((_, i) => i !== index);
+                            setSpeciesPrices(newPrices);
                           }}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteReportMutation.mutate({ 
-                            reportId: report.id, 
-                            documentUrl: report.document_url 
-                          })}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                    <Button
+                      variant="outline"
+                      onClick={() => setSpeciesPrices([...speciesPrices, { year: new Date().getFullYear(), price: 0 }])}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Añadir Precio
+                    </Button>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-8">
-                  No hay reportes disponibles
-                </p>
-              )}
-            </CardContent>
-          </Card>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowSpeciesPricesDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedSpeciesForPrices && speciesPrices.length > 0) {
+                      const validPrices = speciesPrices.filter(p => p.year > 0 && p.price > 0);
+                      if (validPrices.length > 0) {
+                        addSpeciesPricesMutation.mutate({
+                          speciesId: selectedSpeciesForPrices.id,
+                          prices: validPrices
+                        });
+                      }
+                    }
+                  }}
+                  disabled={addSpeciesPricesMutation.isPending || speciesPrices.length === 0}
+                >
+                  {addSpeciesPricesMutation.isPending ? 'Guardando...' : 'Guardar Precios'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
+
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">

@@ -384,6 +384,8 @@ export type Database = {
           email: string
           id: string
           name: string | null
+          password_reset_expires: string | null
+          password_reset_token: string | null
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
@@ -395,6 +397,8 @@ export type Database = {
           email: string
           id?: string
           name?: string | null
+          password_reset_expires?: string | null
+          password_reset_token?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -406,6 +410,8 @@ export type Database = {
           email?: string
           id?: string
           name?: string | null
+          password_reset_expires?: string | null
+          password_reset_token?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -419,11 +425,18 @@ export type Database = {
     }
     Functions: {
       create_user_with_profile: {
-        Args: {
-          user_email: string
-          user_name: string
-          user_role?: Database["public"]["Enums"]["app_role"]
-        }
+        Args:
+          | {
+              user_email: string
+              user_name: string
+              user_role?: Database["public"]["Enums"]["app_role"]
+            }
+          | {
+              user_email: string
+              user_name: string
+              user_role?: Database["public"]["Enums"]["app_role"]
+              user_balance?: number
+            }
         Returns: Json
       }
       has_role: {
@@ -432,6 +445,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      request_password_reset: {
+        Args: { user_email: string }
+        Returns: Json
       }
       send_investment_notification: {
         Args: {
