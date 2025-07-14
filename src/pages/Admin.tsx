@@ -103,13 +103,29 @@ const Admin = () => {
         .select(`
           *,
           plant_species (name),
-          profiles (name, email),
           plots (name)
         `)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data;
+      
+      // Fetch user profiles separately and match them
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, name, email');
+        
+      if (profilesError) throw profilesError;
+      
+      // Match investments with profiles
+      const investmentsWithProfiles = data?.map(investment => {
+        const userProfile = profiles?.find(profile => profile.user_id === investment.user_id);
+        return {
+          ...investment,
+          profiles: userProfile || null
+        };
+      });
+      
+      return investmentsWithProfiles;
     }
   });
 
@@ -633,7 +649,7 @@ const Admin = () => {
                 <TableBody>
                   {investments?.map((investment) => (
                     <TableRow key={investment.id}>
-                      <TableCell>{investment.profiles?.name || investment.profiles?.email}</TableCell>
+                      <TableCell>{investment.profiles?.name || investment.profiles?.email || 'Usuario desconocido'}</TableCell>
                       <TableCell>{investment.plant_species?.name}</TableCell>
                       <TableCell>{investment.plant_count.toLocaleString()}</TableCell>
                       <TableCell>{formatCurrency(investment.total_amount)}</TableCell>
