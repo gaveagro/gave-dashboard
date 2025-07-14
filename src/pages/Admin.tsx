@@ -61,7 +61,7 @@ const Admin = () => {
     plantation_year: new Date().getFullYear(),
     expected_harvest_year: new Date().getFullYear() + 5,
     weight_per_plant_kg: 50,
-    plot_id: '',
+    plot_id: 'unassigned',
     status: 'active'
   });
 
@@ -313,6 +313,7 @@ const Admin = () => {
     try {
       const investmentData = {
         ...investmentForm,
+        plot_id: investmentForm.plot_id === 'unassigned' ? null : investmentForm.plot_id,
         total_amount: investmentForm.plant_count * investmentForm.price_per_plant
       };
 
@@ -342,7 +343,7 @@ const Admin = () => {
         plantation_year: new Date().getFullYear(),
         expected_harvest_year: new Date().getFullYear() + 5,
         weight_per_plant_kg: 50,
-        plot_id: '',
+        plot_id: 'unassigned',
         status: 'active'
       });
     } catch (error: any) {
@@ -655,7 +656,7 @@ const Admin = () => {
                         <SelectValue placeholder="Seleccionar parcela" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sin asignar</SelectItem>
+                        <SelectItem value="unassigned">Sin asignar</SelectItem>
                         {plots?.map((plot) => (
                           <SelectItem key={plot.id} value={plot.id}>
                             {plot.name} - {plot.location}
@@ -736,7 +737,7 @@ const Admin = () => {
                                 plantation_year: investment.plantation_year,
                                 expected_harvest_year: investment.expected_harvest_year,
                                 weight_per_plant_kg: investment.weight_per_plant_kg || 50,
-                                plot_id: investment.plot_id || '',
+                                plot_id: investment.plot_id || 'unassigned',
                                 status: investment.status || 'active'
                               });
                               setShowInvestmentDialog(true);
