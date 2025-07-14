@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +28,7 @@ export function SpeciesManager() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingSpecies, setEditingSpecies] = useState<PlantSpecies | null>(null);
   const [editingPrices, setEditingPrices] = useState<{ [key: string]: PriceWithYear }>({});
+  const [newPriceData, setNewPriceData] = useState<{ [key: string]: { year: string; price: string } }>({});
   const [newSpeciesData, setNewSpeciesData] = useState({
     name: '',
     scientific_name: '',
@@ -134,6 +136,10 @@ export function SpeciesManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plant-prices'] });
+      toast({
+        title: "Precio agregado",
+        description: "El precio ha sido agregado exitosamente",
+      });
     },
   });
 
@@ -150,6 +156,10 @@ export function SpeciesManager() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plant-prices'] });
       setEditingPrices({});
+      toast({
+        title: "Precio actualizado",
+        description: "El precio ha sido actualizado exitosamente",
+      });
     },
   });
 
@@ -164,6 +174,10 @@ export function SpeciesManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plant-prices'] });
+      toast({
+        title: "Precio eliminado",
+        description: "El precio ha sido eliminado exitosamente",
+      });
     },
   });
 
@@ -207,12 +221,44 @@ export function SpeciesManager() {
     setEditingPrices(newEditingPrices);
   };
 
-  const addNewPrice = (speciesId: string) => {
+  const handleAddNewPrice = (speciesId: string) => {
     const currentYear = new Date().getFullYear();
-    createPriceMutation.mutate({
-      species_id: speciesId,
-      year: currentYear,
-      price: 100
+    const priceData = newPriceData[speciesId];
+    
+    if (priceData && priceData.year && priceData.price) {
+      const year = parseInt(priceData.year);
+      const price = parseFloat(priceData.price);
+      
+      if (!isNaN(year) && !isNaN(price)) {
+        createPriceMutation.mutate({
+          species_id: speciesId,
+          year: year,
+          price: price
+        });
+        
+        // Clear the form
+        setNewPriceData({
+          ...newPriceData,
+          [speciesId]: { year: '', price: '' }
+        });
+      }
+    } else {
+      // Use default values if no input
+      createPriceMutation.mutate({
+        species_id: speciesId,
+        year: currentYear,
+        price: 250
+      });
+    }
+  };
+
+  const updateNewPriceData = (speciesId: string, field: 'year' | 'price', value: string) => {
+    setNewPriceData({
+      ...newPriceData,
+      [speciesId]: {
+        ...newPriceData[speciesId],
+        [field]: value
+      }
     });
   };
 
@@ -335,7 +381,19 @@ export function SpeciesManager() {
                     ) : (
                       specie.name
                     )}
-                    <Badge variant="secondary">{specie.maturation_years} años</Badge>
+                    {editingSpecies?.id === specie.id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={editingSpecies.maturation_years}
+                          onChange={(e) => setEditingSpecies(prev => prev ? { ...prev, maturation_years: parseInt(e.target.value) } : null)}
+                          className="w-16 text-center"
+                        />
+                        <span className="text-sm">años</span>
+                      </div>
+                    ) : (
+                      <Badge variant="secondary">{specie.maturation_years} años</Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>
                     {editingSpecies?.id === specie.id ? (
@@ -409,10 +467,36 @@ export function SpeciesManager() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h4 className="font-semibold">Precios por Año de Establecimiento</h4>
-                  <Button size="sm" variant="outline" onClick={() => addNewPrice(specie.id)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar Año
-                  </Button>
+                </div>
+                
+                {/* Form para agregar nuevo precio */}
+                <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <Label htmlFor={`year-${specie.id}`}>Año</Label>
+                    <Input
+                      id={`year-${specie.id}`}
+                      type="number"
+                      placeholder="2025"
+                      value={newPriceData[specie.id]?.year || ''}
+                      onChange={(e) => updateNewPriceData(specie.id, 'year', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor={`price-${specie.id}`}>Precio por Planta</Label>
+                    <Input
+                      id={`price-${specie.id}`}
+                      type="number"
+                      placeholder="250"
+                      value={newPriceData[specie.id]?.price || ''}
+                      onChange={(e) => updateNewPriceData(specie.id, 'price', e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button onClick={() => handleAddNewPrice(specie.id)} className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Precio
+                    </Button>
+                  </div>
                 </div>
                 
                 <Table>

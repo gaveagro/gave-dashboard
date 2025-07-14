@@ -11,35 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-// Datos exactos del simulador según especificaciones
-const speciesData = {
-  'Espadín': {
-    scientificName: 'Agave angustifolia Haw',
-    maturationYears: 5,
-    weightRange: { min: 40, max: 60 }, // kg por planta configurable
-    description: 'Especie principal de Gavé, ideal para mezcal'
-  },
-  'Salmiana': {
-    scientificName: 'Agave Salmiana ssp. Crassispina',
-    maturationYears: 7,
-    weightRange: { min: 60, max: 90 }, // kg por planta configurable
-    description: 'Especie de crecimiento lento pero alto rendimiento'
-  },
-  'Atrovirens': {
-    scientificName: 'Agave Atrovirens',
-    maturationYears: 7,
-    weightRange: { min: 60, max: 90 }, // kg por planta configurable
-    description: 'Especie robusta de alto rendimiento'
-  }
-};
-
-// CO2 capturado: 30-60 toneladas por año por hectárea
-// Densidad: 2,500 plantas por hectárea
-const carbonCapturePerHectarePerYear = { min: 30, max: 60 }; // toneladas CO₂
-const plantsPerHectare = 2500;
-
-// Los precios ahora se cargan dinámicamente desde la base de datos
+import { useQuery } from '@tanstack/react-query';
 
 interface InvestmentResults {
   totalInvestment: number;
@@ -58,65 +30,100 @@ export const InvestmentSimulator: React.FC = () => {
   const { user, profile } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
-  const [selectedSpecies, setSelectedSpecies] = useState<string>('Espadín');
+  const [selectedSpecies, setSelectedSpecies] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [numberOfPlants, setNumberOfPlants] = useState<number>(200);
   const [selectedPricePerKg, setSelectedPricePerKg] = useState<number[]>([12]);
   const [weightPerPlant, setWeightPerPlant] = useState<number[]>([50]);
   const [loading, setLoading] = useState(false);
-  const [plantPrices, setPlantPrices] = useState<Record<string, number>>({});
-  const [plantSpeciesMap, setPlantSpeciesMap] = useState<Record<string, string>>({});
   
-  // Cargar precios desde la base de datos
+  // Fetch species data
+  const { data: plantSpecies } = useQuery({
+    queryKey: ['plant-species-simulator'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plant_species')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Fetch price data
+  const { data: plantPrices } = useQuery({
+    queryKey: ['plant-prices-simulator'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('plant_prices')
+        .select(`
+          *,
+          plant_species (name, scientific_name)
+        `)
+        .order('year', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Set default species when data loads
   React.useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        const { data: pricesData } = await supabase
-          .from('plant_prices')
-          .select(`
-            *,
-            plant_species (name, scientific_name)
-          `);
-        
-        const { data: speciesData } = await supabase
-          .from('plant_species')
-          .select('*');
+    if (plantSpecies && plantSpecies.length > 0 && !selectedSpecies) {
+      setSelectedSpecies(plantSpecies[0].id);
+    }
+  }, [plantSpecies, selectedSpecies]);
 
-        // Crear mapas de precios por año y especie
-        const priceMap: Record<string, number> = {};
-        const speciesMap: Record<string, string> = {};
-        
-        pricesData?.forEach(price => {
-          const key = `${price.plant_species.name}-${price.year}`;
-          priceMap[key] = price.price_per_plant;
-        });
-        
-        speciesData?.forEach(species => {
-          speciesMap[species.name] = species.id;
-        });
+  // Get current species data
+  const currentSpecies = plantSpecies?.find(s => s.id === selectedSpecies);
 
-        setPlantPrices(priceMap);
-        setPlantSpeciesMap(speciesMap);
-      } catch (error) {
-        console.error('Error fetching prices:', error);
-      }
-    };
-
-    fetchPrices();
-  }, []);
-
-  // Efecto para ajustar el peso cuando cambia la especie
+  // Effect to adjust weight when species changes
   React.useEffect(() => {
-    const species = speciesData[selectedSpecies as keyof typeof speciesData];
-    const defaultWeight = (species.weightRange.min + species.weightRange.max) / 2;
-    setWeightPerPlant([defaultWeight]);
-  }, [selectedSpecies]);
+    if (currentSpecies) {
+      const defaultWeight = (currentSpecies.min_weight_kg + currentSpecies.max_weight_kg) / 2;
+      setWeightPerPlant([defaultWeight]);
+    }
+  }, [currentSpecies]);
+
+  // Get available years for selected species
+  const availableYears = useMemo(() => {
+    if (!plantPrices || !selectedSpecies) return [];
+    return plantPrices
+      .filter(price => price.species_id === selectedSpecies)
+      .map(price => ({
+        year: price.year.toString(),
+        price: price.price_per_plant
+      }));
+  }, [plantPrices, selectedSpecies]);
+
+  // Get current price per plant
+  const currentPricePerPlant = useMemo(() => {
+    if (!plantPrices || !selectedSpecies) return 250;
+    const priceData = plantPrices.find(p => 
+      p.species_id === selectedSpecies && p.year.toString() === selectedYear
+    );
+    return priceData ? priceData.price_per_plant : 250;
+  }, [plantPrices, selectedSpecies, selectedYear]);
 
   const results: InvestmentResults = useMemo(() => {
+    if (!currentSpecies) {
+      return {
+        totalInvestment: 0,
+        finalReturn: 0,
+        investorProfit: 0,
+        gaveProfit: 0,
+        totalYield: 0,
+        grossRevenue: 0,
+        roi: 0,
+        totalCarbonCapture: 0,
+        maturationDate: new Date(),
+        avgWeightPerPlant: 0
+      };
+    }
+
     // 1. Datos base
-    const species = speciesData[selectedSpecies as keyof typeof speciesData];
-    const priceKey = `${selectedSpecies}-${selectedYear}`;
-    const pricePerPlant = plantPrices[priceKey] || 250; // fallback price
+    const pricePerPlant = currentPricePerPlant;
     const totalInvestment = numberOfPlants * pricePerPlant;
 
     // 2. Cálculo de rendimiento
@@ -133,12 +140,11 @@ export const InvestmentSimulator: React.FC = () => {
     const finalReturn = totalInvestment + investorProfit;
     const roi = totalInvestment > 0 ? (investorProfit / totalInvestment) * 100 : 0;
     
-    // 5. Cálculo correcto de CO2: 30-60 ton/año/hectárea, 2500 plantas/hectárea
-    const hectares = numberOfPlants / plantsPerHectare;
-    const avgCO2PerHectarePerYear = (carbonCapturePerHectarePerYear.min + carbonCapturePerHectarePerYear.max) / 2;
-    const totalCarbonCapture = hectares * avgCO2PerHectarePerYear * species.maturationYears;
+    // 5. Cálculo de CO2: usando carbon_capture_per_plant de la base de datos
+    const carbonCapturePerPlant = currentSpecies.carbon_capture_per_plant || 0.072;
+    const totalCarbonCapture = numberOfPlants * carbonCapturePerPlant * currentSpecies.maturation_years;
     
-    const maturationDate = new Date(Date.now() + species.maturationYears * 365 * 24 * 60 * 60 * 1000);
+    const maturationDate = new Date(Date.now() + currentSpecies.maturation_years * 365 * 24 * 60 * 60 * 1000);
 
     return {
       totalInvestment,
@@ -152,7 +158,7 @@ export const InvestmentSimulator: React.FC = () => {
       maturationDate,
       avgWeightPerPlant
     };
-  }, [selectedSpecies, selectedYear, numberOfPlants, selectedPricePerKg, weightPerPlant, plantPrices]);
+  }, [currentSpecies, numberOfPlants, selectedPricePerKg, weightPerPlant, currentPricePerPlant]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -180,6 +186,15 @@ export const InvestmentSimulator: React.FC = () => {
       return;
     }
 
+    if (!currentSpecies) {
+      toast({
+        title: "Error",
+        description: "Por favor selecciona una especie",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Guardar solicitud en la base de datos
@@ -191,7 +206,7 @@ export const InvestmentSimulator: React.FC = () => {
           user_name: profile.name || profile.email,
           user_phone: profile.phone,
           plant_count: numberOfPlants,
-          species_name: selectedSpecies,
+          species_name: currentSpecies.name,
           establishment_year: parseInt(selectedYear),
           total_investment: results.totalInvestment,
           weight_per_plant: weightPerPlant[0],
@@ -212,7 +227,7 @@ export const InvestmentSimulator: React.FC = () => {
           userName: profile.name || profile.email,
           userPhone: profile.phone,
           plantCount: numberOfPlants,
-          speciesName: selectedSpecies,
+          speciesName: currentSpecies.name,
           establishmentYear: parseInt(selectedYear),
           totalInvestment: results.totalInvestment,
           weightPerPlant: weightPerPlant[0],
@@ -240,6 +255,18 @@ export const InvestmentSimulator: React.FC = () => {
       setLoading(false);
     }
   };
+
+  if (!plantSpecies || !currentSpecies) {
+    return (
+      <div className="w-full max-w-7xl mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-lg text-muted-foreground">Cargando simulador...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-8">
@@ -274,18 +301,18 @@ export const InvestmentSimulator: React.FC = () => {
                   <SelectValue placeholder={t('simulator.selectSpecies')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(speciesData).map(([name, data]) => (
-                    <SelectItem key={name} value={name}>
+                  {plantSpecies.map((species) => (
+                    <SelectItem key={species.id} value={species.id}>
                       <div className="flex flex-col">
-                        <span className="font-medium">{name}</span>
-                        <span className="text-xs text-muted-foreground">{data.scientificName}</span>
+                        <span className="font-medium">{species.name}</span>
+                        <span className="text-xs text-muted-foreground">{species.scientific_name}</span>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
-                {speciesData[selectedSpecies as keyof typeof speciesData].description}
+                {currentSpecies.description}
               </p>
             </div>
 
@@ -297,19 +324,12 @@ export const InvestmentSimulator: React.FC = () => {
                   <SelectValue placeholder={t('simulator.selectYear')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.keys(plantPrices)
-                    .filter(key => key.startsWith(selectedSpecies + '-'))
-                    .map(key => {
-                      const year = key.split('-')[1];
-                      const price = plantPrices[key];
-                      return (
-                        <SelectItem key={year} value={year}>
-                          {year} - {formatCurrency(price)} por planta
-                        </SelectItem>
-                      );
-                    })
-                  }
-                  {Object.keys(plantPrices).filter(key => key.startsWith(selectedSpecies + '-')).length === 0 && (
+                  {availableYears.map(({ year, price }) => (
+                    <SelectItem key={year} value={year}>
+                      {year} - {formatCurrency(price)} por planta
+                    </SelectItem>
+                  ))}
+                  {availableYears.length === 0 && (
                     <SelectItem value="2025">2025 - $250 MXN por planta (precio por defecto)</SelectItem>
                   )}
                 </SelectContent>
@@ -340,18 +360,18 @@ export const InvestmentSimulator: React.FC = () => {
                 <Slider
                   value={weightPerPlant}
                   onValueChange={setWeightPerPlant}
-                  max={speciesData[selectedSpecies as keyof typeof speciesData].weightRange.max}
-                  min={speciesData[selectedSpecies as keyof typeof speciesData].weightRange.min}
+                  max={currentSpecies.max_weight_kg}
+                  min={currentSpecies.min_weight_kg}
                   step={1}
                   className="w-full"
                 />
               </div>
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>{speciesData[selectedSpecies as keyof typeof speciesData].weightRange.min} kg</span>
+                <span>{currentSpecies.min_weight_kg} kg</span>
                 <span className="font-medium text-primary text-lg">
                   {formatNumber(weightPerPlant[0])} {t('simulator.weightPerPlantUnit')}
                 </span>
-                <span>{speciesData[selectedSpecies as keyof typeof speciesData].weightRange.max} kg</span>
+                <span>{currentSpecies.max_weight_kg} kg</span>
               </div>
             </div>
 
@@ -394,7 +414,7 @@ export const InvestmentSimulator: React.FC = () => {
                 {formatCurrency(results.totalInvestment)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {formatNumber(numberOfPlants)} plantas × {formatCurrency(plantPrices[`${selectedSpecies}-${selectedYear}`] || 250)}
+                {formatNumber(numberOfPlants)} plantas × {formatCurrency(currentPricePerPlant)}
               </p>
             </CardContent>
           </Card>
@@ -472,7 +492,7 @@ export const InvestmentSimulator: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {speciesData[selectedSpecies as keyof typeof speciesData].maturationYears} {t('simulator.years')}
+              {currentSpecies.maturation_years} {t('simulator.years')}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {t('simulator.harvestDate')}: {results.maturationDate.toLocaleDateString('es-MX', { 

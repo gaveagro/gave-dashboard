@@ -14,6 +14,7 @@ import {
   Users,
   TrendingUp,
   ClipboardList,
+  LogOut,
 } from "lucide-react"
 
 import {
@@ -74,8 +75,17 @@ export function AppSidebar() {
   ]
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Error signing out:', error);
+      }
+      navigate('/');
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      // Even if there's an error, navigate to home
+      navigate('/');
+    }
   };
 
   const allItems = profile?.role === 'admin' ? [...items, ...adminItems] : items;
@@ -123,7 +133,7 @@ export function AppSidebar() {
                   <span>Perfil</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut}>
-                  <Settings />
+                  <LogOut />
                   <span>Cerrar Sesión</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
