@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -175,6 +174,13 @@ export const InvestmentSimulator: React.FC = () => {
       actualHarvestYear
     };
   }, [currentSpecies, numberOfPlants, selectedPricePerKg, weightPerPlant, currentPricePerPlant, selectedYear]);
+
+  // Calculate annual ROI
+  const annualROI = useMemo(() => {
+    if (!currentSpecies || results.totalInvestment === 0) return 0;
+    const totalYears = currentSpecies.maturation_years;
+    return totalYears > 0 ? results.roi / totalYears : 0;
+  }, [results.roi, currentSpecies]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -469,7 +475,7 @@ export const InvestmentSimulator: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Ganancia Neta */}
+          {/* Ganancia Neta con ROI Anual */}
           <Card className="animate-fade-in border-roi/20 bg-gradient-to-br from-roi/5 to-roi/10">
             <CardHeader className="pb-3">
               <CardTitle className="text-roi flex items-center gap-2">
@@ -481,9 +487,14 @@ export const InvestmentSimulator: React.FC = () => {
               <div className="text-3xl font-bold text-roi">
                 {formatCurrency(results.investorProfit)}
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                ROI: {formatNumber(results.roi, 1)}%
-              </p>
+              <div className="flex justify-between items-center mt-1">
+                <p className="text-sm text-muted-foreground">
+                  ROI Total: {formatNumber(results.roi, 1)}%
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  ROI Anual: {formatNumber(annualROI, 1)}%
+                </p>
+              </div>
             </CardContent>
           </Card>
 

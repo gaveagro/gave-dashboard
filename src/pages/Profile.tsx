@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { User, Phone, Mail, Save, Edit, Lock } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useQuery } from '@tanstack/react-query';
 
 const Profile = () => {
   const { user, profile } = useAuth();
@@ -25,6 +26,24 @@ const Profile = () => {
     confirmPassword: ''
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  // Fetch total invested capital
+  const { data: totalInvested } = useQuery({
+    queryKey: ['user-total-invested', user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      
+      const { data, error } = await supabase
+        .from('investments')
+        .select('total_amount')
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      return data.reduce((sum, investment) => sum + Number(investment.total_amount), 0);
+    },
+    enabled: !!user
+  });
 
   useEffect(() => {
     if (profile) {
@@ -304,9 +323,9 @@ const Profile = () => {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Balance de Cuenta</Label>
+              <Label>Capital Total Invertido</Label>
               <div className="text-2xl font-bold text-investment">
-                ${profile.account_balance?.toLocaleString() || '0'} MXN
+                ${totalInvested?.toLocaleString() || '0'} MXN
               </div>
             </div>
             <div className="space-y-2">
