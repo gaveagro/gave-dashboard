@@ -1132,7 +1132,7 @@ const Admin = () => {
                               setEditNotificationForm({
                                 title: notification.title,
                                 message: notification.message,
-                                type: notification.type || 'info'
+                                type: (notification.type as 'info' | 'warning' | 'success') || 'info'
                               });
                               setShowNotificationDialog(true);
                             }}
