@@ -13,9 +13,10 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Plus, Send, DollarSign, TrendingUp, RotateCcw, MapPin, Trash2, Upload, Download, Eye, Edit, FileText, TreePine, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Users, Plus, Send, DollarSign, TrendingUp, RotateCcw, MapPin, Trash2, Upload, Download, Eye, Edit, FileText, TreePine, CheckCircle, XCircle, Clock, BarChart3 } from 'lucide-react';
 import { SpeciesManager } from '@/components/admin/SpeciesManager';
 import { UserManager } from '@/components/admin/UserManager';
+import { InvestmentChart } from '@/components/InvestmentChart';
 import { Checkbox } from '@/components/ui/checkbox';
 
 const Admin = () => {
@@ -31,19 +32,15 @@ const Admin = () => {
   const [newInvestmentYear, setNewInvestmentYear] = useState('');
   const [newInvestmentPricePerPlant, setNewInvestmentPricePerPlant] = useState('');
 
+  // States for investment editing
+  const [editingInvestment, setEditingInvestment] = useState<any>(null);
+  const [isEditInvestmentDialogOpen, setIsEditInvestmentDialogOpen] = useState(false);
+
   // States for notifications
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationTarget, setNotificationTarget] = useState<'all' | 'specific'>('all');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-
-  // Document upload states
-  const [documentUserId, setDocumentUserId] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [documentType, setDocumentType] = useState('');
-  const [documentName, setDocumentName] = useState('');
-  const [contractType, setContractType] = useState('');
-  const [uploading, setUploading] = useState(false);
 
   // Plot states
   const [showCreatePlotDialog, setShowCreatePlotDialog] = useState(false);
@@ -130,19 +127,6 @@ const Admin = () => {
     }
   });
 
-  const { data: investmentRequests } = useQuery({
-    queryKey: ['admin-investment-requests'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('investment_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    }
-  });
-
   const { data: allNotifications } = useQuery({
     queryKey: ['admin-notifications'],
     queryFn: async () => {
@@ -213,6 +197,75 @@ const Admin = () => {
       toast({
         title: "Error",
         description: error.message || "Error al crear inversión",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Update investment mutation
+  const updateInvestmentMutation = useMutation({
+    mutationFn: async (investmentData: any) => {
+      const species = plantSpecies?.find(s => s.id === investmentData.species_id);
+      if (!species) throw new Error('Especie no encontrada');
+
+      const totalAmount = investmentData.plant_count * investmentData.price_per_plant;
+      const expectedHarvestYear = investmentData.plantation_year + species.maturation_years;
+
+      const { error } = await supabase
+        .from('investments')
+        .update({
+          user_id: investmentData.user_id,
+          species_id: investmentData.species_id,
+          plant_count: investmentData.plant_count,
+          plantation_year: investmentData.plantation_year,
+          expected_harvest_year: expectedHarvestYear,
+          price_per_plant: investmentData.price_per_plant,
+          total_amount: totalAmount,
+          status: investmentData.status
+        })
+        .eq('id', investmentData.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Inversión actualizada",
+        description: "La inversión ha sido actualizada exitosamente."
+      });
+      setIsEditInvestmentDialogOpen(false);
+      setEditingInvestment(null);
+      queryClient.invalidateQueries({ queryKey: ['admin-investments'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al actualizar inversión",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Delete investment mutation
+  const deleteInvestmentMutation = useMutation({
+    mutationFn: async (investmentId: string) => {
+      const { error } = await supabase
+        .from('investments')
+        .delete()
+        .eq('id', investmentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Inversión eliminada",
+        description: "La inversión ha sido eliminada exitosamente."
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin-investments'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Error al eliminar inversión",
         variant: "destructive"
       });
     }
@@ -334,36 +387,6 @@ const Admin = () => {
     }
   });
 
-  // Update investment request status
-  const updateRequestStatusMutation = useMutation({
-    mutationFn: async ({ requestId, status, notes }: { requestId: string; status: string; notes?: string }) => {
-      const { error } = await supabase
-        .from('investment_requests')
-        .update({ 
-          status, 
-          admin_notes: notes,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', requestId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Solicitud actualizada",
-        description: "El estado de la solicitud ha sido actualizado."
-      });
-      queryClient.invalidateQueries({ queryKey: ['admin-investment-requests'] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `No se pudo actualizar la solicitud: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
-
   // Send notification mutation
   const sendNotificationMutation = useMutation({
     mutationFn: async () => {
@@ -431,6 +454,17 @@ const Admin = () => {
     });
   };
 
+  const handleEditInvestment = (investment: any) => {
+    setEditingInvestment(investment);
+    setIsEditInvestmentDialogOpen(true);
+  };
+
+  const handleUpdateInvestment = () => {
+    if (editingInvestment) {
+      updateInvestmentMutation.mutate(editingInvestment);
+    }
+  };
+
   const handleEditPlot = (plot: any) => {
     setEditingPlot(plot);
     setShowEditPlotDialog(true);
@@ -449,6 +483,14 @@ const Admin = () => {
       setSelectedUsers(selectedUsers.filter(id => id !== userId));
     }
   };
+
+  // Prepare data for charts
+  const investmentChartData = investments?.map(investment => ({
+    species: investment.plant_species?.name || 'Desconocida',
+    amount: investment.total_amount,
+    count: investment.plant_count,
+    year: investment.plantation_year
+  })) || [];
 
   if (profile?.role !== 'admin') {
     return (
@@ -469,7 +511,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="users">
             <Users className="w-4 h-4 mr-2" />
             Usuarios
@@ -486,9 +528,9 @@ const Admin = () => {
             <TrendingUp className="w-4 h-4 mr-2" />
             Inversiones
           </TabsTrigger>
-          <TabsTrigger value="requests">
-            <FileText className="w-4 h-4 mr-2" />
-            Solicitudes
+          <TabsTrigger value="statistics">
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Estadísticas
           </TabsTrigger>
           <TabsTrigger value="notifications">
             <Send className="w-4 h-4 mr-2" />
@@ -822,6 +864,10 @@ const Admin = () => {
             <div className="grid gap-4">
               {investments?.map((investment) => {
                 const userProfile = profiles?.find(p => p.user_id === investment.user_id);
+                const currentYear = new Date().getFullYear();
+                const yearsToHarvest = investment.expected_harvest_year - currentYear;
+                const isReady = yearsToHarvest <= 0;
+                
                 return (
                   <Card key={investment.id}>
                     <CardHeader>
@@ -830,14 +876,33 @@ const Admin = () => {
                           <CardTitle className="flex items-center gap-2">
                             {userProfile?.name || userProfile?.email}
                             <Badge variant="secondary">{investment.plant_species?.name}</Badge>
+                            {isReady && <Badge variant="default" className="bg-green-600">Lista para cosechar</Badge>}
                           </CardTitle>
                           <CardDescription>
                             {investment.plant_count} plantas - Año {investment.plantation_year}
+                            {!isReady && <span className="text-amber-600 ml-2">({yearsToHarvest} años restantes)</span>}
                           </CardDescription>
                         </div>
-                        <Badge variant={investment.status === 'active' ? 'default' : 'secondary'}>
-                          {investment.status}
-                        </Badge>
+                        <div className="flex gap-2">
+                          <Badge variant={investment.status === 'active' ? 'default' : 'secondary'}>
+                            {investment.status}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditInvestment(investment)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteInvestmentMutation.mutate(investment.id)}
+                            disabled={deleteInvestmentMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -860,101 +925,183 @@ const Admin = () => {
                 );
               })}
             </div>
+
+            {/* Dialog para editar inversión */}
+            <Dialog open={isEditInvestmentDialogOpen} onOpenChange={setIsEditInvestmentDialogOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Editar Inversión</DialogTitle>
+                  <DialogDescription>
+                    Modifica los datos de la inversión
+                  </DialogDescription>
+                </DialogHeader>
+                {editingInvestment && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="edit-investment-user">Usuario</Label>
+                      <Select value={editingInvestment.user_id} onValueChange={(value) => setEditingInvestment(prev => ({ ...prev, user_id: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona un usuario" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users?.map((user) => (
+                            <SelectItem key={user.user_id} value={user.user_id}>
+                              {user.name || user.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-investment-species">Especie</Label>
+                      <Select value={editingInvestment.species_id} onValueChange={(value) => setEditingInvestment(prev => ({ ...prev, species_id: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona una especie" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {plantSpecies?.map((species) => (
+                            <SelectItem key={species.id} value={species.id}>
+                              {species.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-investment-plant-count">Número de Plantas</Label>
+                      <Input
+                        id="edit-investment-plant-count"
+                        type="number"
+                        value={editingInvestment.plant_count}
+                        onChange={(e) => setEditingInvestment(prev => ({ ...prev, plant_count: parseInt(e.target.value) }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-investment-year">Año de Plantación</Label>
+                      <Input
+                        id="edit-investment-year"
+                        type="number"
+                        value={editingInvestment.plantation_year}
+                        onChange={(e) => setEditingInvestment(prev => ({ ...prev, plantation_year: parseInt(e.target.value) }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-investment-price">Precio por Planta</Label>
+                      <Input
+                        id="edit-investment-price"
+                        type="number"
+                        step="0.01"
+                        value={editingInvestment.price_per_plant}
+                        onChange={(e) => setEditingInvestment(prev => ({ ...prev, price_per_plant: parseFloat(e.target.value) }))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-investment-status">Estado</Label>
+                      <Select value={editingInvestment.status} onValueChange={(value) => setEditingInvestment(prev => ({ ...prev, status: value }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Activa</SelectItem>
+                          <SelectItem value="pending">Pendiente</SelectItem>
+                          <SelectItem value="completed">Completada</SelectItem>
+                          <SelectItem value="cancelled">Cancelada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="outline" onClick={() => setIsEditInvestmentDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleUpdateInvestment} disabled={updateInvestmentMutation.isPending}>
+                        {updateInvestmentMutation.isPending ? 'Actualizando...' : 'Actualizar Inversión'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
         </TabsContent>
 
-        <TabsContent value="requests">
+        <TabsContent value="statistics">
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold">Solicitudes de Inversión</h2>
-                <p className="text-muted-foreground">Gestiona las solicitudes de inversión de los usuarios</p>
-              </div>
+            <div>
+              <h2 className="text-2xl font-bold">Estadísticas de Inversiones</h2>
+              <p className="text-muted-foreground">Visualiza el resumen de todas las inversiones</p>
             </div>
 
-            <div className="grid gap-4">
-              {investmentRequests?.map((request) => (
-                <Card key={request.id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          {request.user_name}
-                          <Badge variant={
-                            request.status === 'approved' ? 'default' : 
-                            request.status === 'rejected' ? 'destructive' : 
-                            'secondary'
-                          }>
-                            {request.status === 'pending' ? 'Pendiente' : 
-                             request.status === 'approved' ? 'Aprobada' : 
-                             'Rechazada'}
-                          </Badge>
-                        </CardTitle>
-                        <CardDescription>
-                          {request.user_email} - {request.user_phone}
-                        </CardDescription>
-                      </div>
-                      <div className="flex gap-2">
-                        {request.status === 'pending' && (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => updateRequestStatusMutation.mutate({ 
-                                requestId: request.id, 
-                                status: 'approved' 
-                              })}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Aprobar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => updateRequestStatusMutation.mutate({ 
-                                requestId: request.id, 
-                                status: 'rejected' 
-                              })}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Rechazar
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="font-medium">Especie:</span> {request.species_name}
-                      </div>
-                      <div>
-                        <span className="font-medium">Plantas:</span> {request.plant_count}
-                      </div>
-                      <div>
-                        <span className="font-medium">Año:</span> {request.establishment_year}
-                      </div>
-                      <div>
-                        <span className="font-medium">Inversión:</span> ${request.total_investment.toLocaleString()}
-                      </div>
-                    </div>
-                    <div className="mt-4 text-sm">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <span className="font-medium">Peso por planta:</span> {request.weight_per_plant} kg
-                        </div>
-                        <div>
-                          <span className="font-medium">Precio por kg:</span> ${request.price_per_kg}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-4 text-xs text-muted-foreground">
-                      Solicitado: {new Date(request.created_at).toLocaleDateString('es-MX')}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            {/* Resumen de estadísticas */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Total Inversiones</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${investments?.reduce((sum, inv) => sum + inv.total_amount, 0).toLocaleString() || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {investments?.length || 0} inversiones
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Plantas Vendidas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {investments?.reduce((sum, inv) => sum + inv.plant_count, 0).toLocaleString() || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Total de plantas
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Especies Activas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {new Set(investments?.map(inv => inv.species_id)).size || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Diferentes especies
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Inversiones Listas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {investments?.filter(inv => inv.expected_harvest_year <= new Date().getFullYear()).length || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Para cosechar
+                  </p>
+                </CardContent>
+              </Card>
             </div>
+
+            {/* Gráficos */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribución de Inversiones</CardTitle>
+                <CardDescription>
+                  Análisis visual de las inversiones por especie y año
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InvestmentChart investments={investmentChartData} />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

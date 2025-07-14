@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Calculator, TrendingUp, Clock, Leaf, Info } from 'lucide-react';
+import { Calculator, TrendingUp, Clock, Leaf, Info, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,6 +24,9 @@ interface InvestmentResults {
   totalCarbonCapture: number;
   maturationDate: Date;
   avgWeightPerPlant: number;
+  isReadyForHarvest: boolean;
+  yearsToHarvest: number;
+  actualHarvestYear: number;
 }
 
 export const InvestmentSimulator: React.FC = () => {
@@ -118,9 +121,19 @@ export const InvestmentSimulator: React.FC = () => {
         roi: 0,
         totalCarbonCapture: 0,
         maturationDate: new Date(),
-        avgWeightPerPlant: 0
+        avgWeightPerPlant: 0,
+        isReadyForHarvest: false,
+        yearsToHarvest: 0,
+        actualHarvestYear: 0
       };
     }
+
+    const currentYear = new Date().getFullYear();
+    const establishmentYear = parseInt(selectedYear);
+    const yearsGrown = currentYear - establishmentYear;
+    const yearsToHarvest = Math.max(0, currentSpecies.maturation_years - yearsGrown);
+    const isReadyForHarvest = yearsToHarvest === 0;
+    const actualHarvestYear = isReadyForHarvest ? currentYear : currentYear + yearsToHarvest;
 
     // 1. Datos base
     const pricePerPlant = currentPricePerPlant;
@@ -142,9 +155,9 @@ export const InvestmentSimulator: React.FC = () => {
     
     // 5. Cálculo de CO2: usando carbon_capture_per_plant de la base de datos
     const carbonCapturePerPlant = currentSpecies.carbon_capture_per_plant || 0.072;
-    const totalCarbonCapture = numberOfPlants * carbonCapturePerPlant * currentSpecies.maturation_years;
+    const totalCarbonCapture = numberOfPlants * carbonCapturePerPlant * Math.max(yearsGrown, currentSpecies.maturation_years);
     
-    const maturationDate = new Date(Date.now() + currentSpecies.maturation_years * 365 * 24 * 60 * 60 * 1000);
+    const maturationDate = new Date(actualHarvestYear, 0, 1);
 
     return {
       totalInvestment,
@@ -156,9 +169,12 @@ export const InvestmentSimulator: React.FC = () => {
       roi,
       totalCarbonCapture,
       maturationDate,
-      avgWeightPerPlant
+      avgWeightPerPlant,
+      isReadyForHarvest,
+      yearsToHarvest,
+      actualHarvestYear
     };
-  }, [currentSpecies, numberOfPlants, selectedPricePerKg, weightPerPlant, currentPricePerPlant]);
+  }, [currentSpecies, numberOfPlants, selectedPricePerKg, weightPerPlant, currentPricePerPlant, selectedYear]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
@@ -334,6 +350,22 @@ export const InvestmentSimulator: React.FC = () => {
                   )}
                 </SelectContent>
               </Select>
+              {results.isReadyForHarvest && (
+                <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
+                  <AlertTriangle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm text-green-700">
+                    ¡Estas plantas ya están listas para cosechar!
+                  </span>
+                </div>
+              )}
+              {results.yearsToHarvest > 0 && (
+                <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm text-amber-700">
+                    Faltan {results.yearsToHarvest} años para la cosecha
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Número de Plantas */}
@@ -492,7 +524,7 @@ export const InvestmentSimulator: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {currentSpecies.maturation_years} {t('simulator.years')}
+              {results.isReadyForHarvest ? "¡Lista!" : `${results.yearsToHarvest} años`}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {t('simulator.harvestDate')}: {results.maturationDate.toLocaleDateString('es-MX', { 
