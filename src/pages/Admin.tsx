@@ -12,24 +12,23 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Plus, Send, DollarSign, TrendingUp, RotateCcw, MapPin, Trash2, Upload, Download, Eye, Edit, FileText } from 'lucide-react';
+import { Users, Plus, Send, DollarSign, TrendingUp, RotateCcw, MapPin, Trash2, Upload, Download, Eye, Edit, FileText, TreePine } from 'lucide-react';
+import { SpeciesManager } from '@/components/admin/SpeciesManager';
+import { UserManager } from '@/components/admin/UserManager';
 
 const Admin = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'investor'>('investor');
-  const [newUserBalance, setNewUserBalance] = useState('0');
-
+  // States for investment creation
   const [newInvestmentUserId, setNewInvestmentUserId] = useState('');
   const [newInvestmentSpecies, setNewInvestmentSpecies] = useState('');
   const [newInvestmentPlantCount, setNewInvestmentPlantCount] = useState('');
   const [newInvestmentYear, setNewInvestmentYear] = useState('');
   const [newInvestmentPricePerPlant, setNewInvestmentPricePerPlant] = useState('');
 
+  // States for notifications
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationTarget, setNotificationTarget] = useState<'all' | 'specific'>('all');
@@ -48,16 +47,6 @@ const Admin = () => {
   const [showEditPlotDialog, setShowEditPlotDialog] = useState(false);
   const [editingPlot, setEditingPlot] = useState<any>(null);
   
-  // Price editing states
-  const [editingPrice, setEditingPrice] = useState<any>(null);
-  const [showPriceDialog, setShowPriceDialog] = useState(false);
-  const [newPriceValue, setNewPriceValue] = useState('');
-  
-  // Species price management states
-  const [showSpeciesPricesDialog, setShowSpeciesPricesDialog] = useState(false);
-  const [selectedSpeciesForPrices, setSelectedSpeciesForPrices] = useState<any>(null);
-  const [speciesPrices, setSpeciesPrices] = useState<{year: number, price: number}[]>([]);
-
   const [newPlotData, setNewPlotData] = useState({
     name: '',
     location: '',
@@ -72,6 +61,7 @@ const Admin = () => {
     longitude: ''
   });
 
+  // Fetch data
   const { data: users, refetch: refetchUsers } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
@@ -97,7 +87,6 @@ const Admin = () => {
     }
   });
 
-
   const { data: investments } = useQuery({
     queryKey: ['admin-investments'],
     queryFn: async () => {
@@ -114,7 +103,6 @@ const Admin = () => {
     }
   });
 
-  // Fetch profiles separately to join with investments
   const { data: profiles } = useQuery({
     queryKey: ['admin-profiles'],
     queryFn: async () => {
@@ -140,7 +128,6 @@ const Admin = () => {
     }
   });
 
-  // Fetch investment requests
   const { data: investmentRequests } = useQuery({
     queryKey: ['admin-investment-requests'],
     queryFn: async () => {
@@ -154,7 +141,6 @@ const Admin = () => {
     }
   });
 
-  // Fetch notifications for admin management
   const { data: allNotifications } = useQuery({
     queryKey: ['admin-notifications'],
     queryFn: async () => {
@@ -165,14 +151,12 @@ const Admin = () => {
       
       if (error) throw error;
 
-      // Get user profiles separately
       const userIds = [...new Set(notifications?.map(n => n.user_id))];
       const { data: userProfiles } = await supabase
         .from('profiles')
         .select('user_id, name, email')
         .in('user_id', userIds);
 
-      // Join the data
       return notifications?.map(notification => ({
         ...notification,
         user_profile: userProfiles?.find(p => p.user_id === notification.user_id)
@@ -180,170 +164,52 @@ const Admin = () => {
     }
   });
 
-  // Fetch plant prices
-  const { data: plantPrices } = useQuery({
-    queryKey: ['admin-plant-prices'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('plant_prices')
-        .select(`
-          *,
-          plant_species (name)
-        `)
-        .order('year', { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    }
-  });
+  // Create investment mutation
+  const createInvestmentMutation = useMutation({
+    mutationFn: async (investmentData: {
+      userId: string;
+      speciesId: string;
+      plantCount: number;
+      plantationYear: number;
+      pricePerPlant: number;
+    }) => {
+      const species = plantSpecies?.find(s => s.id === investmentData.speciesId);
+      if (!species) throw new Error('Especie no encontrada');
 
-  // Fetch reports
-  const { data: reports } = useQuery({
-    queryKey: ['admin-reports'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('document_type', 'report')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    }
-  });
-
-  // Species management states
-  const [showSpeciesDialog, setShowSpeciesDialog] = useState(false);
-  const [editingSpecies, setEditingSpecies] = useState<any>(null);
-  const [newSpeciesData, setNewSpeciesData] = useState({
-    name: '',
-    scientific_name: '',
-    description: '',
-    maturation_years: '',
-    min_weight_kg: '',
-    max_weight_kg: '',
-    carbon_capture_per_plant: ''
-  });
-
-  // Create user mutation using database function
-  const createUserMutation = useMutation({
-    mutationFn: async ({ email, name, role, balance }: { email: string; name: string; role: 'admin' | 'investor'; balance: number }) => {
-      const { data, error } = await supabase.rpc('create_user_with_profile', {
-        user_email: email,
-        user_name: name,
-        user_role: role,
-        user_balance: balance
-      });
-
-      if (error) throw error;
-      if (!(data as any)?.success) throw new Error((data as any)?.error);
-      
-      return data;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Usuario creado",
-        description: "El usuario ha sido creado exitosamente. Se debe restablecer la contraseña.",
-      });
-      setNewUserEmail('');
-      setNewUserName('');
-      setNewUserRole('investor');
-      setNewUserBalance('0');
-      refetchUsers();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Error al crear usuario",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Add multiple prices for a species
-  const addSpeciesPricesMutation = useMutation({
-    mutationFn: async ({ speciesId, prices }: { speciesId: string; prices: {year: number, price: number}[] }) => {
-      const priceInserts = prices.map(p => ({
-        species_id: speciesId,
-        year: p.year,
-        price_per_plant: p.price
-      }));
+      const totalAmount = investmentData.plantCount * investmentData.pricePerPlant;
+      const expectedHarvestYear = investmentData.plantationYear + species.maturation_years;
 
       const { error } = await supabase
-        .from('plant_prices')
-        .upsert(priceInserts, { onConflict: 'species_id, year' });
+        .from('investments')
+        .insert({
+          user_id: investmentData.userId,
+          species_id: investmentData.speciesId,
+          plant_count: investmentData.plantCount,
+          plantation_year: investmentData.plantationYear,
+          expected_harvest_year: expectedHarvestYear,
+          price_per_plant: investmentData.pricePerPlant,
+          total_amount: totalAmount,
+          status: 'active'
+        });
 
       if (error) throw error;
     },
     onSuccess: () => {
       toast({
-        title: "Precios actualizados",
-        description: "Los precios de la especie han sido actualizados exitosamente."
+        title: "Inversión creada",
+        description: "La inversión ha sido creada exitosamente."
       });
-      queryClient.invalidateQueries({ queryKey: ['admin-plant-prices'] });
-      setShowSpeciesPricesDialog(false);
-      setSpeciesPrices([]);
+      setNewInvestmentUserId('');
+      setNewInvestmentSpecies('');
+      setNewInvestmentPlantCount('');
+      setNewInvestmentYear('');
+      setNewInvestmentPricePerPlant('');
+      queryClient.invalidateQueries({ queryKey: ['admin-investments'] });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Error al actualizar precios",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Upload document mutation
-  const uploadDocumentMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedFile || !documentType || !documentName || !documentUserId) {
-        throw new Error('Por favor completa todos los campos requeridos');
-      }
-
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${documentUserId}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('contracts')
-        .upload(fileName, selectedFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('contracts')
-        .getPublicUrl(fileName);
-
-      const { error: dbError } = await supabase
-        .from('documents')
-        .insert({
-          user_id: documentUserId,
-          document_name: documentName,
-          document_type: documentType,
-          contract_type: documentType === 'contract' ? contractType : null,
-          document_url: publicUrl,
-          file_size: selectedFile.size,
-          uploaded_by: profile?.user_id
-        });
-
-      if (dbError) throw dbError;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Éxito",
-        description: "Documento subido correctamente"
-      });
-      setSelectedFile(null);
-      setDocumentType('');
-      setDocumentName('');
-      setContractType('');
-      setDocumentUserId('');
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
-    },
-    onError: (error: any) => {
-      console.error('Error uploading file:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Error al subir el archivo",
+        description: error.message || "Error al crear inversión",
         variant: "destructive"
       });
     }
@@ -427,137 +293,25 @@ const Admin = () => {
     }
   });
 
-  // Update plot mutation
-  const updatePlotMutation = useMutation({
-    mutationFn: async ({ plotId, plotData }: { plotId: string; plotData: any }) => {
-      const { error } = await supabase
-        .from('plots')
-        .update({
-          name: plotData.name,
-          location: plotData.location,
-          coordinates: plotData.coordinates,
-          area: parseFloat(plotData.area),
-          total_plants: parseInt(plotData.total_plants) || 0,
-          available_plants: parseInt(plotData.available_plants) || 0,
-          temperature: plotData.temperature || null,
-          rainfall: plotData.rainfall ? parseInt(plotData.rainfall) : null,
-          elevation: plotData.elevation ? parseInt(plotData.elevation) : null,
-          latitude: plotData.latitude ? parseFloat(plotData.latitude) : null,
-          longitude: plotData.longitude ? parseFloat(plotData.longitude) : null,
-        })
-        .eq('id', plotId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Parcela actualizada",
-        description: "La parcela ha sido actualizada exitosamente."
-      });
-      queryClient.invalidateQueries({ queryKey: ['admin-plots'] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `No se pudo actualizar la parcela: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const sendPasswordResetMutation = useMutation({
-    mutationFn: async (email: string) => {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth`
-      });
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Email enviado",
-        description: "Se ha enviado un email para restablecer la contraseña."
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `No se pudo enviar el email: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const createInvestmentMutation = useMutation({
-    mutationFn: async (investmentData: {
-      userId: string;
-      speciesId: string;
-      plantCount: number;
-      plantationYear: number;
-      pricePerPlant: number;
-    }) => {
-      const species = plantSpecies?.find(s => s.id === investmentData.speciesId);
-      if (!species) throw new Error('Especie no encontrada');
-
-      const totalAmount = investmentData.plantCount * investmentData.pricePerPlant;
-      const expectedHarvestYear = investmentData.plantationYear + species.maturation_years;
-
-      const { error } = await supabase
-        .from('investments')
-        .insert({
-          user_id: investmentData.userId,
-          species_id: investmentData.speciesId,
-          plant_count: investmentData.plantCount,
-          plantation_year: investmentData.plantationYear,
-          expected_harvest_year: expectedHarvestYear,
-          price_per_plant: investmentData.pricePerPlant,
-          total_amount: totalAmount,
-          status: 'active'
-        });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Inversión creada",
-        description: "La inversión ha sido registrada exitosamente."
-      });
-      setNewInvestmentUserId('');
-      setNewInvestmentSpecies('');
-      setNewInvestmentPlantCount('');
-      setNewInvestmentYear('');
-      setNewInvestmentPricePerPlant('');
-      queryClient.invalidateQueries({ queryKey: ['admin-investments'] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `No se pudo crear la inversión: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
-
+  // Send notification mutation
   const sendNotificationMutation = useMutation({
-    mutationFn: async (notificationData: {
-      title: string;
-      message: string;
-      target: 'all' | 'specific';
-      userIds?: string[];
-    }) => {
-      let targetUserIds: string[] = [];
+    mutationFn: async () => {
+      if (!notificationTitle || !notificationMessage) {
+        throw new Error('Por favor completa todos los campos');
+      }
 
-      if (notificationData.target === 'all') {
-        const allUsers = users || [];
-        targetUserIds = allUsers.map(user => user.user_id);
-      } else {
-        targetUserIds = notificationData.userIds || [];
+      const targetUserIds = notificationTarget === 'all' 
+        ? users?.map(u => u.user_id) || []
+        : selectedUsers;
+
+      if (targetUserIds.length === 0) {
+        throw new Error('No hay usuarios seleccionados');
       }
 
       const notifications = targetUserIds.map(userId => ({
         user_id: userId,
-        title: notificationData.title,
-        message: notificationData.message,
+        title: notificationTitle,
+        message: notificationMessage,
         type: 'info'
       }));
 
@@ -569,8 +323,8 @@ const Admin = () => {
     },
     onSuccess: () => {
       toast({
-        title: "Notificación enviada",
-        description: "La notificación ha sido enviada exitosamente."
+        title: "Notificaciones enviadas",
+        description: `Se enviaron ${notificationTarget === 'all' ? users?.length : selectedUsers.length} notificaciones.`
       });
       setNotificationTitle('');
       setNotificationMessage('');
@@ -578,1638 +332,325 @@ const Admin = () => {
       setSelectedUsers([]);
       queryClient.invalidateQueries({ queryKey: ['admin-notifications'] });
     },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `No se pudo enviar la notificación: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Delete investment mutation
-  const deleteInvestmentMutation = useMutation({
-    mutationFn: async (investmentId: string) => {
-      const { error } = await supabase
-        .from('investments')
-        .delete()
-        .eq('id', investmentId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Inversión eliminada",
-        description: "La inversión ha sido eliminada exitosamente."
-      });
-      queryClient.invalidateQueries({ queryKey: ['admin-investments'] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `No se pudo eliminar la inversión: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Delete notification mutation
-  const deleteNotificationMutation = useMutation({
-    mutationFn: async (notificationId: string) => {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Notificación eliminada",
-        description: "La notificación ha sido eliminada exitosamente."
-      });
-      queryClient.invalidateQueries({ queryKey: ['admin-notifications'] });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `No se pudo eliminar la notificación: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const handleCreateUser = () => {
-    if (!newUserEmail || !newUserName) return;
-
-    createUserMutation.mutate({
-      email: newUserEmail,
-      name: newUserName,
-      role: newUserRole,
-      balance: parseFloat(newUserBalance) || 0
-    });
-  };
-
-  const handleCreateInvestment = () => {
-    if (!newInvestmentUserId || !newInvestmentSpecies || !newInvestmentPlantCount || !newInvestmentYear || !newInvestmentPricePerPlant) return;
-
-    createInvestmentMutation.mutate({
-      userId: newInvestmentUserId,
-      speciesId: newInvestmentSpecies,
-      plantCount: parseInt(newInvestmentPlantCount),
-      plantationYear: parseInt(newInvestmentYear),
-      pricePerPlant: parseFloat(newInvestmentPricePerPlant)
-    });
-  };
-
-  const handleSendNotification = () => {
-    if (!notificationTitle || !notificationMessage) return;
-
-    if (notificationTarget === 'specific' && selectedUsers.length === 0) {
-      toast({
-        title: "Error",
-        description: "Selecciona al menos un usuario para notificaciones específicas.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    sendNotificationMutation.mutate({
-      title: notificationTitle,
-      message: notificationMessage,
-      target: notificationTarget,
-      userIds: notificationTarget === 'specific' ? selectedUsers : undefined
-    });
-  };
-
-  const handleUploadDocument = () => {
-    uploadDocumentMutation.mutate();
-  };
-
-  const handleCreatePlot = () => {
-    if (!newPlotData.name || !newPlotData.location || !newPlotData.area) {
-      toast({
-        title: "Error",
-        description: "Por favor completa los campos requeridos (nombre, ubicación, área).",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    createPlotMutation.mutate(newPlotData);
-  };
-
-  // Update price mutation
-  const updatePriceMutation = useMutation({
-    mutationFn: async ({ priceId, newPrice }: { priceId: string; newPrice: number }) => {
-      const { error } = await supabase
-        .from('plant_prices')
-        .update({ price_per_plant: newPrice })
-        .eq('id', priceId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Precio actualizado",
-        description: "El precio ha sido actualizado exitosamente."
-      });
-      setShowPriceDialog(false);
-      setEditingPrice(null);
-      setNewPriceValue('');
-      queryClient.invalidateQueries({ queryKey: ['admin-plant-prices'] });
-    },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: `No se pudo actualizar el precio: ${error.message}`,
+        description: error.message || "Error al enviar notificaciones",
         variant: "destructive"
       });
     }
   });
-
-  // Delete price mutation
-  const deletePriceMutation = useMutation({
-    mutationFn: async (priceId: string) => {
-      const { error } = await supabase
-        .from('plant_prices')
-        .delete()
-        .eq('id', priceId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Precio eliminado",
-        description: "El precio ha sido eliminado exitosamente."
-      });
-      queryClient.invalidateQueries({ queryKey: ['admin-plant-prices'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Error al eliminar el precio",
-        variant: "destructive"
-      });
-    }
-  });
-
-
-  // Delete report mutation
-  const deleteReportMutation = useMutation({
-    mutationFn: async ({ reportId, documentUrl }: { reportId: string; documentUrl: string }) => {
-      // Extract file path from URL
-      const urlParts = documentUrl.split('/');
-      const filePath = urlParts.slice(-2).join('/');
-
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('contracts')
-        .remove([filePath]);
-
-      if (storageError) {
-        console.error('Storage deletion error:', storageError);
-      }
-
-      // Delete from database
-      const { error: dbError } = await supabase
-        .from('documents')
-        .delete()
-        .eq('id', reportId);
-
-      if (dbError) throw dbError;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Reporte eliminado",
-        description: "El reporte ha sido eliminado exitosamente."
-      });
-      queryClient.invalidateQueries({ queryKey: ['admin-reports'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: `Error al eliminar el reporte: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Create price mutation
-  const createPriceMutation = useMutation({
-    mutationFn: async (priceData: { species_id: string; year: number; price_per_plant: number }) => {
-      const { error } = await supabase
-        .from('plant_prices')
-        .insert(priceData);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Precio añadido",
-        description: "El precio ha sido añadido exitosamente."
-      });
-      queryClient.invalidateQueries({ queryKey: ['admin-plant-prices'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Error al añadir el precio",
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Species management mutations
-  const createSpeciesMutation = useMutation({
-    mutationFn: async (speciesData: any) => {
-      const { error } = await supabase
-        .from('plant_species')
-        .insert({
-          name: speciesData.name,
-          scientific_name: speciesData.scientific_name,
-          description: speciesData.description,
-          maturation_years: parseInt(speciesData.maturation_years),
-          min_weight_kg: parseInt(speciesData.min_weight_kg),
-          max_weight_kg: parseInt(speciesData.max_weight_kg),
-          carbon_capture_per_plant: parseFloat(speciesData.carbon_capture_per_plant) || 0.5
-        });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Especie creada",
-        description: "La especie ha sido creada exitosamente."
-      });
-      setShowSpeciesDialog(false);
-      setNewSpeciesData({
-        name: '',
-        scientific_name: '',
-        description: '',
-        maturation_years: '',
-        min_weight_kg: '',
-        max_weight_kg: '',
-        carbon_capture_per_plant: ''
-      });
-      queryClient.invalidateQueries({ queryKey: ['plant-species-admin'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Error al crear la especie",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const updateSpeciesMutation = useMutation({
-    mutationFn: async ({ id, speciesData }: { id: string, speciesData: any }) => {
-      const { error } = await supabase
-        .from('plant_species')
-        .update({
-          name: speciesData.name,
-          scientific_name: speciesData.scientific_name,
-          description: speciesData.description,
-          maturation_years: parseInt(speciesData.maturation_years),
-          min_weight_kg: parseInt(speciesData.min_weight_kg),
-          max_weight_kg: parseInt(speciesData.max_weight_kg),
-          carbon_capture_per_plant: parseFloat(speciesData.carbon_capture_per_plant) || 0.5
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Especie actualizada",
-        description: "La especie ha sido actualizada exitosamente."
-      });
-      setShowSpeciesDialog(false);
-      setEditingSpecies(null);
-      queryClient.invalidateQueries({ queryKey: ['plant-species-admin'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Error al actualizar la especie",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const updateUserEmail = async (userId: string, newEmail: string) => {
-    try {
-      await supabase
-        .from('profiles')
-        .update({ email: newEmail })
-        .eq('user_id', userId);
-
-      toast({
-        title: "Email actualizado",
-        description: "El email del usuario ha sido actualizado."
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: `No se pudo actualizar el email: ${error.message}`,
-        variant: "destructive"
-      });
-    }
-  };
 
   if (profile?.role !== 'admin') {
     return (
-      <div className="container mx-auto py-6">
-        <Card>
-          <CardContent className="pt-6">
-            <p>No tienes permisos para acceder a esta página.</p>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-2">Acceso Denegado</h1>
+          <p className="text-gray-600">No tienes permisos para acceder a esta página.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
-        <p className="text-muted-foreground">
-          Gestiona usuarios, inversiones, parcelas y notificaciones
-        </p>
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Panel de Administración</h1>
+        <Badge variant="secondary">Admin</Badge>
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="investments">Inversiones</TabsTrigger>
-          <TabsTrigger value="requests">Solicitudes</TabsTrigger>
-          <TabsTrigger value="species">Especies</TabsTrigger>
-          <TabsTrigger value="plots">Parcelas</TabsTrigger>
-          <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
-          <TabsTrigger value="stats">Estadísticas</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="users">
+            <Users className="w-4 h-4 mr-2" />
+            Usuarios
+          </TabsTrigger>
+          <TabsTrigger value="species">
+            <TreePine className="w-4 h-4 mr-2" />
+            Especies
+          </TabsTrigger>
+          <TabsTrigger value="plots">
+            <MapPin className="w-4 h-4 mr-2" />
+            Parcelas
+          </TabsTrigger>
+          <TabsTrigger value="investments">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Inversiones
+          </TabsTrigger>
+          <TabsTrigger value="notifications">
+            <Send className="w-4 h-4 mr-2" />
+            Notificaciones
+          </TabsTrigger>
         </TabsList>
 
-        {/* Users Tab */}
-        <TabsContent value="users" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Crear Nuevo Usuario
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newUserEmail}
-                    onChange={(e) => setNewUserEmail(e.target.value)}
-                    placeholder="usuario@email.com"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="name">Nombre</Label>
-                  <Input
-                    id="name"
-                    value={newUserName}
-                    onChange={(e) => setNewUserName(e.target.value)}
-                    placeholder="Nombre completo"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="role">Rol</Label>
-                  <Select value={newUserRole} onValueChange={(value: 'admin' | 'investor') => setNewUserRole(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="investor">Inversor</SelectItem>
-                      <SelectItem value="admin">Administrador</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="balance">Balance Inicial (MXN)</Label>
-                  <Input
-                    id="balance"
-                    type="number"
-                    step="0.01"
-                    value={newUserBalance}
-                    onChange={(e) => setNewUserBalance(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-              <Button 
-                onClick={handleCreateUser}
-                disabled={createUserMutation.isPending || !newUserEmail || !newUserName}
-              >
-                {createUserMutation.isPending ? 'Creando...' : 'Crear Usuario'}
-              </Button>
-            </CardContent>
-          </Card>
+        <TabsContent value="users">
+          <UserManager />
+        </TabsContent>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Usuarios Registrados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {users?.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
+        <TabsContent value="species">
+          <SpeciesManager />
+        </TabsContent>
+
+        <TabsContent value="plots">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Gestión de Parcelas</h2>
+                <p className="text-muted-foreground">Administra las parcelas donde se cultivan las plantas</p>
+              </div>
+              <Dialog open={showCreatePlotDialog} onOpenChange={setShowCreatePlotDialog}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nueva Parcela
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Crear Nueva Parcela</DialogTitle>
+                    <DialogDescription>
+                      Agrega una nueva parcela al sistema
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <h3 className="font-semibold">{user.name}</h3>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
-                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                        {user.role}
-                      </Badge>
+                      <Label htmlFor="plot-name">Nombre de la Parcela</Label>
+                      <Input
+                        id="plot-name"
+                        value={newPlotData.name}
+                        onChange={(e) => setNewPlotData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Ej: Parcela Norte A"
+                      />
                     </div>
-                    <div className="flex gap-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            Editar Email
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Editar Email</DialogTitle>
-                            <DialogDescription>
-                              Actualizar el email de {user.name}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <Input
-                              defaultValue={user.email}
-                              onChange={(e) => {
-                                const newEmail = e.target.value;
-                                e.target.setAttribute('data-new-email', newEmail);
-                              }}
-                            />
-                            <Button
-                              onClick={(e) => {
-                                const input = e.currentTarget.parentElement?.querySelector('input');
-                                const newEmail = input?.getAttribute('data-new-email') || input?.value;
-                                if (newEmail && newEmail !== user.email) {
-                                  updateUserEmail(user.user_id, newEmail);
-                                }
-                              }}
-                            >
-                              Actualizar Email
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => sendPasswordResetMutation.mutate(user.email)}
-                        disabled={sendPasswordResetMutation.isPending}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Reset Password
-                      </Button>
+                    <div>
+                      <Label htmlFor="plot-location">Ubicación</Label>
+                      <Input
+                        id="plot-location"
+                        value={newPlotData.location}
+                        onChange={(e) => setNewPlotData(prev => ({ ...prev, location: e.target.value }))}
+                        placeholder="Ej: Jalisco, México"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="plot-coordinates">Coordenadas</Label>
+                      <Input
+                        id="plot-coordinates"
+                        value={newPlotData.coordinates}
+                        onChange={(e) => setNewPlotData(prev => ({ ...prev, coordinates: e.target.value }))}
+                        placeholder="Ej: 20.6597, -103.3496"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="plot-area">Área (hectáreas)</Label>
+                      <Input
+                        id="plot-area"
+                        type="number"
+                        step="0.01"
+                        value={newPlotData.area}
+                        onChange={(e) => setNewPlotData(prev => ({ ...prev, area: e.target.value }))}
+                        placeholder="10.5"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="plot-total-plants">Total de Plantas</Label>
+                      <Input
+                        id="plot-total-plants"
+                        type="number"
+                        value={newPlotData.total_plants}
+                        onChange={(e) => setNewPlotData(prev => ({ ...prev, total_plants: e.target.value }))}
+                        placeholder="1000"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="plot-available-plants">Plantas Disponibles</Label>
+                      <Input
+                        id="plot-available-plants"
+                        type="number"
+                        value={newPlotData.available_plants}
+                        onChange={(e) => setNewPlotData(prev => ({ ...prev, available_plants: e.target.value }))}
+                        placeholder="800"
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Investments Tab */}
-        <TabsContent value="investments" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Nueva Inversión
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <div>
-                  <Label>Usuario</Label>
-                  <Select value={newInvestmentUserId} onValueChange={setNewInvestmentUserId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar usuario" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users?.filter(u => u.role === 'investor').map((user) => (
-                        <SelectItem key={user.id} value={user.user_id}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Especie</Label>
-                  <Select value={newInvestmentSpecies} onValueChange={setNewInvestmentSpecies}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar especie" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {plantSpecies?.map((species) => (
-                        <SelectItem key={species.id} value={species.id}>
-                          {species.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Cantidad de plantas</Label>
-                  <Input
-                    type="number"
-                    value={newInvestmentPlantCount}
-                    onChange={(e) => setNewInvestmentPlantCount(e.target.value)}
-                    placeholder="100"
-                  />
-                </div>
-                <div>
-                  <Label>Año de establecimiento</Label>
-                  <Input
-                    type="number"
-                    value={newInvestmentYear}
-                    onChange={(e) => setNewInvestmentYear(e.target.value)}
-                    placeholder="2024"
-                  />
-                </div>
-                <div>
-                  <Label>Precio por planta ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={newInvestmentPricePerPlant}
-                    onChange={(e) => setNewInvestmentPricePerPlant(e.target.value)}
-                    placeholder="100.00"
-                  />
-                </div>
-              </div>
-              {newInvestmentPlantCount && newInvestmentPricePerPlant && (
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium">
-                    Total de inversión: ${(parseInt(newInvestmentPlantCount || '0') * parseFloat(newInvestmentPricePerPlant || '0')).toLocaleString()}
-                  </p>
-                </div>
-              )}
-              <Button 
-                onClick={handleCreateInvestment}
-                disabled={createInvestmentMutation.isPending || !newInvestmentUserId || !newInvestmentSpecies || !newInvestmentPlantCount || !newInvestmentYear || !newInvestmentPricePerPlant}
-              >
-                {createInvestmentMutation.isPending ? 'Creando...' : 'Crear Inversión'}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Inversiones Registradas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {investments?.map((investment) => {
-                  const userProfile = profiles?.find(p => p.user_id === investment.user_id);
-                  return (
-                    <div key={investment.id} className="flex items-center justify-between p-4 border rounded-lg">
-                     <div>
-                       <h3 className="font-semibold">{userProfile?.name || userProfile?.email || `Usuario ID: ${investment.user_id}`}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {investment.plant_count} plantas de {investment.plant_species?.name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Año: {investment.plantation_year} | Total: ${investment.total_amount.toLocaleString()}
-                      </p>
-                    </div>
-                     <div className="flex items-center gap-2">
-                       <Badge variant={investment.status === 'active' ? 'default' : 'secondary'}>
-                         {investment.status}
-                       </Badge>
-                       <Button
-                         variant="destructive"
-                         size="sm"
-                         onClick={() => deleteInvestmentMutation.mutate(investment.id)}
-                         disabled={deleteInvestmentMutation.isPending}
-                       >
-                         <Trash2 className="h-4 w-4" />
-                       </Button>
-                     </div>
-                   </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Investment Requests Tab */}
-        <TabsContent value="requests" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Solicitudes de Inversión</CardTitle>
-              <CardDescription>
-                Revisa y gestiona las solicitudes de nuevas inversiones
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {investmentRequests?.map((request) => (
-                  <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">{request.user_name}</h3>
-                      <p className="text-sm text-muted-foreground">{request.user_email}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {request.plant_count} plantas de {request.species_name}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Año: {request.establishment_year} | Total: ${request.total_investment.toLocaleString()}
-                      </p>
-                    </div>
-                    <Badge variant={request.status === 'pending' ? 'outline' : request.status === 'approved' ? 'default' : 'destructive'}>
-                      {request.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Species Management Tab */}
-        <TabsContent value="species" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Gestión de Especies y Precios</CardTitle>
-              <CardDescription>
-                Administra especies de plantas y sus precios por año
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {/* Plant Prices List */}
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">Precios por Especie y Año</h3>
-                    <Button 
-                      onClick={() => {
-                        // For now, let's add a simple form in a dialog
-                        const year = prompt('Año:');
-                        const speciesId = prompt('ID de Especie (temporal):');
-                        const price = prompt('Precio por planta:');
-                        
-                        if (year && speciesId && price) {
-                          createPriceMutation.mutate({
-                            species_id: speciesId,
-                            year: parseInt(year),
-                            price_per_plant: parseFloat(price)
-                          });
-                        }
-                      }}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Añadir Precio
+                  <div className="flex justify-end space-x-2 mt-6">
+                    <Button variant="outline" onClick={() => setShowCreatePlotDialog(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={() => createPlotMutation.mutate(newPlotData)} disabled={createPlotMutation.isPending}>
+                      {createPlotMutation.isPending ? 'Creando...' : 'Crear Parcela'}
                     </Button>
                   </div>
-                  {plantPrices?.map((price) => (
-                    <div key={price.id} className="flex items-center justify-between p-4 border rounded-lg">
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="grid gap-4">
+              {plots?.map((plot) => (
+                <Card key={plot.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
                       <div>
-                        <span className="font-medium">{price.plant_species?.name}</span>
-                        <span className="text-muted-foreground ml-2">({price.year})</span>
+                        <CardTitle>{plot.name}</CardTitle>
+                        <CardDescription>{plot.location}</CardDescription>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">${price.price_per_plant}</span>
+                      <div className="flex gap-2">
+                        <Badge variant="secondary">{plot.area} ha</Badge>
                         <Button
-                          variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setEditingPrice(price);
-                            setNewPriceValue(price.price_per_plant.toString());
-                            setShowPriceDialog(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold">Especies Disponibles</h3>
-                    <Button 
-                      onClick={() => {
-                        setEditingSpecies(null);
-                        setNewSpeciesData({
-                          name: '',
-                          scientific_name: '',
-                          description: '',
-                          maturation_years: '',
-                          min_weight_kg: '',
-                          max_weight_kg: '',
-                          carbon_capture_per_plant: ''
-                        });
-                        setShowSpeciesDialog(true);
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Nueva Especie
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    {plantSpecies?.map((species) => (
-                      <div key={species.id} className="p-4 border rounded-lg">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-semibold">{species.name}</h4>
-                            <p className="text-sm text-muted-foreground">{species.scientific_name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Maduración: {species.maturation_years} años | 
-                              Peso: {species.min_weight_kg}-{species.max_weight_kg} kg
-                            </p>
-                            {species.carbon_capture_per_plant && (
-                              <p className="text-sm text-muted-foreground">
-                                Captura CO₂: {species.carbon_capture_per_plant} t por planta
-                              </p>
-                            )}
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingSpecies(species);
-                              setNewSpeciesData({
-                                name: species.name,
-                                scientific_name: species.scientific_name || '',
-                                description: species.description || '',
-                                maturation_years: species.maturation_years.toString(),
-                                min_weight_kg: species.min_weight_kg.toString(),
-                                max_weight_kg: species.max_weight_kg.toString(),
-                                carbon_capture_per_plant: species.carbon_capture_per_plant?.toString() || ''
-                              });
-                              setShowSpeciesDialog(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedSpeciesForPrices(species);
-                              setSpeciesPrices([]);
-                              setShowSpeciesPricesDialog(true);
-                            }}
-                          >
-                            ${/* Precio icon */}
-                            <DollarSign className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        
-                        <div className="mt-4">
-                          <h5 className="font-medium mb-2">Precios por Año</h5>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                            {plantPrices?.filter(price => price.species_id === species.id).map((price) => (
-                              <div key={price.id} className="text-sm">
-                                {price.year}: ${price.price_per_plant}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Plots Tab */}
-        <TabsContent value="plots" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                Agregar Nueva Parcela
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => setShowCreatePlotDialog(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nueva Parcela
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Parcelas Existentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {plots?.map((plot) => (
-                  <div key={plot.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">{plot.name}</h3>
-                      <p className="text-sm text-muted-foreground">{plot.location}</p>
-                       <p className="text-sm text-muted-foreground">
-                         Área: {plot.area} ha | Plantas: {plot.total_plants}
-                       </p>
-                     </div>
-                     <div className="flex gap-2">
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         onClick={() => {
-                           setEditingPlot(plot);
-                           setNewPlotData({
-                             name: plot.name,
-                             location: plot.location,
-                             coordinates: plot.coordinates || '',
-                             area: plot.area.toString(),
-                             total_plants: plot.total_plants.toString(),
-                             available_plants: plot.available_plants.toString(),
-                             temperature: plot.temperature || '',
-                             rainfall: plot.rainfall?.toString() || '',
-                             elevation: plot.elevation?.toString() || '',
-                             latitude: plot.latitude?.toString() || '',
-                             longitude: plot.longitude?.toString() || ''
-                           });
-                           setShowEditPlotDialog(true);
-                         }}
-                       >
-                         Editar
-                       </Button>
-                       <Button
-                         variant="destructive"
-                         size="sm"
-                         onClick={() => deletePlotMutation.mutate(plot.id)}
-                         disabled={deletePlotMutation.isPending}
-                       >
-                         <Trash2 className="h-4 w-4" />
-                       </Button>
-                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Create Plot Dialog */}
-          <Dialog open={showCreatePlotDialog} onOpenChange={setShowCreatePlotDialog}>
-            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Crear Nueva Parcela</DialogTitle>
-                <DialogDescription>
-                  Completa la información de la nueva parcela
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-name">Nombre *</Label>
-                    <Input 
-                      id="plot-name" 
-                      value={newPlotData.name}
-                      onChange={(e) => setNewPlotData({...newPlotData, name: e.target.value})}
-                      placeholder="Nombre de la parcela"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-location">Ubicación *</Label>
-                    <Input 
-                      id="plot-location" 
-                      value={newPlotData.location}
-                      onChange={(e) => setNewPlotData({...newPlotData, location: e.target.value})}
-                      placeholder="Ciudad, Estado"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="plot-coordinates">Coordenadas Google Maps</Label>
-                  <Input 
-                    id="plot-coordinates" 
-                    value={newPlotData.coordinates}
-                    onChange={(e) => setNewPlotData({...newPlotData, coordinates: e.target.value})}
-                    placeholder="19.4326, -99.1332"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-area">Área (ha) *</Label>
-                    <Input 
-                      id="plot-area" 
-                      type="number"
-                      step="0.01"
-                      value={newPlotData.area}
-                      onChange={(e) => setNewPlotData({...newPlotData, area: e.target.value})}
-                      placeholder="10.5"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-total-plants">Plantas Totales</Label>
-                    <Input 
-                      id="plot-total-plants" 
-                      type="number"
-                      value={newPlotData.total_plants}
-                      onChange={(e) => setNewPlotData({...newPlotData, total_plants: e.target.value})}
-                      placeholder="1000"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-available-plants">Plantas Disponibles</Label>
-                    <Input 
-                      id="plot-available-plants" 
-                      type="number"
-                      value={newPlotData.available_plants}
-                      onChange={(e) => setNewPlotData({...newPlotData, available_plants: e.target.value})}
-                      placeholder="500"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-temperature">Temperatura Promedio</Label>
-                    <Input 
-                      id="plot-temperature" 
-                      value={newPlotData.temperature}
-                      onChange={(e) => setNewPlotData({...newPlotData, temperature: e.target.value})}
-                      placeholder="22°C"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-rainfall">Precipitación (mm)</Label>
-                    <Input 
-                      id="plot-rainfall" 
-                      type="number"
-                      value={newPlotData.rainfall}
-                      onChange={(e) => setNewPlotData({...newPlotData, rainfall: e.target.value})}
-                      placeholder="800"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-elevation">Elevación (m)</Label>
-                    <Input 
-                      id="plot-elevation" 
-                      type="number"
-                      value={newPlotData.elevation}
-                      onChange={(e) => setNewPlotData({...newPlotData, elevation: e.target.value})}
-                      placeholder="1500"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-latitude">Latitud</Label>
-                    <Input 
-                      id="plot-latitude" 
-                      type="number"
-                      step="any"
-                      value={newPlotData.latitude}
-                      onChange={(e) => setNewPlotData({...newPlotData, latitude: e.target.value})}
-                      placeholder="19.4326"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="plot-longitude">Longitud</Label>
-                    <Input 
-                      id="plot-longitude" 
-                      type="number"
-                      step="any"
-                      value={newPlotData.longitude}
-                      onChange={(e) => setNewPlotData({...newPlotData, longitude: e.target.value})}
-                      placeholder="-99.1332"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowCreatePlotDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleCreatePlot} disabled={createPlotMutation.isPending}>
-                  {createPlotMutation.isPending ? 'Creando...' : 'Crear Parcela'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Edit Plot Dialog */}
-          <Dialog open={showEditPlotDialog} onOpenChange={setShowEditPlotDialog}>
-            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Editar Parcela</DialogTitle>
-                <DialogDescription>
-                  Modifica la información de la parcela
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-name">Nombre *</Label>
-                    <Input 
-                      id="edit-plot-name" 
-                      value={newPlotData.name}
-                      onChange={(e) => setNewPlotData({...newPlotData, name: e.target.value})}
-                      placeholder="Nombre de la parcela"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-location">Ubicación *</Label>
-                    <Input 
-                      id="edit-plot-location" 
-                      value={newPlotData.location}
-                      onChange={(e) => setNewPlotData({...newPlotData, location: e.target.value})}
-                      placeholder="Ciudad, Estado"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-plot-coordinates">Coordenadas Google Maps</Label>
-                  <Input 
-                    id="edit-plot-coordinates" 
-                    value={newPlotData.coordinates}
-                    onChange={(e) => setNewPlotData({...newPlotData, coordinates: e.target.value})}
-                    placeholder="19.4326, -99.1332"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-area">Área (ha) *</Label>
-                    <Input 
-                      id="edit-plot-area" 
-                      type="number"
-                      step="0.01"
-                      value={newPlotData.area}
-                      onChange={(e) => setNewPlotData({...newPlotData, area: e.target.value})}
-                      placeholder="10.5"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-total-plants">Plantas Totales</Label>
-                    <Input 
-                      id="edit-plot-total-plants" 
-                      type="number"
-                      value={newPlotData.total_plants}
-                      onChange={(e) => setNewPlotData({...newPlotData, total_plants: e.target.value})}
-                      placeholder="1000"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-temperature">Temperatura Promedio</Label>
-                    <Input 
-                      id="edit-plot-temperature" 
-                      value={newPlotData.temperature}
-                      onChange={(e) => setNewPlotData({...newPlotData, temperature: e.target.value})}
-                      placeholder="22°C"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-rainfall">Precipitación (mm)</Label>
-                    <Input 
-                      id="edit-plot-rainfall" 
-                      type="number"
-                      value={newPlotData.rainfall}
-                      onChange={(e) => setNewPlotData({...newPlotData, rainfall: e.target.value})}
-                      placeholder="800"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-elevation">Elevación (m)</Label>
-                    <Input 
-                      id="edit-plot-elevation" 
-                      type="number"
-                      value={newPlotData.elevation}
-                      onChange={(e) => setNewPlotData({...newPlotData, elevation: e.target.value})}
-                      placeholder="1500"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-latitude">Latitud</Label>
-                    <Input 
-                      id="edit-plot-latitude" 
-                      type="number"
-                      step="any"
-                      value={newPlotData.latitude}
-                      onChange={(e) => setNewPlotData({...newPlotData, latitude: e.target.value})}
-                      placeholder="19.4326"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-plot-longitude">Longitud</Label>
-                    <Input 
-                      id="edit-plot-longitude" 
-                      type="number"
-                      step="any"
-                      value={newPlotData.longitude}
-                      onChange={(e) => setNewPlotData({...newPlotData, longitude: e.target.value})}
-                      placeholder="-99.1332"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowEditPlotDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={() => {
-                    if (editingPlot) {
-                      updatePlotMutation.mutate({ plotId: editingPlot.id, plotData: newPlotData });
-                      setShowEditPlotDialog(false);
-                    }
-                  }} 
-                  disabled={updatePlotMutation.isPending}
-                >
-                  {updatePlotMutation.isPending ? 'Actualizando...' : 'Actualizar Parcela'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Edit Price Dialog */}
-          <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Editar Precio</DialogTitle>
-                <DialogDescription>
-                  Actualizar precio para {editingPrice?.plant_species?.name} ({editingPrice?.year})
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="new-price">Nuevo Precio</Label>
-                  <Input
-                    id="new-price"
-                    type="number"
-                    value={newPriceValue}
-                    onChange={(e) => setNewPriceValue(e.target.value)}
-                    placeholder="Precio por planta"
-                  />
-                </div>
-                <Button
-                  onClick={() => updatePriceMutation.mutate({
-                    priceId: editingPrice?.id || '',
-                    newPrice: parseFloat(newPriceValue)
-                  })}
-                  disabled={!newPriceValue || updatePriceMutation.isPending}
-                >
-                  {updatePriceMutation.isPending ? 'Actualizando...' : 'Actualizar Precio'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Species Dialog */}
-          <Dialog open={showSpeciesDialog} onOpenChange={setShowSpeciesDialog}>
-            <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingSpecies ? 'Editar Especie' : 'Nueva Especie'}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingSpecies ? 'Actualizar datos de la especie' : 'Añadir nueva especie de planta'}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="species-name">Nombre *</Label>
-                    <Input 
-                      id="species-name" 
-                      value={newSpeciesData.name}
-                      onChange={(e) => setNewSpeciesData({...newSpeciesData, name: e.target.value})}
-                      placeholder="Nombre común"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="species-scientific">Nombre Científico</Label>
-                    <Input 
-                      id="species-scientific" 
-                      value={newSpeciesData.scientific_name}
-                      onChange={(e) => setNewSpeciesData({...newSpeciesData, scientific_name: e.target.value})}
-                      placeholder="Nombre científico"
-                    />
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="species-description">Descripción</Label>
-                  <Textarea 
-                    id="species-description" 
-                    value={newSpeciesData.description}
-                    onChange={(e) => setNewSpeciesData({...newSpeciesData, description: e.target.value})}
-                    placeholder="Descripción de la especie"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="species-maturation">Años de Maduración *</Label>
-                    <Input 
-                      id="species-maturation" 
-                      type="number"
-                      value={newSpeciesData.maturation_years}
-                      onChange={(e) => setNewSpeciesData({...newSpeciesData, maturation_years: e.target.value})}
-                      placeholder="Años"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="species-min-weight">Peso Min (kg) *</Label>
-                    <Input 
-                      id="species-min-weight" 
-                      type="number"
-                      value={newSpeciesData.min_weight_kg}
-                      onChange={(e) => setNewSpeciesData({...newSpeciesData, min_weight_kg: e.target.value})}
-                      placeholder="Peso mínimo"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="species-max-weight">Peso Max (kg) *</Label>
-                    <Input 
-                      id="species-max-weight" 
-                      type="number"
-                      value={newSpeciesData.max_weight_kg}
-                      onChange={(e) => setNewSpeciesData({...newSpeciesData, max_weight_kg: e.target.value})}
-                      placeholder="Peso máximo"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="species-carbon">Captura de CO₂ (kg por planta en todo el ciclo)</Label>
-                  <Input 
-                    id="species-carbon" 
-                    type="number"
-                    step="0.1"
-                    value={newSpeciesData.carbon_capture_per_plant ? (parseFloat(newSpeciesData.carbon_capture_per_plant) * 1000).toString() : '72'}
-                    onChange={(e) => setNewSpeciesData({...newSpeciesData, carbon_capture_per_plant: (parseFloat(e.target.value) / 1000).toString()})}
-                    placeholder="72 kg (estándar)"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Basado en: 72 kg por planta en 6 años = 12 kg/año por planta
-                  </p>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowSpeciesDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={() => {
-                    const speciesData = {
-                      ...newSpeciesData,
-                      maturation_years: parseInt(newSpeciesData.maturation_years),
-                      min_weight_kg: parseInt(newSpeciesData.min_weight_kg),
-                      max_weight_kg: parseInt(newSpeciesData.max_weight_kg),
-                      carbon_capture_per_plant: newSpeciesData.carbon_capture_per_plant ? parseFloat(newSpeciesData.carbon_capture_per_plant) : null
-                    };
-
-                    if (editingSpecies) {
-                      updateSpeciesMutation.mutate({
-                        id: editingSpecies.id,
-                        speciesData
-                      });
-                    } else {
-                      createSpeciesMutation.mutate(speciesData);
-                    }
-                  }}
-                  disabled={!newSpeciesData.name || !newSpeciesData.maturation_years || !newSpeciesData.min_weight_kg || !newSpeciesData.max_weight_kg}
-                >
-                  {editingSpecies ? 
-                    (updateSpeciesMutation.isPending ? 'Actualizando...' : 'Actualizar Especie') :
-                    (createSpeciesMutation.isPending ? 'Creando...' : 'Crear Especie')
-                  }
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Species Prices Dialog */}
-          <Dialog open={showSpeciesPricesDialog} onOpenChange={setShowSpeciesPricesDialog}>
-            <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Gestionar Precios - {selectedSpeciesForPrices?.name}</DialogTitle>
-                <DialogDescription>
-                  Añade, edita o elimina precios por año de establecimiento para esta especie
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                {/* Current prices */}
-                <div className="space-y-2">
-                  <Label>Precios Actuales:</Label>
-                  <div className="max-h-40 overflow-y-auto border rounded-lg p-2">
-                    {plantPrices?.filter(p => p.species_id === selectedSpeciesForPrices?.id).length > 0 ? 
-                      plantPrices?.filter(p => p.species_id === selectedSpeciesForPrices?.id).map((price) => (
-                        <div key={price.id} className="flex justify-between items-center p-2 border-b">
-                          <span>Año {price.year}: ${price.price_per_plant.toLocaleString()}</span>
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            onClick={() => deletePriceMutation.mutate(price.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )) : (
-                        <p className="text-muted-foreground text-center py-4">Sin precios configurados</p>
-                      )
-                    }
-                  </div>
-                </div>
-
-                {/* Add new prices */}
-                <div className="space-y-2">
-                  <Label>Añadir Nuevos Precios:</Label>
-                  <div className="space-y-2">
-                    {speciesPrices.map((price, index) => (
-                      <div key={index} className="flex gap-2 items-center">
-                        <Input
-                          type="number"
-                          placeholder="Año"
-                          value={price.year}
-                          onChange={(e) => {
-                            const newPrices = [...speciesPrices];
-                            newPrices[index].year = parseInt(e.target.value) || 0;
-                            setSpeciesPrices(newPrices);
-                          }}
-                        />
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Precio por planta"
-                          value={price.price}
-                          onChange={(e) => {
-                            const newPrices = [...speciesPrices];
-                            newPrices[index].price = parseFloat(e.target.value) || 0;
-                            setSpeciesPrices(newPrices);
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            const newPrices = speciesPrices.filter((_, i) => i !== index);
-                            setSpeciesPrices(newPrices);
-                          }}
+                          variant="destructive"
+                          onClick={() => deletePlotMutation.mutate(plot.id)}
+                          disabled={deletePlotMutation.isPending}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                    ))}
-                    <Button
-                      variant="outline"
-                      onClick={() => setSpeciesPrices([...speciesPrices, { year: new Date().getFullYear(), price: 0 }])}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Añadir Precio
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowSpeciesPricesDialog(false)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (selectedSpeciesForPrices && speciesPrices.length > 0) {
-                      const validPrices = speciesPrices.filter(p => p.year > 0 && p.price > 0);
-                      if (validPrices.length > 0) {
-                        addSpeciesPricesMutation.mutate({
-                          speciesId: selectedSpeciesForPrices.id,
-                          prices: validPrices
-                        });
-                      }
-                    }
-                  }}
-                  disabled={addSpeciesPricesMutation.isPending || speciesPrices.length === 0}
-                >
-                  {addSpeciesPricesMutation.isPending ? 'Guardando...' : 'Guardar Precios'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </TabsContent>
-
-
-        {/* Notifications Tab */}
-        <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Send className="h-5 w-5" />
-                Enviar Notificación
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="notification-title">Título</Label>
-                <Input
-                  id="notification-title"
-                  value={notificationTitle}
-                  onChange={(e) => setNotificationTitle(e.target.value)}
-                  placeholder="Título de la notificación"
-                />
-              </div>
-              <div>
-                <Label htmlFor="notification-message">Mensaje</Label>
-                <Textarea
-                  id="notification-message"
-                  value={notificationMessage}
-                  onChange={(e) => setNotificationMessage(e.target.value)}
-                  placeholder="Mensaje de la notificación"
-                  rows={4}
-                />
-              </div>
-              <div>
-                <Label>Destinatarios</Label>
-                <Select value={notificationTarget} onValueChange={(value: 'all' | 'specific') => setNotificationTarget(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos los usuarios</SelectItem>
-                    <SelectItem value="specific">Usuarios específicos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {notificationTarget === 'specific' && (
-                <div>
-                  <Label>Seleccionar usuarios</Label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-2">
-                    {users?.map((user) => (
-                      <label key={user.id} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.includes(user.user_id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedUsers([...selectedUsers, user.user_id]);
-                            } else {
-                              setSelectedUsers(selectedUsers.filter(id => id !== user.user_id));
-                            }
-                          }}
-                        />
-                        <span className="text-sm">{user.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <Button 
-                onClick={handleSendNotification}
-                disabled={sendNotificationMutation.isPending || !notificationTitle || !notificationMessage}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {sendNotificationMutation.isPending ? 'Enviando...' : 'Enviar Notificación'}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Notificaciones Enviadas</CardTitle>
-              <CardDescription>
-                Administra las notificaciones que han sido enviadas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {allNotifications?.map((notification) => (
-                  <div key={notification.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h3 className="font-semibold">{notification.title}</h3>
-                      <p className="text-sm text-muted-foreground">{notification.message}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Para: {notification.user_profile?.name || notification.user_profile?.email} | 
-                        Enviado: {new Date(notification.created_at).toLocaleDateString()}
-                      </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={notification.read ? 'default' : 'outline'}>
-                        {notification.read ? 'Leída' : 'No leída'}
-                      </Badge>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteNotificationMutation.mutate(notification.id)}
-                        disabled={deleteNotificationMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Stats Tab */}
-        <TabsContent value="stats" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Usuarios</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{users?.length || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Inversiones</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{investments?.length || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  ${investments?.reduce((sum, inv) => sum + inv.total_amount, 0).toLocaleString() || 0}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Plantas</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {investments?.reduce((sum, inv) => sum + inv.plant_count, 0).toLocaleString() || 0}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Breakdown by Species and Year */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Plantas por Especie</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {plantSpecies?.map((species) => {
-                    const speciesInvestments = investments?.filter(inv => inv.species_id === species.id) || [];
-                    const totalPlants = speciesInvestments.reduce((sum, inv) => sum + inv.plant_count, 0);
-                    return totalPlants > 0 ? (
-                      <div key={species.id} className="flex justify-between items-center">
-                        <span className="text-sm">{species.name}</span>
-                        <span className="font-semibold">{totalPlants.toLocaleString()}</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Total plantas:</span> {plot.total_plants?.toLocaleString() || 0}
                       </div>
-                    ) : null;
-                  })}
+                      <div>
+                        <span className="font-medium">Disponibles:</span> {plot.available_plants?.toLocaleString() || 0}
+                      </div>
+                      <div>
+                        <span className="font-medium">Coordenadas:</span> {plot.coordinates}
+                      </div>
+                      <div>
+                        <span className="font-medium">Estado:</span> 
+                        <Badge variant="outline" className="ml-1">{plot.status}</Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="investments">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Gestión de Inversiones</h2>
+                <p className="text-muted-foreground">Administra las inversiones de los usuarios</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              {investments?.map((investment) => {
+                const userProfile = profiles?.find(p => p.user_id === investment.user_id);
+                return (
+                  <Card key={investment.id}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            {userProfile?.name || userProfile?.email}
+                            <Badge variant="secondary">{investment.plant_species?.name}</Badge>
+                          </CardTitle>
+                          <CardDescription>
+                            {investment.plant_count} plantas - Año {investment.plantation_year}
+                          </CardDescription>
+                        </div>
+                        <Badge variant={investment.status === 'active' ? 'default' : 'secondary'}>
+                          {investment.status}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Precio por planta:</span> ${investment.price_per_plant.toLocaleString()}
+                        </div>
+                        <div>
+                          <span className="font-medium">Total:</span> ${investment.total_amount.toLocaleString()}
+                        </div>
+                        <div>
+                          <span className="font-medium">Cosecha esperada:</span> {investment.expected_harvest_year}
+                        </div>
+                        <div>
+                          <span className="font-medium">Creada:</span> {new Date(investment.created_at).toLocaleDateString('es-MX')}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Enviar Notificación</CardTitle>
+                <CardDescription>
+                  Envía notificaciones a usuarios específicos o a todos los usuarios
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="notification-title">Título</Label>
+                  <Input
+                    id="notification-title"
+                    value={notificationTitle}
+                    onChange={(e) => setNotificationTitle(e.target.value)}
+                    placeholder="Título de la notificación"
+                  />
                 </div>
+                <div>
+                  <Label htmlFor="notification-message">Mensaje</Label>
+                  <Textarea
+                    id="notification-message"
+                    value={notificationMessage}
+                    onChange={(e) => setNotificationMessage(e.target.value)}
+                    placeholder="Contenido de la notificación"
+                    rows={4}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="notification-target">Destinatarios</Label>
+                  <Select value={notificationTarget} onValueChange={(value: 'all' | 'specific') => setNotificationTarget(value)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los usuarios</SelectItem>
+                      <SelectItem value="specific">Usuarios específicos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  onClick={() => sendNotificationMutation.mutate()}
+                  disabled={sendNotificationMutation.isPending}
+                  className="w-full"
+                >
+                  {sendNotificationMutation.isPending ? 'Enviando...' : 'Enviar Notificación'}
+                </Button>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Plantas por Año de Establecimiento</CardTitle>
+                <CardTitle>Historial de Notificaciones</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {investments && Object.entries(
-                    investments.reduce((acc, inv) => {
-                      acc[inv.plantation_year] = (acc[inv.plantation_year] || 0) + inv.plant_count;
-                      return acc;
-                    }, {} as Record<number, number>)
-                  )
-                  .sort(([a], [b]) => Number(b) - Number(a))
-                  .map(([year, count]) => (
-                    <div key={year} className="flex justify-between items-center">
-                      <span className="text-sm">{year}</span>
-                      <span className="font-semibold">{count.toLocaleString()}</span>
+                <div className="space-y-4">
+                  {allNotifications?.slice(0, 10).map((notification) => (
+                    <div key={notification.id} className="flex justify-between items-start p-4 border rounded">
+                      <div className="flex-1">
+                        <div className="font-medium">{notification.title}</div>
+                        <div className="text-sm text-muted-foreground">{notification.message}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Para: {notification.user_profile?.name || notification.user_profile?.email}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(notification.created_at).toLocaleDateString('es-MX')}
+                      </div>
                     </div>
                   ))}
                 </div>
