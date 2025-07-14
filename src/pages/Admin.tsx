@@ -25,19 +25,22 @@ import {
   MapPin,
   Calendar,
   DollarSign,
-  Clock
+  Clock,
+  Bell
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SpeciesManager } from '@/components/admin/SpeciesManager';
 import { UserManager } from '@/components/admin/UserManager';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const Admin = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('investments');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [notificationForm, setNotificationForm] = useState({
     title: '',
@@ -79,6 +82,15 @@ const Admin = () => {
     soil_type: '',
     temperature: '',
     status: 'Activa'
+  });
+
+  // Notification editing state
+  const [showNotificationDialog, setShowNotificationDialog] = useState(false);
+  const [editingNotification, setEditingNotification] = useState<any>(null);
+  const [editNotificationForm, setEditNotificationForm] = useState({
+    title: '',
+    message: '',
+    type: 'info' as 'info' | 'warning' | 'success'
   });
 
   // Fetch data
@@ -168,6 +180,66 @@ const Admin = () => {
     }
   });
 
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications-admin'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  // Chart data preparation
+  const chartData = {
+    plantsByYear: investments?.reduce((acc: any[], inv) => {
+      const existing = acc.find(item => item.year === inv.plantation_year);
+      if (existing) {
+        existing.plants += inv.plant_count;
+      } else {
+        acc.push({ year: inv.plantation_year, plants: inv.plant_count });
+      }
+      return acc;
+    }, []).sort((a, b) => a.year - b.year) || [],
+
+    plantsBySpecies: investments?.reduce((acc: any[], inv) => {
+      const speciesName = inv.plant_species?.name || 'Unknown';
+      const existing = acc.find(item => item.species === speciesName);
+      if (existing) {
+        existing.plants += inv.plant_count;
+        existing.amount += inv.total_amount;
+      } else {
+        acc.push({ 
+          species: speciesName, 
+          plants: inv.plant_count,
+          amount: inv.total_amount
+        });
+      }
+      return acc;
+    }, []) || [],
+
+    investmentsByUser: investments?.reduce((acc: any[], inv) => {
+      const userName = inv.profiles?.name || inv.profiles?.email || 'Unknown';
+      const existing = acc.find(item => item.user === userName);
+      if (existing) {
+        existing.amount += inv.total_amount;
+        existing.plants += inv.plant_count;
+      } else {
+        acc.push({ 
+          user: userName, 
+          amount: inv.total_amount,
+          plants: inv.plant_count
+        });
+      }
+      return acc;
+    }, []).sort((a, b) => b.amount - a.amount).slice(0, 10) || []
+  };
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
   // Statistics calculations
   const stats = {
     totalInvestments: investments?.reduce((sum, inv) => sum + Number(inv.total_amount), 0) || 0,
@@ -224,6 +296,7 @@ const Admin = () => {
       setNotificationForm({ title: '', message: '', type: 'info' });
       setSelectedUsers([]);
       setSelectedNotificationTarget('all');
+      queryClient.invalidateQueries({ queryKey: ['notifications-admin'] });
     } catch (error) {
       console.error('Error sending notifications:', error);
       toast({
@@ -347,6 +420,56 @@ const Admin = () => {
     }
   };
 
+  const handleDeleteNotification = async (notificationId: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta notificación?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) throw error;
+
+      toast({ title: "Notificación eliminada exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ['notifications-admin'] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditNotification = async () => {
+    if (!editingNotification) return;
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({
+          title: editNotificationForm.title,
+          message: editNotificationForm.message,
+          type: editNotificationForm.type || 'info'
+        })
+        .eq('id', editingNotification.id);
+
+      if (error) throw error;
+
+      toast({ title: "Notificación actualizada exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ['notifications-admin'] });
+      setShowNotificationDialog(false);
+      setEditingNotification(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
@@ -395,8 +518,7 @@ const Admin = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="overview">Resumen</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="investments">Inversiones</TabsTrigger>
           <TabsTrigger value="plots">Parcelas</TabsTrigger>
           <TabsTrigger value="species">Especies</TabsTrigger>
@@ -404,62 +526,6 @@ const Admin = () => {
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
           <TabsTrigger value="statistics">Estadísticas</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Inversiones</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatCurrency(stats.totalInvestments)}</div>
-                <p className="text-xs text-muted-foreground">
-                  Capital total invertido
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Plantas Vendidas</CardTitle>
-                <Leaf className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.totalPlantsSold.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Total de plantas establecidas
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Especies Activas</CardTitle>
-                <Leaf className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.activeSpecies}</div>
-                <p className="text-xs text-muted-foreground">
-                  Variedades disponibles
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Listas para Cosecha</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.harvestReadyInvestments}</div>
-                <p className="text-xs text-muted-foreground">
-                  Inversiones maduras
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
 
         <TabsContent value="investments" className="space-y-6">
           <div className="flex justify-between items-center">
@@ -1024,6 +1090,124 @@ const Admin = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Sent Notifications Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notificaciones Enviadas
+              </CardTitle>
+              <CardDescription>
+                Gestiona las notificaciones que has enviado
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Mensaje</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {notifications?.map((notification) => (
+                    <TableRow key={notification.id}>
+                      <TableCell className="font-medium">{notification.title}</TableCell>
+                      <TableCell className="max-w-xs truncate">{notification.message}</TableCell>
+                      <TableCell>{getStatusBadge(notification.type || 'info')}</TableCell>
+                      <TableCell>
+                        {new Date(notification.created_at).toLocaleDateString('es-MX')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingNotification(notification);
+                              setEditNotificationForm({
+                                title: notification.title,
+                                message: notification.message,
+                                type: notification.type || 'info'
+                              });
+                              setShowNotificationDialog(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteNotification(notification.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Edit Notification Dialog */}
+          <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar Notificación</DialogTitle>
+                <DialogDescription>
+                  Modifica el contenido de la notificación
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Título</Label>
+                  <Input
+                    value={editNotificationForm.title}
+                    onChange={(e) => setEditNotificationForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Título de la notificación"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Mensaje</Label>
+                  <Input
+                    value={editNotificationForm.message}
+                    onChange={(e) => setEditNotificationForm(prev => ({ ...prev, message: e.target.value }))}
+                    placeholder="Contenido del mensaje"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select 
+                    value={editNotificationForm.type} 
+                    onValueChange={(value: 'info' | 'warning' | 'success') => 
+                      setEditNotificationForm(prev => ({ ...prev, type: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="info">Información</SelectItem>
+                      <SelectItem value="success">Éxito</SelectItem>
+                      <SelectItem value="warning">Advertencia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button onClick={handleEditNotification} className="w-full">
+                  Actualizar Notificación
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="statistics" className="space-y-6">
@@ -1081,15 +1265,148 @@ const Admin = () => {
             </Card>
           </div>
 
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Plantas por Año de Establecimiento</CardTitle>
+                <CardDescription>Distribución de plantas vendidas por año</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    plants: {
+                      label: "Plantas",
+                      color: "hsl(var(--chart-1))",
+                    },
+                  }}
+                  className="h-[300px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.plantsByYear}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" />
+                      <YAxis />
+                      <ChartTooltip
+                        content={<ChartTooltipContent />}
+                      />
+                      <Bar dataKey="plants" fill="var(--color-plants)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Plantas por Especie</CardTitle>
+                <CardDescription>Distribución de plantas por tipo de agave</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    plants: {
+                      label: "Plantas",
+                    },
+                  }}
+                  className="h-[300px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData.plantsBySpecies}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, value }) => `${name}: ${value.toLocaleString()}`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="plants"
+                        nameKey="species"
+                      >
+                        {chartData.plantsBySpecies.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Top 10 Inversionistas</CardTitle>
+                <CardDescription>Usuarios con mayor inversión total</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    amount: {
+                      label: "Monto",
+                      color: "hsl(var(--chart-2))",
+                    },
+                  }}
+                  className="h-[300px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.investmentsByUser} layout="horizontal">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="user" type="category" width={100} />
+                      <ChartTooltip
+                        content={<ChartTooltipContent />}
+                        formatter={(value) => [formatCurrency(Number(value)), "Inversión"]}
+                      />
+                      <Bar dataKey="amount" fill="var(--color-amount)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Inversión por Especies</CardTitle>
+                <CardDescription>Monto total invertido por tipo de agave</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    amount: {
+                      label: "Monto",
+                      color: "hsl(var(--chart-3))",
+                    },
+                  }}
+                  className="h-[300px]"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.plantsBySpecies}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="species" />
+                      <YAxis />
+                      <ChartTooltip
+                        content={<ChartTooltipContent />}
+                        formatter={(value) => [formatCurrency(Number(value)), "Inversión"]}
+                      />
+                      <Bar dataKey="amount" fill="var(--color-amount)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Investment Requests Table */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Solicitudes de Inversión
+                Solicitudes de Inversión del Simulador
               </CardTitle>
               <CardDescription>
-                Todas las solicitudes enviadas desde el simulador
+                Todas las solicitudes enviadas desde el simulador de inversiones
               </CardDescription>
             </CardHeader>
             <CardContent>
