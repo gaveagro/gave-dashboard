@@ -32,6 +32,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SpeciesManager } from '@/components/admin/SpeciesManager';
 import { UserManager } from '@/components/admin/UserManager';
+import { PhotoManager } from '@/components/admin/PhotoManager';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -540,9 +541,10 @@ const Admin = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="investments">Inversiones</TabsTrigger>
           <TabsTrigger value="plots">Parcelas</TabsTrigger>
+          <TabsTrigger value="photos">Fotos</TabsTrigger>
           <TabsTrigger value="species">Especies</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
@@ -922,6 +924,18 @@ const Admin = () => {
                     </Select>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label>Año de Establecimiento</Label>
+                    <Input
+                      type="number"
+                      value={plotForm.establishment_year}
+                      onChange={(e) => setPlotForm(prev => ({ ...prev, establishment_year: parseInt(e.target.value) || new Date().getFullYear() }))}
+                      placeholder="Ej: 2024"
+                      min="2000"
+                      max="2030"
+                    />
+                  </div>
+
                   <div className="col-span-2 pt-4">
                     <Button onClick={handleCreatePlot} className="w-full">
                       {editingPlot ? 'Actualizar Parcela' : 'Crear Parcela'}
@@ -946,6 +960,7 @@ const Admin = () => {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Ubicación</TableHead>
                     <TableHead>Área (ha)</TableHead>
+                    <TableHead>Año Establecimiento</TableHead>
                     <TableHead>Plantas Establecidas</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Acciones</TableHead>
@@ -961,7 +976,8 @@ const Admin = () => {
                         <TableCell className="font-medium">{plot.name}</TableCell>
                         <TableCell>{plot.location}</TableCell>
                         <TableCell>{plot.area}</TableCell>
-                        <TableCell>{plantsEstablished.toLocaleString()}</TableCell>
+                        <TableCell>{plot.establishment_year || 'No definido'}</TableCell>
+                        <TableCell className="font-medium text-primary">{plantsEstablished.toLocaleString()}</TableCell>
                         <TableCell>{getStatusBadge(plot.status || 'Activa')}</TableCell>
                         <TableCell>
                           <Button
@@ -998,6 +1014,10 @@ const Admin = () => {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="photos">
+          <PhotoManager />
         </TabsContent>
 
         <TabsContent value="species">
