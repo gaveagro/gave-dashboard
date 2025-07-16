@@ -327,6 +327,7 @@ export type Database = {
           coordinates: string
           created_at: string
           elevation: number | null
+          establishment_year: number | null
           id: string
           latitude: number | null
           location: string
@@ -345,6 +346,7 @@ export type Database = {
           coordinates: string
           created_at?: string
           elevation?: number | null
+          establishment_year?: number | null
           id?: string
           latitude?: number | null
           location: string
@@ -363,6 +365,7 @@ export type Database = {
           coordinates?: string
           created_at?: string
           elevation?: number | null
+          establishment_year?: number | null
           id?: string
           latitude?: number | null
           location?: string
