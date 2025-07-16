@@ -81,7 +81,27 @@ const Admin = () => {
     rainfall: 0,
     soil_type: '',
     temperature: '',
-    status: 'Activa'
+    status: 'Activa',
+    establishment_year: new Date().getFullYear()
+  });
+
+  // Photo editing state
+  const [showPhotoDialog, setShowPhotoDialog] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<any>(null);
+  const [photoForm, setPhotoForm] = useState({
+    description: '',
+    year: new Date().getFullYear()
+  });
+
+  // User editing state
+  const [showUserDialog, setShowUserDialog] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [userForm, setUserForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    account_balance: 0,
+    role: 'investor' as 'admin' | 'investor'
   });
 
   // Notification editing state
@@ -410,7 +430,8 @@ const Admin = () => {
         rainfall: 0,
         soil_type: '',
         temperature: '',
-        status: 'Activa'
+        status: 'Activa',
+        establishment_year: new Date().getFullYear()
       });
     } catch (error: any) {
       toast({
@@ -961,7 +982,8 @@ const Admin = () => {
                                 rainfall: plot.rainfall || 0,
                                 soil_type: plot.soil_type || '',
                                 temperature: plot.temperature || '',
-                                status: plot.status || 'Activa'
+                                status: plot.status || 'Activa',
+                                establishment_year: plot.establishment_year || new Date().getFullYear()
                               });
                               setShowPlotDialog(true);
                             }}
