@@ -245,6 +245,12 @@ const Plots = () => {
     return plotInvestments.reduce((sum, inv) => sum + inv.plant_count, 0);
   };
 
+  const getPlotSpecies = (plotId: string) => {
+    const plotInvestments = investments?.filter(inv => inv.plot_id === plotId) || [];
+    const speciesIds = [...new Set(plotInvestments.map(inv => inv.species_id))];
+    return speciesIds.map(id => plantSpecies?.find(s => s.id === id)?.name).filter(Boolean);
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
@@ -272,6 +278,7 @@ const Plots = () => {
           const plotProgress = getPlotProgress(plot.id);
           const nextHarvest = getNextHarvest(plot.id);
           const plantsEstablished = getPlantsEstablished(plot.id);
+          const plotSpecies = getPlotSpecies(plot.id);
           
           return (
             <Card key={plot.id} className="overflow-hidden">
@@ -313,6 +320,12 @@ const Plots = () => {
                     <span className="font-medium">Plantas establecidas:</span>
                     <p>{plantsEstablished.toLocaleString()}</p>
                   </div>
+                  {plotSpecies.length > 0 && (
+                    <div className="col-span-2">
+                      <span className="font-medium">Especies establecidas:</span>
+                      <p>{plotSpecies.join(', ')}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Progreso hacia la madurez */}
@@ -377,7 +390,7 @@ const Plots = () => {
                       <span className="text-sm font-medium">Fotos recientes</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      {recentPhotos.slice(0, 3).map((photo) => (
+                      {recentPhotos.slice(0, 6).map((photo) => (
                         <div key={photo.id} className="relative aspect-square group">
                           <img
                             src={photo.photo_url}

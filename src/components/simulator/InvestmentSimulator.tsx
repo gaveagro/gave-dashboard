@@ -70,10 +70,11 @@ export const InvestmentSimulator: React.FC = () => {
     }
   });
 
-  // Set default species when data loads
+  // Set default species when data loads (prioritize "Espadín")
   React.useEffect(() => {
     if (plantSpecies && plantSpecies.length > 0 && !selectedSpecies) {
-      setSelectedSpecies(plantSpecies[0].id);
+      const espadín = plantSpecies.find(s => s.name.toLowerCase().includes('espadín'));
+      setSelectedSpecies(espadín ? espadín.id : plantSpecies[0].id);
     }
   }, [plantSpecies, selectedSpecies]);
 

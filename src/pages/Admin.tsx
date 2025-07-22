@@ -502,6 +502,28 @@ const Admin = () => {
     }).format(amount);
   };
 
+  const handleDeleteInvestmentRequest = async (requestId: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta solicitud?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('investment_requests')
+        .delete()
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast({ title: "Solicitud eliminada exitosamente" });
+      queryClient.invalidateQueries({ queryKey: ['investment-requests-admin'] });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants = {
       'pending': 'default',
@@ -1462,27 +1484,37 @@ const Admin = () => {
                     <TableHead>Especie</TableHead>
                     <TableHead>Plantas</TableHead>
                     <TableHead>Año</TableHead>
-                    <TableHead>Monto</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Fecha</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {investmentRequests?.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="font-medium">{request.user_name}</TableCell>
-                      <TableCell>{request.user_email}</TableCell>
-                      <TableCell>{request.user_phone || 'No proporcionado'}</TableCell>
-                      <TableCell>{request.species_name}</TableCell>
-                      <TableCell>{request.plant_count.toLocaleString()}</TableCell>
-                      <TableCell>{request.establishment_year}</TableCell>
-                      <TableCell>{formatCurrency(request.total_investment)}</TableCell>
-                      <TableCell>{getStatusBadge(request.status)}</TableCell>
-                      <TableCell>
-                        {new Date(request.created_at).toLocaleDateString('es-MX')}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                     <TableHead>Monto</TableHead>
+                     <TableHead>Estado</TableHead>
+                     <TableHead>Fecha</TableHead>
+                     <TableHead>Acciones</TableHead>
+                   </TableRow>
+                 </TableHeader>
+                 <TableBody>
+                   {investmentRequests?.map((request) => (
+                     <TableRow key={request.id}>
+                       <TableCell className="font-medium">{request.user_name}</TableCell>
+                       <TableCell>{request.user_email}</TableCell>
+                       <TableCell>{request.user_phone || 'No proporcionado'}</TableCell>
+                       <TableCell>{request.species_name}</TableCell>
+                       <TableCell>{request.plant_count.toLocaleString()}</TableCell>
+                       <TableCell>{request.establishment_year}</TableCell>
+                       <TableCell>{formatCurrency(request.total_investment)}</TableCell>
+                       <TableCell>{getStatusBadge(request.status)}</TableCell>
+                       <TableCell>
+                         {new Date(request.created_at).toLocaleDateString('es-MX')}
+                       </TableCell>
+                       <TableCell>
+                         <Button
+                           size="sm"
+                           variant="ghost"
+                           onClick={() => handleDeleteInvestmentRequest(request.id)}
+                         >
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                       </TableCell>
+                     </TableRow>
+                   ))}
                 </TableBody>
               </Table>
             </CardContent>

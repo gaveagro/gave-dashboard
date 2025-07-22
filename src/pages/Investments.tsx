@@ -1,14 +1,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Leaf, Clock, TrendingUp } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Leaf, Clock, TrendingUp, Search } from 'lucide-react';
 import { InvestmentChart } from '@/components/InvestmentChart';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Investments = () => {
   const { t } = useLanguage();
+  const { profile } = useAuth();
   const [userInvestments, setUserInvestments] = useState<any[]>([]);
+  const [allInvestments, setAllInvestments] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
@@ -20,17 +25,32 @@ const Investments = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: investments, error } = await supabase
-        .from('investments')
-        .select(`
-          *,
-          plant_species:species_id (name, scientific_name, carbon_capture_per_plant)
-        `)
-        .eq('user_id', user.id);
+      if (profile?.role === 'admin') {
+        // Admin can see all investments with user info
+        const { data: investments, error } = await supabase
+          .from('investments')
+          .select(`
+            *,
+            plant_species:species_id (name, scientific_name, carbon_capture_per_plant),
+            profiles!investments_user_id_fkey (name, email)
+          `);
 
-      if (error) throw error;
+        if (error) throw error;
+        setAllInvestments(investments || []);
+        setUserInvestments(investments || []);
+      } else {
+        // Regular users see only their investments
+        const { data: investments, error } = await supabase
+          .from('investments')
+          .select(`
+            *,
+            plant_species:species_id (name, scientific_name, carbon_capture_per_plant)
+          `)
+          .eq('user_id', user.id);
 
-      setUserInvestments(investments || []);
+        if (error) throw error;
+        setUserInvestments(investments || []);
+      }
     } catch (error) {
       console.error('Error fetching investments:', error);
     } finally {
@@ -70,7 +90,16 @@ const Investments = () => {
     return <div className="container mx-auto p-6">Cargando inversiones...</div>;
   }
 
-  const chartData = userInvestments.map(inv => ({
+  // Filter investments based on search term for admin
+  const filteredInvestments = profile?.role === 'admin' && searchTerm 
+    ? allInvestments.filter(inv => 
+        inv.profiles?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inv.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inv.plant_species?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : userInvestments;
+
+  const chartData = filteredInvestments.map(inv => ({
     species: inv.plant_species?.name || 'Desconocida',
     amount: inv.total_amount,
     count: inv.plant_count,
@@ -87,6 +116,19 @@ const Investments = () => {
         <p className="text-muted-foreground text-lg">
           {t('investments.description')}
         </p>
+        
+        {/* Search for admin */}
+        {profile?.role === 'admin' && (
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por usuario, email o especie..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        )}
       </div>
 
       {/* Resumen General */}
@@ -98,7 +140,7 @@ const Investments = () => {
               <div className="text-sm text-muted-foreground">Total Plantas</div>
             </div>
             <div className="text-2xl font-bold text-primary mt-1">
-              {userInvestments.reduce((acc, inv) => acc + inv.plant_count, 0)}
+              {filteredInvestments.reduce((acc, inv) => acc + inv.plant_count, 0)}
             </div>
           </CardContent>
         </Card>
@@ -110,7 +152,7 @@ const Investments = () => {
               <div className="text-sm text-muted-foreground">Inversión Total</div>
             </div>
             <div className="text-2xl font-bold text-investment mt-1">
-              {formatCurrency(userInvestments.reduce((acc, inv) => acc + inv.total_amount, 0))}
+              {formatCurrency(filteredInvestments.reduce((acc, inv) => acc + inv.total_amount, 0))}
             </div>
           </CardContent>
         </Card>
@@ -134,14 +176,14 @@ const Investments = () => {
               <div className="text-sm text-muted-foreground">CO₂ Capturado</div>
             </div>
             <div className="text-2xl font-bold text-contrast mt-1">
-              {formatNumber(userInvestments.reduce((acc, inv) => acc + (inv.plant_species?.carbon_capture_per_plant || 0.5) * inv.plant_count, 0), 1)} t
+              {formatNumber(filteredInvestments.reduce((acc, inv) => acc + (inv.plant_species?.carbon_capture_per_plant || 0.5) * inv.plant_count, 0), 1)} t
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Pie Chart para múltiples inversiones */}
-      {userInvestments.length > 1 && (
+      {filteredInvestments.length > 1 && (
         <Card className="animate-fade-in">
           <CardHeader>
             <CardTitle>Análisis de Inversiones</CardTitle>
@@ -159,7 +201,7 @@ const Investments = () => {
       <div className="space-y-6">
         <h2 className="text-xl font-semibold">Inversiones Detalladas</h2>
         
-        {userInvestments.map((investment) => (
+        {filteredInvestments.map((investment) => (
           <Card key={investment.id} className="animate-fade-in border-l-4 border-l-primary">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -167,6 +209,11 @@ const Investments = () => {
                   <CardTitle className="flex items-center gap-2">
                     <Leaf className="h-5 w-5 text-primary" />
                     {investment.plant_species?.name || 'Especie desconocida'} - {investment.plant_count} plantas
+                    {profile?.role === 'admin' && investment.profiles && (
+                      <Badge variant="outline" className="ml-2">
+                        {investment.profiles.name || investment.profiles.email}
+                      </Badge>
+                    )}
                   </CardTitle>
                   <CardDescription>
                     {investment.plant_species?.scientific_name || 'Nombre científico no disponible'}
