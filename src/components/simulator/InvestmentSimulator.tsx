@@ -243,8 +243,8 @@ export const InvestmentSimulator: React.FC = () => {
         throw dbError;
       }
 
-      // Enviar notificación por email
-      const response = await supabase.functions.invoke('send-investment-notification', {
+      // Enviar notificación por email y crear notificación en app
+      const response = await supabase.functions.invoke('send-investment-request-notification', {
         body: {
           userEmail: profile.email,
           userName: profile.name || profile.email,
@@ -324,7 +324,9 @@ export const InvestmentSimulator: React.FC = () => {
                   <SelectValue placeholder={t('simulator.selectSpecies')} />
                 </SelectTrigger>
                 <SelectContent>
-                  {plantSpecies.map((species) => (
+                  {plantSpecies
+                    .sort((a, b) => a.name.toLowerCase().includes('espadín') ? -1 : b.name.toLowerCase().includes('espadín') ? 1 : 0)
+                    .map((species) => (
                     <SelectItem key={species.id} value={species.id}>
                       <div className="flex flex-col">
                         <span className="font-medium">{species.name}</span>
@@ -450,10 +452,10 @@ export const InvestmentSimulator: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-investment">
-                {formatCurrency(results.totalInvestment)}
+                {formatCurrency(results.totalInvestment)} MXN
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {formatNumber(numberOfPlants)} plantas × {formatCurrency(currentPricePerPlant)}
+                {formatNumber(numberOfPlants)} plantas × {formatCurrency(currentPricePerPlant)} MXN
               </p>
             </CardContent>
           </Card>
@@ -468,7 +470,7 @@ export const InvestmentSimulator: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-profit">
-                {formatCurrency(results.finalReturn)}
+                {formatCurrency(results.finalReturn)} MXN
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {t('simulator.returnDesc')}
@@ -486,7 +488,7 @@ export const InvestmentSimulator: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-roi">
-                {formatCurrency(results.investorProfit)}
+                {formatCurrency(results.investorProfit)} MXN
               </div>
               <div className="flex justify-between items-center mt-1">
                 <p className="text-sm text-muted-foreground">
@@ -514,11 +516,11 @@ export const InvestmentSimulator: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">{t('simulator.grossValue')}</span>
-                <span className="font-medium">{formatCurrency(results.grossRevenue)}</span>
+                <span className="font-medium">{formatCurrency(results.grossRevenue)} MXN</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Comisión Gavé (35%):</span>
-                <span className="font-medium">{formatCurrency(results.gaveProfit)}</span>
+                <span className="font-medium">{formatCurrency(results.gaveProfit)} MXN</span>
               </div>
             </CardContent>
           </Card>

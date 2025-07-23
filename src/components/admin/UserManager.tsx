@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Upload, User, Mail, Phone, DollarSign, Edit } from "lucide-react";
+import { Plus, Upload, User, Mail, Phone, DollarSign, Edit, Trash2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 
@@ -276,6 +276,43 @@ export function UserManager() {
     syncBalanceMutation.mutate(userId);
   };
 
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      // First delete the profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('user_id', userId);
+      
+      if (profileError) throw profileError;
+
+      // Then delete from auth.users using admin API
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      if (authError) throw authError;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Usuario eliminado",
+        description: "El usuario ha sido eliminado correctamente",
+      });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el usuario",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteUser = (userId: string) => {
+    if (confirm('¿Estás seguro de que quieres eliminar este usuario? Esta acción no se puede deshacer.')) {
+      deleteUserMutation.mutate(userId);
+    }
+  };
+
   const csvTemplate = `email,nombre,telefono,balance,rol
 ejemplo1@email.com,Juan Pérez,+52 123 456 7890,1500.00,investor
 ejemplo2@email.com,María González,+52 098 765 4321,2000.50,investor
@@ -500,6 +537,14 @@ admin@email.com,Admin User,+52 555 555 5555,0,admin`;
                           💰
                         </Button>
                       )}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteUser(user.user_id)}
+                        title="Eliminar usuario"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

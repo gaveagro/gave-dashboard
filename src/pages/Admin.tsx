@@ -982,8 +982,8 @@ const Admin = () => {
                 </TableHeader>
                 <TableBody>
                   {plots?.map((plot) => {
-                    const plantsEstablished = investments?.filter(inv => inv.plot_id === plot.id)
-                      .reduce((sum, inv) => sum + inv.plant_count, 0) || 0;
+                    // Show total_plants from plot data (what admin enters) instead of counting investments
+                    const plantsEstablished = plot.total_plants || 0;
                     
                     return (
                       <TableRow key={plot.id}>

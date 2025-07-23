@@ -116,6 +116,10 @@ const translations = {
     'auth.resetEmailSent': 'Correo de restablecimiento enviado',
     'auth.checkEmailForReset': 'Revisa tu correo para restablecer tu contraseña',
     'auth.enterEmailFirst': 'Por favor ingresa tu correo electrónico primero',
+    'auth.description': 'Accede a tu panel de inversiones',
+    'auth.emailPlaceholder': 'tu@email.com',
+    'auth.noAccess': '¿No tienes acceso?',
+    'auth.contactAdmin': 'Contacta al administrador para obtener una cuenta.',
     
     // Common
     'common.loading': 'Cargando...',
@@ -261,6 +265,10 @@ const translations = {
     'auth.resetEmailSent': 'Reset email sent',
     'auth.checkEmailForReset': 'Check your email to reset your password',
     'auth.enterEmailFirst': 'Please enter your email address first',
+    'auth.description': 'Access your investment panel',
+    'auth.emailPlaceholder': 'your@email.com',
+    'auth.noAccess': 'Don\'t have access?',
+    'auth.contactAdmin': 'Contact the administrator to get an account.',
     
     // Common
     'common.loading': 'Loading...',

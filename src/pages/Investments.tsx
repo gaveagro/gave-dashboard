@@ -231,30 +231,30 @@ const Investments = () => {
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Inversión Inicial</div>
                   <div className="text-lg font-bold text-investment">
-                    {formatCurrency(investment.total_amount)}
+                    {formatCurrency(investment.total_amount)} MXN
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {formatCurrency(investment.price_per_plant)} por planta
+                    {formatCurrency(investment.price_per_plant)} MXN por planta
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Valor Estimado</div>
                   <div className="text-lg font-bold text-profit">
-                    Usar simulador
+                    Calculadora próximamente
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Simula diferentes escenarios de precio
+                    Calculadora de ROI en desarrollo
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">ROI Proyectado</div>
                   <div className="text-lg font-bold text-roi">
-                    Usar simulador
+                    Calculadora próximamente
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Para calcular escenarios
+                    Basado en escenarios de mercado
                   </div>
                 </div>
               </div>

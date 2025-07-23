@@ -7,13 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const Auth = () => {
   const { user, signIn } = useAuth();
   const { toast } = useToast();
+  const { language, setLanguage, t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -72,29 +74,41 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
+          <div className="flex justify-between items-center mb-4">
+            <div></div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
+              className="flex items-center gap-2"
+            >
+              <Globe className="h-4 w-4" />
+              {language === 'es' ? 'EN' : 'ES'}
+            </Button>
+          </div>
           <CardTitle className="text-2xl font-bold bg-gradient-agave bg-clip-text text-transparent">
             Gavé Dashboard
           </CardTitle>
           <CardDescription>
-            Accede a tu panel de inversiones
+            {t('auth.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Correo electrónico</Label>
+              <Label htmlFor="email">{t('auth.email')}</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="tu@email.com"
+                placeholder={t('auth.emailPlaceholder')}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <Label htmlFor="password">{t('auth.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -112,7 +126,7 @@ const Auth = () => {
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Iniciar Sesión
+              {t('auth.signIn')}
             </Button>
           </form>
 
@@ -124,13 +138,13 @@ const Auth = () => {
               className="text-sm"
             >
               {resetLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              ¿Olvidaste tu contraseña?
+              {t('auth.forgotPassword')}
             </Button>
           </div>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>¿No tienes acceso?</p>
-            <p>Contacta al administrador para obtener una cuenta.</p>
+            <p>{t('auth.noAccess')}</p>
+            <p>{t('auth.contactAdmin')}</p>
           </div>
         </CardContent>
       </Card>
