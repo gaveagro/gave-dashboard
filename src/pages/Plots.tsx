@@ -49,7 +49,8 @@ const Plots = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('investments')
-        .select('*');
+        .select('*')
+        .eq('status', 'active');
       
       if (error) throw error;
       return data;

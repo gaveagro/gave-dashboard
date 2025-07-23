@@ -35,6 +35,7 @@ import { UserManager } from '@/components/admin/UserManager';
 import { PhotoManager } from '@/components/admin/PhotoManager';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { UserSelector } from '@/components/ui/user-selector';
 
 const Admin = () => {
   const { profile } = useAuth();
@@ -595,21 +596,12 @@ const Admin = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Usuario</Label>
-                    <Select 
-                      value={investmentForm.user_id} 
-                      onValueChange={(value) => setInvestmentForm(prev => ({ ...prev, user_id: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar usuario" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users?.filter(u => u.role === 'investor').map((user) => (
-                          <SelectItem key={user.user_id} value={user.user_id}>
-                            {user.name || user.email}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <UserSelector
+                      users={users?.filter(u => u.role === 'investor') || []}
+                      value={investmentForm.user_id}
+                      onChange={(value) => setInvestmentForm(prev => ({ ...prev, user_id: value }))}
+                      placeholder="Buscar usuario por nombre o email"
+                    />
                   </div>
 
                   <div className="space-y-2">
