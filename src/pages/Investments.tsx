@@ -228,7 +228,7 @@ const Investments = () => {
             
             <CardContent className="space-y-6">
               {/* Métricas Financieras */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Inversión Inicial</div>
                   <div className="text-lg font-bold text-investment">
@@ -236,26 +236,6 @@ const Investments = () => {
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {formatCurrency(investment.price_per_plant)} MXN por planta
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Valor Estimado</div>
-                  <div className="text-lg font-bold text-profit">
-                    {formatCurrency(investment.total_amount * 1.65)} MXN
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Estimación conservadora basada en crecimiento promedio
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">ROI Proyectado</div>
-                  <div className="text-lg font-bold text-roi">
-                    +65%
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Proyección basada en rendimiento histórico
                   </div>
                 </div>
               </div>

@@ -60,7 +60,7 @@ export function AppSidebar() {
       icon: MapPin,
     },
     {
-      title: "Simula tu Próxima Inversión",
+      title: t('nav.simulator'),
       url: "/simulator",
       icon: Calculator,
     },
