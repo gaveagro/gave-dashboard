@@ -277,6 +277,17 @@ const Dashboard = () => {
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
               {t('dashboard.positiveImpact')}
             </p>
+            <div className="mt-3 p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium mb-1">
+                ¿Cómo se calcula?
+              </p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 leading-relaxed">
+                Los agaves capturan aproximadamente 12 kg de CO₂ por planta al año. 
+                Este cálculo se basa en años transcurridos desde la plantación. 
+                Esta captura ayuda a mitigar el cambio climático, purifica el aire y 
+                contribuye a la regeneración del suelo.
+              </p>
+            </div>
           </CardContent>
         </Card>
 

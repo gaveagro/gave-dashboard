@@ -12,7 +12,7 @@ const translations = {
   es: {
     // Navigation
     'nav.dashboard': 'Dashboard',
-    'nav.simulator': 'Simulador',
+    'nav.simulator': 'Simula tu Próxima Inversión',
     'nav.investments': 'Mis Inversiones',
     'nav.plots': 'Parcelas',
     
@@ -158,7 +158,7 @@ const translations = {
   en: {
     // Navigation
     'nav.dashboard': 'Dashboard',
-    'nav.simulator': 'Simulator',
+    'nav.simulator': 'Simulate your Next Investment',
     'nav.investments': 'My Investments',
     'nav.plots': 'Plots',
     

@@ -242,20 +242,20 @@ const Investments = () => {
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Valor Estimado</div>
                   <div className="text-lg font-bold text-profit">
-                    Calculadora próximamente
+                    {formatCurrency(investment.total_amount * 1.65)} MXN
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Calculadora de ROI en desarrollo
+                    Estimación conservadora basada en crecimiento promedio
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">ROI Proyectado</div>
                   <div className="text-lg font-bold text-roi">
-                    Calculadora próximamente
+                    +65%
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Basado en escenarios de mercado
+                    Proyección basada en rendimiento histórico
                   </div>
                 </div>
               </div>

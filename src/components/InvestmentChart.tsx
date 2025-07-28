@@ -43,6 +43,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const InvestmentChart = ({ investments }: InvestmentChartProps) => {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'MXN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
   if (investments.length <= 1) {
     return null;
   }
@@ -63,21 +71,47 @@ export const InvestmentChart = ({ investments }: InvestmentChartProps) => {
     return acc;
   }, []);
 
-  // Datos por años
-  const yearData = investments.reduce((acc: any[], inv) => {
-    const existing = acc.find(item => item.name === inv.year.toString());
-    if (existing) {
-      existing.value += inv.amount;
-      existing.count += inv.count;
+  // Datos por años con desglose de especies
+  const yearSpeciesData = investments.reduce((acc: any[], inv) => {
+    const yearKey = inv.year.toString();
+    const existingYear = acc.find(item => item.year === yearKey);
+    
+    if (existingYear) {
+      existingYear.totalValue += inv.amount;
+      existingYear.totalCount += inv.count;
+      
+      const existingSpecies = existingYear.species.find((s: any) => s.name === inv.species);
+      if (existingSpecies) {
+        existingSpecies.value += inv.amount;
+        existingSpecies.count += inv.count;
+      } else {
+        existingYear.species.push({
+          name: inv.species,
+          value: inv.amount,
+          count: inv.count
+        });
+      }
     } else {
       acc.push({
-        name: inv.year.toString(),
-        value: inv.amount,
-        count: inv.count
+        year: yearKey,
+        totalValue: inv.amount,
+        totalCount: inv.count,
+        species: [{
+          name: inv.species,
+          value: inv.amount,
+          count: inv.count
+        }]
       });
     }
     return acc;
   }, []);
+
+  // Datos para el gráfico de barras (años)
+  const yearData = yearSpeciesData.map(year => ({
+    name: year.year,
+    value: year.totalValue,
+    count: year.totalCount
+  }));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -131,7 +165,7 @@ export const InvestmentChart = ({ investments }: InvestmentChartProps) => {
          </div>
       </div>
 
-      {/* Chart por Años */}
+      {/* Chart por Años con desglose */}
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-center">Distribución por Años de Establecimiento</h3>
         <div className="h-80">
@@ -163,6 +197,34 @@ export const InvestmentChart = ({ investments }: InvestmentChartProps) => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </div>
+        
+        {/* Desglose por especies en cada año */}
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-muted-foreground">Desglose por especies:</h4>
+          {yearSpeciesData.map((yearData, yearIndex) => (
+            <div key={yearData.year} className="bg-muted/30 p-3 rounded-lg">
+              <div className="font-medium text-sm mb-2">
+                Año {yearData.year} - {formatCurrency(yearData.totalValue)} ({yearData.totalCount.toLocaleString()} plantas)
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {yearData.species.map((species: any, speciesIndex: number) => (
+                  <div key={species.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-2 h-2 rounded-full" 
+                        style={{ backgroundColor: COLORS[speciesIndex % COLORS.length] }}
+                      />
+                      <span>{species.name}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {formatCurrency(species.value)} • {species.count.toLocaleString()} plantas
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
