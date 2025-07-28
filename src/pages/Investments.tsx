@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Leaf, Clock, TrendingUp, Search } from 'lucide-react';
 import { InvestmentChart } from '@/components/InvestmentChart';
+import { InvestmentValuationCalculator } from '@/components/InvestmentValuationCalculator';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -44,7 +45,7 @@ const Investments = () => {
           .from('investments')
           .select(`
             *,
-            plant_species:species_id (name, scientific_name, carbon_capture_per_plant)
+            plant_species:species_id (name, scientific_name, carbon_capture_per_plant, min_weight_kg, max_weight_kg)
           `)
           .eq('user_id', user.id);
 
@@ -317,6 +318,11 @@ const Investments = () => {
                   ></div>
                 </div>
               </div>
+
+              {/* Calculadora de Valuación - Solo para usuarios no admin */}
+              {profile?.role !== 'admin' && (
+                <InvestmentValuationCalculator investment={investment} />
+              )}
             </CardContent>
           </Card>
         ))}
