@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Calculator, TrendingUp, Minus } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface InvestmentValuationCalculatorProps {
   investment: {
@@ -19,6 +20,7 @@ interface InvestmentValuationCalculatorProps {
 }
 
 export const InvestmentValuationCalculator = ({ investment }: InvestmentValuationCalculatorProps) => {
+  const { t } = useLanguage();
   // Estados para los parámetros ajustables
   const [pricePerKg, setPricePerKg] = useState([20]); // Rango base MXN por kg
   const [weightPerPlant, setWeightPerPlant] = useState([
@@ -58,7 +60,7 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Calculator className="h-5 w-5 text-profit" />
-          Calculadora de Valuación
+          {t('investments.valuationCalculator')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -67,7 +69,7 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
           {/* Precio por kg */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">
-              Precio por kg estimado: {formatCurrency(pricePerKg[0])} MXN
+              {t('investments.estimatedPricePerKg')} {formatCurrency(pricePerKg[0])} MXN
             </Label>
             <Slider
               value={pricePerKg}
@@ -86,7 +88,7 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
           {/* Peso por planta */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">
-              Peso por planta: {formatNumber(weightPerPlant[0])} kg
+              {t('investments.weightPerPlant')} {formatNumber(weightPerPlant[0])} kg
             </Label>
             <Slider
               value={weightPerPlant}
@@ -105,18 +107,18 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
 
         {/* Datos Fijos */}
         <div className="bg-muted/30 p-4 rounded-lg">
-          <h4 className="font-medium mb-3 text-sm">Datos de tu Inversión</h4>
+          <h4 className="font-medium mb-3 text-sm">{t('investments.yourInvestmentData')}</h4>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <div className="text-muted-foreground">Plantas</div>
+              <div className="text-muted-foreground">{t('investments.plants')}</div>
               <div className="font-medium">{formatNumber(investment.plant_count)}</div>
             </div>
             <div>
-              <div className="text-muted-foreground">Precio pagado/planta</div>
+              <div className="text-muted-foreground">{t('investments.pricePaidPerPlant')}</div>
               <div className="font-medium">{formatCurrency(investment.price_per_plant)}</div>
             </div>
             <div>
-              <div className="text-muted-foreground">Inversión total</div>
+              <div className="text-muted-foreground">{t('investments.totalInvestment')}</div>
               <div className="font-medium">{formatCurrency(investment.total_amount)}</div>
             </div>
           </div>
@@ -124,31 +126,31 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
 
         {/* Resultados de la Calculadora */}
         <div className="space-y-4">
-          <h4 className="font-medium text-sm">Proyección de Valuación</h4>
+          <h4 className="font-medium text-sm">{t('investments.valuationProjection')}</h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Columna de Ingresos */}
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2 border-b border-muted">
-                <span className="text-sm text-muted-foreground">Peso total estimado</span>
+                <span className="text-sm text-muted-foreground">{t('investments.totalEstimatedWeight')}</span>
                 <span className="font-medium">{formatNumber(totalWeightKg)} kg</span>
               </div>
               
               <div className="flex justify-between items-center py-2 border-b border-muted">
-                <span className="text-sm text-muted-foreground">Ingreso bruto</span>
+                <span className="text-sm text-muted-foreground">{t('investments.grossRevenue')}</span>
                 <span className="font-medium text-profit">{formatCurrency(grossRevenue)}</span>
               </div>
               
               <div className="flex justify-between items-center py-2 border-b border-muted">
                 <span className="text-sm text-muted-foreground flex items-center gap-1">
                   <Minus className="h-3 w-3" />
-                  Comisión Gavé (15%)
+                  {t('investments.gaveCommission')}
                 </span>
                 <span className="font-medium text-destructive">-{formatCurrency(gaveCommission)}</span>
               </div>
               
               <div className="flex justify-between items-center py-2 border-b-2 border-primary">
-                <span className="text-sm font-medium">Ingreso neto</span>
+                <span className="text-sm font-medium">{t('investments.netRevenue')}</span>
                 <span className="font-bold text-profit">{formatCurrency(netRevenue)}</span>
               </div>
             </div>
@@ -158,13 +160,13 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
               <div className="flex justify-between items-center py-2 border-b border-muted">
                 <span className="text-sm text-muted-foreground flex items-center gap-1">
                   <Minus className="h-3 w-3" />
-                  Inversión inicial
+                  {t('investments.initialInvestment')}
                 </span>
                 <span className="font-medium text-investment">-{formatCurrency(investment.total_amount)}</span>
               </div>
               
               <div className="flex justify-between items-center py-2 border-b-2 border-primary">
-                <span className="text-sm font-medium">Ganancia total</span>
+                <span className="text-sm font-medium">{t('investments.totalProfit')}</span>
                 <span className={`font-bold ${totalProfit >= 0 ? 'text-profit' : 'text-destructive'}`}>
                   {formatCurrency(totalProfit)}
                 </span>
@@ -173,7 +175,7 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
               <div className="bg-gradient-to-r from-profit/10 to-roi/10 p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-1">
                   <TrendingUp className="h-4 w-4 text-roi" />
-                  <span className="text-sm font-medium">ROI</span>
+                  <span className="text-sm font-medium">{t('investments.roi')}</span>
                 </div>
                 <div className={`text-2xl font-bold ${roi >= 0 ? 'text-roi' : 'text-destructive'}`}>
                   {formatNumber(roi, 1)}%
@@ -184,8 +186,7 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
         </div>
 
         <div className="text-xs text-muted-foreground bg-muted/20 p-3 rounded-lg">
-          <strong>Nota:</strong> Estos cálculos son estimaciones basadas en condiciones ideales de mercado. 
-          Los precios reales pueden variar según la oferta, demanda y calidad del producto al momento de la venta.
+          <strong>Nota:</strong> {t('investments.calculatorNote')}
         </div>
       </CardContent>
     </Card>

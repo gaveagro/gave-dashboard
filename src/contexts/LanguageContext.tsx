@@ -137,6 +137,23 @@ const translations = {
     // Investments 
     'investments.title': 'Mis Inversiones',
     'investments.description': 'Visualiza y rastrea tus inversiones forestales',
+    'investments.valuationCalculator': 'Calculadora de Valuación',
+    'investments.inputParameters': 'Parámetros de Entrada',
+    'investments.estimatedPricePerKg': 'Precio por kg estimado:',
+    'investments.weightPerPlant': 'Peso por planta:',
+    'investments.yourInvestmentData': 'Datos de tu Inversión',
+    'investments.plants': 'Plantas',
+    'investments.pricePaidPerPlant': 'Precio pagado/planta',
+    'investments.totalInvestment': 'Inversión total',
+    'investments.valuationProjection': 'Proyección de Valuación',
+    'investments.totalEstimatedWeight': 'Peso total estimado',
+    'investments.grossRevenue': 'Ingreso bruto',
+    'investments.gaveCommission': 'Comisión Gavé (15%)',
+    'investments.netRevenue': 'Ingreso neto',
+    'investments.initialInvestment': 'Inversión inicial',
+    'investments.totalProfit': 'Ganancia total',
+    'investments.roi': 'ROI',
+    'investments.calculatorNote': 'Estos cálculos son estimaciones basadas en condiciones ideales de mercado. Los precios reales pueden variar según la oferta, demanda y calidad del producto al momento de la venta.',
   },
   en: {
     // Navigation
@@ -286,6 +303,23 @@ const translations = {
     // Investments 
     'investments.title': 'My Investments',
     'investments.description': 'View and track your forest investments',
+    'investments.valuationCalculator': 'Valuation Calculator',
+    'investments.inputParameters': 'Input Parameters',
+    'investments.estimatedPricePerKg': 'Estimated price per kg:',
+    'investments.weightPerPlant': 'Weight per plant:',
+    'investments.yourInvestmentData': 'Your Investment Data',
+    'investments.plants': 'Plants',
+    'investments.pricePaidPerPlant': 'Price paid/plant',
+    'investments.totalInvestment': 'Total investment',
+    'investments.valuationProjection': 'Valuation Projection',
+    'investments.totalEstimatedWeight': 'Total estimated weight',
+    'investments.grossRevenue': 'Gross revenue',
+    'investments.gaveCommission': 'Gavé Commission (15%)',
+    'investments.netRevenue': 'Net revenue',
+    'investments.initialInvestment': 'Initial investment',
+    'investments.totalProfit': 'Total profit',
+    'investments.roi': 'ROI',
+    'investments.calculatorNote': 'These calculations are estimates based on ideal market conditions. Actual prices may vary depending on supply, demand and product quality at the time of sale.',
   }
 };
 
