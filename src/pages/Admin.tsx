@@ -297,6 +297,7 @@ const Admin = () => {
         return;
       }
 
+      // 1. Crear notificaciones en la base de datos
       const notifications = targetUsers.map(userId => ({
         user_id: userId,
         title: notificationForm.title,
@@ -310,10 +311,44 @@ const Admin = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Notificaciones enviadas",
-        description: `Se enviaron ${notifications.length} notificaciones`,
-      });
+      // 2. Obtener datos de usuarios para envío de emails
+      const targetUserData = users?.filter(user => 
+        targetUsers.includes(user.user_id)
+      ).map(user => ({
+        email: user.email,
+        name: user.name || user.email
+      })) || [];
+
+      // 3. Enviar notificaciones por email
+      if (targetUserData.length > 0) {
+        try {
+          await supabase.functions.invoke('send-admin-notification-email', {
+            body: {
+              users: targetUserData,
+              title: notificationForm.title,
+              message: notificationForm.message,
+              type: notificationForm.type
+            }
+          });
+          
+          toast({
+            title: "Notificaciones enviadas",
+            description: `Se enviaron ${notifications.length} notificaciones en app y ${targetUserData.length} emails`,
+          });
+        } catch (emailError) {
+          console.error('Error sending notification emails:', emailError);
+          toast({
+            title: "Notificaciones enviadas (parcial)",
+            description: `Se enviaron ${notifications.length} notificaciones en app, pero hubo un error con los emails`,
+            variant: "default"
+          });
+        }
+      } else {
+        toast({
+          title: "Notificaciones enviadas",
+          description: `Se enviaron ${notifications.length} notificaciones en app`,
+        });
+      }
 
       setNotificationForm({ title: '', message: '', type: 'info' });
       setSelectedUsers([]);
