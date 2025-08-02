@@ -29,12 +29,13 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
   ]);
   
   // Constantes de Gavé
-  const GAVE_COMMISSION = 0.15; // 15% comisión
+  const GAVE_COMMISSION = 0.35; // 35% comisión sobre ganancias
   
   // Cálculos
   const totalWeightKg = weightPerPlant[0] * investment.plant_count;
   const grossRevenue = totalWeightKg * pricePerKg[0];
-  const gaveCommission = grossRevenue * GAVE_COMMISSION;
+  const grossProfit = grossRevenue - investment.total_amount;
+  const gaveCommission = grossProfit > 0 ? grossProfit * GAVE_COMMISSION : 0;
   const netRevenue = grossRevenue - gaveCommission;
   const totalProfit = netRevenue - investment.total_amount;
   const roi = (totalProfit / investment.total_amount) * 100;
