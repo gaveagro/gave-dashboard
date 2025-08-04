@@ -40,9 +40,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email to admin
     const emailResponse = await resend.emails.send({
-      from: "GaveAgro <notificaciones@gaveagro.com>",
+      from: "dashboard@send.gaveagro.com",
       to: ["hola@gaveagro.com"],
-      subject: `Nueva Solicitud de Inversión - ${requestData.user_name}`,
+      subject: "Nueva Solicitud de Inversión - Dashboard",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #22c55e, #16a34a); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
