@@ -42,9 +42,9 @@ const handler = async (req: Request): Promise<Response> => {
     }: InvestmentNotificationRequest = await req.json();
 
     const emailResponse = await resend.emails.send({
-      from: "Gavé Agrotecnología <noreply@gaveagro.com>",
+      from: "dashboard@send.gaveagro.com",
       to: ["hola@gaveagro.com"],
-      subject: `Nueva solicitud de inversión - ${userName}`,
+      subject: "Nueva Solicitud de Inversión - Dashboard",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #059669; text-align: center;">Nueva Solicitud de Inversión</h1>
