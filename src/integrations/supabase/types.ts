@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -434,6 +434,7 @@ export type Database = {
       create_user_with_profile: {
         Args:
           | {
+              user_balance?: number
               user_email: string
               user_name: string
               user_role?: Database["public"]["Enums"]["app_role"]
@@ -442,23 +443,22 @@ export type Database = {
               user_email: string
               user_name: string
               user_role?: Database["public"]["Enums"]["app_role"]
-              user_balance?: number
             }
         Returns: Json
       }
       create_user_with_profile_v2: {
         Args: {
+          user_balance?: number
           user_email: string
           user_name: string
           user_role?: Database["public"]["Enums"]["app_role"]
-          user_balance?: number
         }
         Returns: Json
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
@@ -468,13 +468,13 @@ export type Database = {
       }
       send_investment_notification: {
         Args: {
+          establishment_year: number
+          plant_count: number
+          species_name: string
+          total_investment: number
           user_email: string
           user_name: string
           user_phone: string
-          plant_count: number
-          species_name: string
-          establishment_year: number
-          total_investment: number
         }
         Returns: Json
       }
