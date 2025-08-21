@@ -153,7 +153,7 @@ const Auth = () => {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">
-                  o explora sin registrarte
+                  {t('auth.orExploreWithoutRegistering')}
                 </span>
               </div>
             </div>
@@ -164,7 +164,7 @@ const Auth = () => {
               className="w-full border-green-200 text-green-700 hover:bg-green-50"
             >
               <Eye className="mr-2 h-4 w-4" />
-              Ver Dashboard Demo
+              {t('auth.viewDemoButton')}
             </Button>
           </div>
 

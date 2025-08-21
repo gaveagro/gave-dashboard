@@ -120,6 +120,8 @@ const translations = {
     'auth.emailPlaceholder': 'tu@email.com',
     'auth.noAccess': '¿No tienes acceso?',
     'auth.contactAdmin': 'Contacta al administrador para obtener una cuenta.',
+    'auth.orExploreWithoutRegistering': 'o explora sin registrarte',
+    'auth.viewDemoButton': 'Ver Dashboard Demo',
     
     // Common
     'common.loading': 'Cargando...',
@@ -331,6 +333,8 @@ const translations = {
     'auth.emailPlaceholder': 'your@email.com',
     'auth.noAccess': 'Don\'t have access?',
     'auth.contactAdmin': 'Contact the administrator to get an account.',
+    'auth.orExploreWithoutRegistering': 'or explore without registering',
+    'auth.viewDemoButton': 'View Demo Dashboard',
     
     // Common
     'common.loading': 'Loading...',
