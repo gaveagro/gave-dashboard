@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemo } from '@/contexts/DemoContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,13 +10,18 @@ import { useToast } from '@/hooks/use-toast';
 import { Bell, Check, Trash2 } from 'lucide-react';
 
 const NotificationsPanel = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isDemoMode, demoData } = useDemo();
 
   const { data: notifications } = useQuery({
-    queryKey: ['user-notifications', user?.id],
+    queryKey: ['user-notifications', user?.id, isDemoMode],
     queryFn: async () => {
+      if (isDemoMode) {
+        return demoData.notifications;
+      }
+      
       if (!user?.id) return [];
       
       const { data, error } = await supabase
@@ -32,6 +38,15 @@ const NotificationsPanel = () => {
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
+      if (profile?.role === 'demo') {
+        toast({
+          title: "Función no disponible en el demo",
+          description: "Esta es una funcionalidad solo disponible para usuarios registrados",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const { error } = await supabase
         .from('notifications')
         .update({ read: true })

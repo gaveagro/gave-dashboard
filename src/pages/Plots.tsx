@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemo } from '@/contexts/DemoContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ import PhotoModal from '@/components/PhotoModal';
 const Plots = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const { isDemoMode } = useDemo();
   const queryClient = useQueryClient();
   const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; description?: string; year?: number } | null>(null);
 
@@ -213,6 +215,15 @@ const Plots = () => {
   };
 
   const openInGoogleMaps = (coordinates: string) => {
+    if (profile?.role === 'demo') {
+      toast({
+        title: "Función no disponible en el demo",
+        description: "La ubicación exacta de las parcelas no se muestra en el modo demo por seguridad",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const cleanCoords = coordinates.replace(/[^\d.,-]/g, '');
     const url = `https://www.google.com/maps?q=${cleanCoords}`;
     window.open(url, '_blank');
@@ -434,9 +445,10 @@ const Plots = () => {
                     size="sm"
                     onClick={() => openInGoogleMaps(plot.coordinates)}
                     className="w-full"
+                    disabled={profile?.role === 'demo'}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    Ver en Google Maps
+                    {profile?.role === 'demo' ? 'Ubicación protegida' : 'Ver en Google Maps'}
                   </Button>
                 </div>
               </CardContent>

@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { Calculator, TrendingUp, Clock, Leaf, Info, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDemo } from '@/contexts/DemoContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +33,7 @@ export const InvestmentSimulator: React.FC = () => {
   const { user, profile } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { isDemoMode } = useDemo();
   const [selectedSpecies, setSelectedSpecies] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [numberOfPlants, setNumberOfPlants] = useState<number>(200);
@@ -200,6 +202,15 @@ export const InvestmentSimulator: React.FC = () => {
   };
 
   const handleProceedWithInvestment = async () => {
+    if (profile?.role === 'demo') {
+      toast({
+        title: "Función no disponible en el demo",
+        description: "Para realizar inversiones reales, regístrate como usuario",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (!user || !profile) {
       toast({
         title: t('simulator.accessRequired'),
@@ -586,9 +597,11 @@ export const InvestmentSimulator: React.FC = () => {
           size="lg" 
           className="bg-gradient-agave hover:opacity-90 transition-all duration-300"
           onClick={handleProceedWithInvestment}
-          disabled={loading}
+          disabled={loading || profile?.role === 'demo'}
         >
-          {loading ? 'Enviando solicitud...' : t('simulator.proceed')}
+          {loading ? 'Enviando solicitud...' : 
+           profile?.role === 'demo' ? 'Regístrate para invertir' : 
+           t('simulator.proceed')}
         </Button>
         <p className="text-sm text-muted-foreground mt-2">
           * Los cálculos son estimaciones basadas en condiciones promedio de cultivo

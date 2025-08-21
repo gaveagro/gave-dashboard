@@ -7,7 +7,7 @@ interface Profile {
   user_id: string;
   email: string;
   name: string | null;
-  role: 'admin' | 'investor';
+  role: 'admin' | 'investor' | 'demo';
   account_balance: number;
   phone?: string | null;
   created_at?: string;
@@ -21,6 +21,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  signInDemo: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,7 +112,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear any demo state
+    setUser(null);
+    setProfile(null);
+    setSession(null);
+    
+    // Sign out from Supabase (this will also clear regular auth)
     await supabase.auth.signOut();
+  };
+
+  const signInDemo = () => {
+    // Create a mock demo user and session
+    const demoUser = {
+      id: '00000000-0000-0000-0000-000000000001',
+      email: 'demo@gaveagro.com',
+      created_at: new Date().toISOString(),
+      email_confirmed_at: new Date().toISOString(),
+      user_metadata: { name: 'Usuario Demo' },
+      app_metadata: {},
+      aud: 'authenticated',
+    } as User;
+
+    const demoProfile = {
+      id: '00000000-0000-0000-0000-000000000001',
+      user_id: '00000000-0000-0000-0000-000000000001',
+      email: 'demo@gaveagro.com',
+      name: 'Usuario Demo',
+      role: 'demo' as const,
+      account_balance: 500000,
+      phone: '+52 555 123 4567',
+      created_at: new Date().toISOString(),
+    };
+
+    setUser(demoUser);
+    setProfile(demoProfile);
+    setLoading(false);
   };
 
   const value = {
@@ -121,7 +156,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signIn,
     signUp,
-    signOut
+    signOut,
+    signInDemo
   };
 
   return (

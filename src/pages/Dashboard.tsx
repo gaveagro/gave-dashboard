@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDemo } from '@/contexts/DemoContext';
 import {
   Card,
   CardContent,
@@ -12,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { TreePine, Coins, Leaf, Calendar, Plus, TrendingUp, BarChart3, Sprout, Bell } from 'lucide-react';
+import { TreePine, Coins, Leaf, Calendar, Plus, TrendingUp, BarChart3, Sprout, Bell, AlertTriangle } from 'lucide-react';
 import NotificationsPanel from '@/components/NotificationsPanel';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -22,9 +23,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { isDemoMode, demoData } = useDemo();
   const [showInvestmentRequestDialog, setShowInvestmentRequestDialog] = useState(false);
   const [requestData, setRequestData] = useState({
     user_name: '',
@@ -36,10 +38,14 @@ const Dashboard = () => {
     total_investment: 0
   });
 
-  // Fetch user's investments
+  // Fetch user's investments (or use demo data)
   const { data: investments } = useQuery({
-    queryKey: ['user-investments', user?.id],
+    queryKey: ['user-investments', user?.id, isDemoMode],
     queryFn: async () => {
+      if (isDemoMode) {
+        return demoData.investments;
+      }
+      
       if (!user?.id) return [];
       
       const { data, error } = await supabase
@@ -102,6 +108,15 @@ const Dashboard = () => {
   }, [requestData.plant_count, requestData.species_name, requestData.establishment_year, plantPrices]);
 
   const handleSubmitRequest = async () => {
+    if (profile?.role === 'demo') {
+      toast({
+        title: "Función no disponible en el demo",
+        description: "Para realizar inversiones reales, regístrate como usuario",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       // Calculate final investment if not already done
       let finalTotal = requestData.total_investment;
@@ -201,6 +216,24 @@ const Dashboard = () => {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
+      {/* Demo Badge */}
+      {profile?.role === 'demo' && (
+        <div className="bg-gradient-to-r from-orange-100 to-amber-100 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-orange-600" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-orange-800">Modo Demo</h3>
+            <p className="text-sm text-orange-700">
+              Estás explorando datos ficticios. Para realizar inversiones reales y acceder a todas las funciones, 
+              <button 
+                onClick={() => window.location.href = '/auth'} 
+                className="ml-1 underline font-medium hover:text-orange-900"
+              >
+                regístrate aquí
+              </button>
+            </p>
+          </div>
+        </div>
+      )}
       {/* Header Section */}
       <div className="flex justify-between items-start">
         <div className="space-y-2">
@@ -212,9 +245,20 @@ const Dashboard = () => {
           </p>
         </div>
         <Button 
-          onClick={() => setShowInvestmentRequestDialog(true)}
+          onClick={() => {
+            if (profile?.role === 'demo') {
+              toast({
+                title: "Función no disponible en el demo",
+                description: "Para realizar inversiones reales, regístrate como usuario",
+                variant: "destructive"
+              });
+            } else {
+              setShowInvestmentRequestDialog(true);
+            }
+          }}
           className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 text-lg"
           size="lg"
+          disabled={profile?.role === 'demo'}
         >
           <Plus className="h-5 w-5 mr-2" />
           {t('dashboard.newInvestment')}
@@ -378,9 +422,20 @@ const Dashboard = () => {
               {t('dashboard.noInvestmentsDesc')}
             </p>
             <Button 
-              onClick={() => setShowInvestmentRequestDialog(true)}
+              onClick={() => {
+                if (profile?.role === 'demo') {
+                  toast({
+                    title: "Función no disponible en el demo",
+                    description: "Para realizar inversiones reales, regístrate como usuario",
+                    variant: "destructive"
+                  });
+                } else {
+                  setShowInvestmentRequestDialog(true);
+                }
+              }}
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
               size="lg"
+              disabled={profile?.role === 'demo'}
             >
               <Plus className="h-5 w-5 mr-2" />
               {t('dashboard.firstInvestment')}

@@ -7,13 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Globe } from 'lucide-react';
+import { Loader2, Globe, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const Auth = () => {
-  const { user, signIn } = useAuth();
+  const { user, signIn, signInDemo } = useAuth();
   const { toast } = useToast();
   const { language, setLanguage, t } = useLanguage();
   const [email, setEmail] = useState('');
@@ -23,7 +23,7 @@ const Auth = () => {
   const [resetLoading, setResetLoading] = useState(false);
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -68,6 +68,10 @@ const Auth = () => {
     } finally {
       setResetLoading(false);
     }
+  };
+
+  const handleDemoAccess = () => {
+    signInDemo();
   };
 
   return (
@@ -139,6 +143,28 @@ const Auth = () => {
             >
               {resetLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {t('auth.forgotPassword')}
+            </Button>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  o explora sin registrarte
+                </span>
+              </div>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              onClick={handleDemoAccess}
+              className="w-full border-green-200 text-green-700 hover:bg-green-50"
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Ver Dashboard Demo
             </Button>
           </div>
 
