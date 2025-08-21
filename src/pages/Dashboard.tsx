@@ -42,7 +42,7 @@ const Dashboard = () => {
   const { data: investments } = useQuery({
     queryKey: ['user-investments', user?.id, isDemoMode],
     queryFn: async () => {
-      if (isDemoMode) {
+      if (profile?.role === 'demo' || isDemoMode) {
         return demoData.investments;
       }
       
@@ -224,12 +224,14 @@ const Dashboard = () => {
             <h3 className="font-semibold text-orange-800">Modo Demo</h3>
             <p className="text-sm text-orange-700">
               Estás explorando datos ficticios. Para realizar inversiones reales y acceder a todas las funciones, 
-              <button 
-                onClick={() => window.location.href = '/auth'} 
+              <a 
+                href="https://www.gaveagro.com" 
+                target="_blank"
+                rel="noopener noreferrer"
                 className="ml-1 underline font-medium hover:text-orange-900"
               >
                 regístrate aquí
-              </button>
+              </a>
             </p>
           </div>
         </div>

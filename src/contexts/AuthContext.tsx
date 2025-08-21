@@ -41,9 +41,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
+    // Check for demo mode first
+    const isDemoMode = localStorage.getItem('demo_mode') === 'true';
+    if (isDemoMode) {
+      const demoUser = localStorage.getItem('demo_user');
+      const demoProfile = localStorage.getItem('demo_profile');
+      
+      if (demoUser && demoProfile) {
+        setUser(JSON.parse(demoUser));
+        setProfile(JSON.parse(demoProfile));
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Set up auth state listener for regular users
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // Don't override demo mode
+        if (localStorage.getItem('demo_mode') === 'true') {
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -66,25 +85,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .single()
-          .then(({ data: profileData }) => {
-            setProfile(profileData);
-            setLoading(false);
-          });
-      } else {
-        setLoading(false);
-      }
-    });
+    // Get initial session for regular users
+    if (!isDemoMode) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single()
+            .then(({ data: profileData }) => {
+              setProfile(profileData);
+              setLoading(false);
+            });
+        } else {
+          setLoading(false);
+        }
+      });
+    }
 
     return () => subscription.unsubscribe();
   }, []);
@@ -112,10 +133,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    // Clear any demo state
+    // Clear demo state
+    localStorage.removeItem('demo_mode');
+    localStorage.removeItem('demo_user');
+    localStorage.removeItem('demo_profile');
+    
+    // Clear state
     setUser(null);
     setProfile(null);
     setSession(null);
+    
+    // Trigger demo mode off in DemoContext
+    window.dispatchEvent(new CustomEvent('demo-mode-changed', { detail: { isDemoMode: false } }));
     
     // Sign out from Supabase (this will also clear regular auth)
     await supabase.auth.signOut();
@@ -144,9 +173,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       created_at: new Date().toISOString(),
     };
 
+    // Store demo state in localStorage for persistence
+    localStorage.setItem('demo_mode', 'true');
+    localStorage.setItem('demo_user', JSON.stringify(demoUser));
+    localStorage.setItem('demo_profile', JSON.stringify(demoProfile));
+
     setUser(demoUser);
     setProfile(demoProfile);
     setLoading(false);
+    
+    // Trigger demo mode in DemoContext
+    window.dispatchEvent(new CustomEvent('demo-mode-changed', { detail: { isDemoMode: true } }));
   };
 
   const value = {

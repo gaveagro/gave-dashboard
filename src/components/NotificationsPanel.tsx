@@ -18,7 +18,7 @@ const NotificationsPanel = () => {
   const { data: notifications } = useQuery({
     queryKey: ['user-notifications', user?.id, isDemoMode],
     queryFn: async () => {
-      if (isDemoMode) {
+      if (profile?.role === 'demo' || isDemoMode) {
         return demoData.notifications;
       }
       

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface DemoContextType {
   isDemoMode: boolean;
@@ -52,7 +52,9 @@ export function useDemo() {
 }
 
 export function DemoProvider({ children }: { children: React.ReactNode }) {
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(() => {
+    return localStorage.getItem('demo_mode') === 'true';
+  });
 
   const demoData = {
     user: {
@@ -140,7 +142,35 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
 
   const setDemoMode = (demo: boolean) => {
     setIsDemoMode(demo);
+    if (demo) {
+      localStorage.setItem('demo_mode', 'true');
+    } else {
+      localStorage.removeItem('demo_mode');
+    }
   };
+
+  // Listen for demo mode changes from localStorage
+  useEffect(() => {
+    const checkDemoMode = () => {
+      const demoMode = localStorage.getItem('demo_mode') === 'true';
+      if (demoMode !== isDemoMode) {
+        setIsDemoMode(demoMode);
+      }
+    };
+
+    const handleDemoModeChange = (event: CustomEvent) => {
+      setIsDemoMode(event.detail.isDemoMode);
+    };
+
+    // Check on window focus (in case another tab changed it)
+    window.addEventListener('focus', checkDemoMode);
+    window.addEventListener('demo-mode-changed', handleDemoModeChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('focus', checkDemoMode);
+      window.removeEventListener('demo-mode-changed', handleDemoModeChange as EventListener);
+    };
+  }, [isDemoMode]);
 
   const value = {
     isDemoMode,
