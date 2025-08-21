@@ -534,6 +534,13 @@ const Dashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Platform Footer */}
+      <div className="text-center pt-8 border-t border-muted mt-8">
+        <p className="text-lg font-semibold text-muted-foreground">
+          {t('investments.platformTitle')}
+        </p>
+      </div>
     </div>
   );
 };

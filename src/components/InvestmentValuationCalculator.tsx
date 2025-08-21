@@ -40,13 +40,33 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
   const totalProfit = netRevenue - investment.total_amount;
   const roi = (totalProfit / investment.total_amount) * 100;
   
+  // Currency state and exchange rate
+  const [currency, setCurrency] = useState<'MXN' | 'USD'>('MXN');
+  const [exchangeRate, setExchangeRate] = useState(1);
+
+  // Fetch exchange rate
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await fetch('https://api.exchangerate-api.com/v4/latest/MXN');
+        const data = await response.json();
+        setExchangeRate(data.rates.USD || 0.056);
+      } catch (error) {
+        console.error('Error fetching exchange rate:', error);
+        setExchangeRate(0.056);
+      }
+    };
+    fetchExchangeRate();
+  }, []);
+
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
+    const convertedAmount = currency === 'USD' ? amount * exchangeRate : amount;
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-MX', {
       style: 'currency',
-      currency: 'MXN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+      currency: currency,
+      minimumFractionDigits: currency === 'USD' ? 2 : 0,
+      maximumFractionDigits: currency === 'USD' ? 2 : 0
+    }).format(convertedAmount);
   };
 
   const formatNumber = (num: number, decimals: number = 0) => {
@@ -63,6 +83,29 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
           <Calculator className="h-5 w-5 text-profit" />
           {t('investments.valuationCalculator')}
         </CardTitle>
+        {/* Currency Selector */}
+        <div className="flex items-center gap-4 mt-2">
+          <span className="text-sm text-muted-foreground">Moneda:</span>
+          <div className="flex bg-muted rounded-lg p-1">
+            <button
+              onClick={() => setCurrency('MXN')}
+              className={`px-3 py-1 text-sm rounded ${currency === 'MXN' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+            >
+              MXN
+            </button>
+            <button
+              onClick={() => setCurrency('USD')}
+              className={`px-3 py-1 text-sm rounded ${currency === 'USD' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+            >
+              USD
+            </button>
+          </div>
+          {currency === 'USD' && (
+            <span className="text-xs text-muted-foreground">
+              1 MXN = ${exchangeRate.toFixed(4)} USD
+            </span>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Parámetros de Entrada */}
@@ -70,7 +113,7 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
           {/* Precio por kg */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">
-              {t('investments.estimatedPricePerKg')} {formatCurrency(pricePerKg[0])} MXN
+              {t('investments.estimatedPricePerKg')} {formatCurrency(pricePerKg[0])}
             </Label>
             <Slider
               value={pricePerKg}
@@ -81,8 +124,8 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
               className="w-full"
             />
             <div className="text-xs text-muted-foreground flex justify-between">
-              <span>$0 MXN/kg</span>
-              <span>$40 MXN/kg</span>
+              <span>{formatCurrency(0)}/kg</span>
+              <span>{formatCurrency(40)}/kg</span>
             </div>
           </div>
 

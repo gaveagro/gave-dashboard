@@ -237,9 +237,9 @@ const Investments = () => {
       {filteredInvestments.length > 1 && (
         <Card className="animate-fade-in">
           <CardHeader>
-            <CardTitle>Análisis de Inversiones</CardTitle>
+            <CardTitle>{t('investments.analysisTitle')}</CardTitle>
             <CardDescription>
-              Distribución detallada de tus inversiones por especies y años de establecimiento
+              {t('investments.analysisDescription')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -250,7 +250,7 @@ const Investments = () => {
 
       {/* Lista de Inversiones */}
       <div className="space-y-6">
-        <h2 className="text-xl font-semibold">Inversiones Detalladas</h2>
+        <h2 className="text-xl font-semibold">{t('investments.detailedInvestments')}</h2>
         
         {filteredInvestments.map((investment) => (
           <Card key={investment.id} className="animate-fade-in border-l-4 border-l-primary">
@@ -267,11 +267,11 @@ const Investments = () => {
                     )}
                   </CardTitle>
                   <CardDescription>
-                    {investment.plant_species?.scientific_name || 'Nombre científico no disponible'}
+                    {investment.plant_species?.scientific_name || t('investments.scientificNameNotAvailable')}
                   </CardDescription>
                 </div>
                 <Badge className={getStatusColor(investment.status)}>
-                  {investment.status === 'active' ? 'Activa' : investment.status === 'pending' ? 'Pendiente' : 'Completada'}
+                  {investment.status === 'active' ? t('investments.active') : investment.status === 'pending' ? t('investments.pending') : t('investments.completed')}
                 </Badge>
               </div>
             </CardHeader>
@@ -280,12 +280,12 @@ const Investments = () => {
               {/* Métricas Financieras */}
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Inversión Inicial</div>
+                  <div className="text-sm text-muted-foreground">{t('investments.initialInvestment')}</div>
                    <div className="text-lg font-bold text-investment">
                      {formatCurrency(investment.total_amount)}
                    </div>
                    <div className="text-xs text-muted-foreground">
-                     {formatCurrency(investment.price_per_plant)} por planta
+                     {formatCurrency(investment.price_per_plant)} {t('investments.pricePaidPerPlant')}
                    </div>
                 </div>
               </div>
@@ -296,7 +296,7 @@ const Investments = () => {
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="font-medium">Año de Plantación</div>
+                      <div className="font-medium">{t('investments.plantationYear')}</div>
                       <div className="text-muted-foreground">{investment.plantation_year}</div>
                     </div>
                   </div>
@@ -304,7 +304,7 @@ const Investments = () => {
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="font-medium">Cosecha Estimada</div>
+                      <div className="font-medium">{t('investments.estimatedHarvest')}</div>
                       <div className="text-muted-foreground">{investment.expected_harvest_year}</div>
                     </div>
                   </div>
@@ -312,9 +312,9 @@ const Investments = () => {
                   <div className="flex items-center gap-2">
                     <Leaf className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="font-medium">Peso Estimado</div>
+                      <div className="font-medium">{t('investments.estimatedWeight')}</div>
                       <div className="text-muted-foreground">
-                        Usar simulador para estimar
+                        {t('investments.useSimulatorToEstimate')}
                       </div>
                     </div>
                   </div>
@@ -322,9 +322,9 @@ const Investments = () => {
                   <div className="flex items-center gap-2">
                     <Leaf className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="font-medium">Captura CO₂</div>
+                      <div className="font-medium">{t('investments.co2Capture')}</div>
                       <div className="text-muted-foreground">
-                        {formatNumber((investment.plant_species?.carbon_capture_per_plant || 0.5) * investment.plant_count, 1)} tons
+                        {formatNumber((investment.plant_species?.carbon_capture_per_plant || 0.5) * investment.plant_count, 1)} {t('investments.tons')}
                       </div>
                     </div>
                   </div>
@@ -336,7 +336,7 @@ const Investments = () => {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm font-medium">Progreso de Maduración</div>
                   <div className="text-sm text-muted-foreground">
-                    {investment.expected_harvest_year - new Date().getFullYear()} años restantes
+                    {Math.max(0, investment.expected_harvest_year - new Date().getFullYear())} {t('investments.remainingYears')}
                   </div>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">

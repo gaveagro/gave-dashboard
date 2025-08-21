@@ -40,6 +40,8 @@ export const InvestmentSimulator: React.FC = () => {
   const [selectedPricePerKg, setSelectedPricePerKg] = useState<number[]>([12]);
   const [weightPerPlant, setWeightPerPlant] = useState<number[]>([50]);
   const [loading, setLoading] = useState(false);
+  const [currency, setCurrency] = useState<'MXN' | 'USD'>('MXN');
+  const [exchangeRate, setExchangeRate] = useState(1);
   
   // Fetch species data
   const { data: plantSpecies } = useQuery({
@@ -71,6 +73,21 @@ export const InvestmentSimulator: React.FC = () => {
       return data;
     }
   });
+
+  // Fetch exchange rate
+  React.useEffect(() => {
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await fetch('https://api.exchangerate-api.com/v4/latest/MXN');
+        const data = await response.json();
+        setExchangeRate(data.rates.USD || 0.056);
+      } catch (error) {
+        console.error('Error fetching exchange rate:', error);
+        setExchangeRate(0.056);
+      }
+    };
+    fetchExchangeRate();
+  }, []);
 
   // Set default species when data loads (prioritize "Espadín")
   React.useEffect(() => {
@@ -186,12 +203,13 @@ export const InvestmentSimulator: React.FC = () => {
   }, [results.roi, currentSpecies]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
+    const convertedAmount = currency === 'USD' ? amount * exchangeRate : amount;
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-MX', {
       style: 'currency',
-      currency: 'MXN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+      currency: currency,
+      minimumFractionDigits: currency === 'USD' ? 2 : 0,
+      maximumFractionDigits: currency === 'USD' ? 2 : 0
+    }).format(convertedAmount);
   };
 
   const formatNumber = (num: number, decimals: number = 0) => {
@@ -312,6 +330,30 @@ export const InvestmentSimulator: React.FC = () => {
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
           {t('simulator.description')}
         </p>
+        
+        {/* Currency Selector */}
+        <div className="flex items-center justify-center gap-4">
+          <span className="text-sm text-muted-foreground">Moneda:</span>
+          <div className="flex bg-muted rounded-lg p-1">
+            <button
+              onClick={() => setCurrency('MXN')}
+              className={`px-3 py-1 text-sm rounded ${currency === 'MXN' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+            >
+              MXN
+            </button>
+            <button
+              onClick={() => setCurrency('USD')}
+              className={`px-3 py-1 text-sm rounded ${currency === 'USD' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+            >
+              USD
+            </button>
+          </div>
+          {currency === 'USD' && (
+            <span className="text-xs text-muted-foreground">
+              1 MXN = ${exchangeRate.toFixed(4)} USD
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -429,24 +471,24 @@ export const InvestmentSimulator: React.FC = () => {
 
             {/* Precio Esperado por Kg */}
             <div className="space-y-4">
-              <Label>{t('simulator.pricePerKg')}</Label>
-              <div className="px-3">
-                <Slider
-                  value={selectedPricePerKg}
-                  onValueChange={setSelectedPricePerKg}
-                  max={50}
-                  min={0}
-                  step={0.5}
-                  className="w-full"
-                />
-              </div>
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>$0 MXN</span>
-                <span className="font-medium text-primary text-lg">
-                  {formatCurrency(selectedPricePerKg[0])} {t('simulator.pricePerKgUnit')}
-                </span>
-                <span>$50 MXN</span>
-              </div>
+            <Label>{t('simulator.pricePerKg')}</Label>
+            <div className="px-3">
+              <Slider
+                value={selectedPricePerKg}
+                onValueChange={setSelectedPricePerKg}
+                max={50}
+                min={0}
+                step={0.5}
+                className="w-full"
+              />
+            </div>
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>{formatCurrency(0)}</span>
+              <span className="font-medium text-primary text-lg">
+                {formatCurrency(selectedPricePerKg[0])} {t('simulator.pricePerKgUnit')}
+              </span>
+              <span>{formatCurrency(50)}</span>
+            </div>
             </div>
           </CardContent>
         </Card>
@@ -463,10 +505,10 @@ export const InvestmentSimulator: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-investment">
-                {formatCurrency(results.totalInvestment)} MXN
+                {formatCurrency(results.totalInvestment)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {formatNumber(numberOfPlants)} plantas × {formatCurrency(currentPricePerPlant)} MXN
+                {formatNumber(numberOfPlants)} plantas × {formatCurrency(currentPricePerPlant)}
               </p>
             </CardContent>
           </Card>
@@ -481,7 +523,7 @@ export const InvestmentSimulator: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-profit">
-                {formatCurrency(results.finalReturn)} MXN
+                {formatCurrency(results.finalReturn)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {t('simulator.returnDesc')}
@@ -499,7 +541,7 @@ export const InvestmentSimulator: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-roi">
-                {formatCurrency(results.investorProfit)} MXN
+                {formatCurrency(results.investorProfit)}
               </div>
               <div className="flex justify-between items-center mt-1">
                 <p className="text-sm text-muted-foreground">
@@ -521,17 +563,17 @@ export const InvestmentSimulator: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">{t('simulator.totalWeight')}</span>
-                <span className="font-medium">{formatNumber(results.totalYield)} kg</span>
-              </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">{t('simulator.totalWeight')}</span>
+                    <span className="font-medium">{formatNumber(results.totalYield)} kg</span>
+                  </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">{t('simulator.grossValue')}</span>
-                <span className="font-medium">{formatCurrency(results.grossRevenue)} MXN</span>
+                <span className="font-medium">{formatCurrency(results.grossRevenue)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Comisión Gavé (35%):</span>
-                <span className="font-medium">{formatCurrency(results.gaveProfit)} MXN</span>
+                <span className="font-medium">{formatCurrency(results.gaveProfit)}</span>
               </div>
             </CardContent>
           </Card>
@@ -564,13 +606,13 @@ export const InvestmentSimulator: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Info className="h-4 w-4" />
-              Modelo de Ganancia
+              {t('investments.profitModel')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">65% / 35%</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Inversionista / Gavé
+              {t('investments.investorGaveShare')}
             </p>
           </CardContent>
         </Card>
@@ -604,7 +646,7 @@ export const InvestmentSimulator: React.FC = () => {
            t('simulator.proceed')}
         </Button>
         <p className="text-sm text-muted-foreground mt-2">
-          * Los cálculos son estimaciones basadas en condiciones promedio de cultivo
+          * {t('investments.calculationNote')}
         </p>
         {!user && (
           <p className="text-sm text-amber-600 mt-2">

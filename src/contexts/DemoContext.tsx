@@ -62,7 +62,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       email: 'demo@gaveagro.com',
       name: 'Usuario Demo',
       role: 'demo' as const,
-      account_balance: 500000,
+      account_balance: 1079850, // Total of all demo investments: 7500*15.99 + 2500*300 + 3200*300
       phone: '+52 555 123 4567',
     },
     investments: [
@@ -70,9 +70,9 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         id: '10000000-0000-0000-0000-000000000001',
         user_id: '00000000-0000-0000-0000-000000000001',
         species_id: 'demo-species-1',
-        plant_count: 2500,
-        total_amount: 750000,
-        price_per_plant: 300,
+        plant_count: 7500, // Updated to match the balance calculation
+        total_amount: 119925, // 7500 * 15.99
+        price_per_plant: 15.99,
         plantation_year: 2020,
         expected_harvest_year: 2028,
         weight_per_plant_kg: 50,
@@ -87,8 +87,8 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         id: '10000000-0000-0000-0000-000000000002',
         user_id: '00000000-0000-0000-0000-000000000001',
         species_id: 'demo-species-1',
-        plant_count: 1800,
-        total_amount: 540000,
+        plant_count: 2500,
+        total_amount: 750000,
         price_per_plant: 300,
         plantation_year: 2022,
         expected_harvest_year: 2030,
