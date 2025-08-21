@@ -221,9 +221,9 @@ const Dashboard = () => {
         <div className="bg-gradient-to-r from-orange-100 to-amber-100 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-orange-600" />
           <div className="flex-1">
-            <h3 className="font-semibold text-orange-800">Modo Demo</h3>
+            <h3 className="font-semibold text-orange-800">{t('dashboard.demoMode')}</h3>
             <p className="text-sm text-orange-700">
-              Estás explorando datos ficticios. Para realizar inversiones reales y acceder a todas las funciones, 
+              {t('dashboard.demoDescription')} 
               <a 
                 href="https://www.gaveagro.com" 
                 target="_blank"
@@ -325,13 +325,10 @@ const Dashboard = () => {
             </p>
             <div className="mt-3 p-2 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
               <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium mb-1">
-                ¿Cómo se calcula?
+                {t('dashboard.co2Calculation')}
               </p>
               <p className="text-xs text-emerald-600 dark:text-emerald-400 leading-relaxed">
-                Los agaves capturan aproximadamente 12 kg de CO₂ por planta al año. 
-                Este cálculo se basa en años transcurridos desde la plantación. 
-                Esta captura ayuda a mitigar el cambio climático, purifica el aire y 
-                contribuye a la regeneración del suelo.
+                {t('dashboard.co2Description')}
               </p>
             </div>
           </CardContent>

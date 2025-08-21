@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemo } from '@/contexts/DemoContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ const Plots = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const { isDemoMode } = useDemo();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; description?: string; year?: number } | null>(null);
 
@@ -306,7 +308,7 @@ const Plots = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={plot.status === 'Activa' ? 'default' : 'secondary'}>
-                      {plot.status}
+                      {plot.status === 'Activa' ? t('plots.active') : plot.status}
                     </Badge>
                     {profile?.role === 'admin' && (
                       <Button
@@ -326,11 +328,11 @@ const Plots = () => {
                 {/* Información básica */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="font-medium">Área:</span>
-                    <p>{plot.area} hectáreas</p>
+                    <span className="font-medium">{t('plots.area')}:</span>
+                    <p>{plot.area} {t('plots.hectares')}</p>
                   </div>
                   <div>
-                    <span className="font-medium">Plantas establecidas:</span>
+                    <span className="font-medium">{t('plots.plantsEstablished')}:</span>
                     <p>{plantsEstablished.toLocaleString()}</p>
                   </div>
                   {plotSpecies.length > 0 && (
@@ -400,7 +402,7 @@ const Plots = () => {
                   <div className="pt-3 border-t">
                     <div className="flex items-center gap-2 mb-2">
                       <Camera className="h-4 w-4" />
-                      <span className="text-sm font-medium">Fotos recientes</span>
+                      <span className="text-sm font-medium">{t('plots.recentPhotos')}</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       {recentPhotos.slice(0, 6).map((photo) => (
@@ -448,7 +450,7 @@ const Plots = () => {
                     disabled={profile?.role === 'demo'}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    {profile?.role === 'demo' ? 'Ubicación protegida' : 'Ver en Google Maps'}
+                    {profile?.role === 'demo' ? t('plots.protectedLocation') : t('plots.viewOnGoogleMaps')}
                   </Button>
                 </div>
               </CardContent>

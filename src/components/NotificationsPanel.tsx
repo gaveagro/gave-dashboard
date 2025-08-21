@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemo } from '@/contexts/DemoContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ const NotificationsPanel = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isDemoMode, demoData } = useDemo();
+  const { t } = useLanguage();
 
   const { data: notifications } = useQuery({
     queryKey: ['user-notifications', user?.id, isDemoMode],
@@ -66,7 +68,7 @@ const NotificationsPanel = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bell className="h-5 w-5" />
-          Notificaciones
+          {t('notifications.title')}
           {unreadCount > 0 && (
             <Badge variant="destructive" className="ml-2">
               {unreadCount}
@@ -74,7 +76,7 @@ const NotificationsPanel = () => {
           )}
         </CardTitle>
         <CardDescription>
-          Mantente al día con las últimas actualizaciones
+          {t('notifications.description')}
         </CardDescription>
       </CardHeader>
       <CardContent>

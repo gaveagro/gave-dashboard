@@ -154,6 +154,29 @@ const translations = {
     'investments.totalProfit': 'Ganancia total',
     'investments.roi': 'ROI',
     'investments.calculatorNote': 'Estos cálculos son estimaciones basadas en condiciones ideales de mercado. Los precios reales pueden variar según la oferta, demanda y calidad del producto al momento de la venta.',
+    'investments.co2Captured': 'CO₂ Capturado',
+    'investments.currentValue': 'Valor Actual',
+    'investments.useSimulator': 'Usar simulador',
+    
+    // Dashboard translations
+    'dashboard.co2Calculation': '¿Cómo se calcula?',
+    'dashboard.co2Description': 'Los agaves capturan aproximadamente 12 kg de CO₂ por planta al año. Este cálculo se basa en años transcurridos desde la plantación. Esta captura ayuda a mitigar el cambio climático, purifica el aire y contribuye a la regeneración del suelo.',
+    'dashboard.demoMode': 'Modo Demo',
+    'dashboard.demoDescription': 'Estás explorando datos ficticios. Para realizar inversiones reales y acceder a todas las funciones,',
+    
+    // Notifications
+    'notifications.title': 'Notificaciones',
+    'notifications.description': 'Mantente al día con las últimas actualizaciones',
+    
+    // Plots page
+    'plots.plotName': 'Nombre de la parcela',
+    'plots.area': 'Área',
+    'plots.plantsEstablished': 'Plantas establecidas',
+    'plots.recentPhotos': 'Fotos recientes',
+    'plots.active': 'Activa',
+    'plots.hectares': 'hectáreas',
+    'plots.protectedLocation': 'Ubicación protegida',
+    'plots.viewOnGoogleMaps': 'Ver en Google Maps',
   },
   en: {
     // Navigation
@@ -320,6 +343,29 @@ const translations = {
     'investments.totalProfit': 'Total profit',
     'investments.roi': 'ROI',
     'investments.calculatorNote': 'These calculations are estimates based on ideal market conditions. Actual prices may vary depending on supply, demand and product quality at the time of sale.',
+    'investments.co2Captured': 'CO₂ Captured',
+    'investments.currentValue': 'Current Value',
+    'investments.useSimulator': 'Use simulator',
+    
+    // Dashboard translations
+    'dashboard.co2Calculation': 'How is it calculated?',
+    'dashboard.co2Description': 'Agaves capture approximately 12 kg of CO₂ per plant per year. This calculation is based on years elapsed since planting. This capture helps mitigate climate change, purifies the air and contributes to soil regeneration.',
+    'dashboard.demoMode': 'Demo Mode',
+    'dashboard.demoDescription': 'You are exploring fictional data. To make real investments and access all features,',
+    
+    // Notifications
+    'notifications.title': 'Notifications', 
+    'notifications.description': 'Stay up to date with the latest updates',
+    
+    // Plots page
+    'plots.plotName': 'Plot name',
+    'plots.area': 'Area',
+    'plots.plantsEstablished': 'Plants established',
+    'plots.recentPhotos': 'Recent photos', 
+    'plots.active': 'Active',
+    'plots.hectares': 'hectares',
+    'plots.protectedLocation': 'Protected location',
+    'plots.viewOnGoogleMaps': 'View on Google Maps',
   }
 };
 

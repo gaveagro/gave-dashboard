@@ -8,21 +8,45 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemo } from '@/contexts/DemoContext';
 
 const Investments = () => {
   const { t } = useLanguage();
   const { profile } = useAuth();
+  const { isDemoMode, demoData } = useDemo();
   const [userInvestments, setUserInvestments] = useState<any[]>([]);
   const [allInvestments, setAllInvestments] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currency, setCurrency] = useState<'MXN' | 'USD'>('MXN');
+  const [exchangeRate, setExchangeRate] = useState(1);
   
   useEffect(() => {
     fetchUserInvestments();
+    fetchExchangeRate();
   }, []);
+
+  const fetchExchangeRate = async () => {
+    try {
+      // Using a free API for exchange rates
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/MXN');
+      const data = await response.json();
+      setExchangeRate(data.rates.USD || 0.056); // Fallback rate
+    } catch (error) {
+      console.error('Error fetching exchange rate:', error);
+      setExchangeRate(0.056); // Fallback to approximate rate
+    }
+  };
 
   const fetchUserInvestments = async () => {
     try {
+      // If demo mode, use demo data
+      if (profile?.role === 'demo' || isDemoMode) {
+        setUserInvestments(demoData.investments);
+        setLoading(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -58,13 +82,15 @@ const Investments = () => {
       setLoading(false);
     }
   };
+
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
+    const convertedAmount = currency === 'USD' ? amount * exchangeRate : amount;
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-MX', {
       style: 'currency',
-      currency: 'MXN',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+      currency: currency,
+      minimumFractionDigits: currency === 'USD' ? 2 : 0,
+      maximumFractionDigits: currency === 'USD' ? 2 : 0
+    }).format(convertedAmount);
   };
 
   const formatNumber = (num: number, decimals: number = 0) => {
@@ -130,52 +156,76 @@ const Investments = () => {
             />
           </div>
         )}
+
+        {/* Currency Selector */}
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-muted-foreground">Moneda:</span>
+          <div className="flex bg-muted rounded-lg p-1">
+            <button
+              onClick={() => setCurrency('MXN')}
+              className={`px-3 py-1 text-sm rounded ${currency === 'MXN' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+            >
+              MXN
+            </button>
+            <button
+              onClick={() => setCurrency('USD')}
+              className={`px-3 py-1 text-sm rounded ${currency === 'USD' ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
+            >
+              USD
+            </button>
+          </div>
+          {currency === 'USD' && (
+            <span className="text-xs text-muted-foreground">
+              1 MXN = ${exchangeRate.toFixed(4)} USD
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Resumen General */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="animate-fade-in">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-primary" />
-              <div className="text-sm text-muted-foreground">Total Plantas</div>
-            </div>
+       <Card className="animate-fade-in">
+         <CardContent className="p-4">
+           <div className="flex items-center gap-2">
+             <Leaf className="h-4 w-4 text-primary" />
+             <div className="text-sm text-muted-foreground">{t('investments.totalPlants')}</div>
+           </div>
             <div className="text-2xl font-bold text-primary mt-1">
               {filteredInvestments.reduce((acc, inv) => acc + inv.plant_count, 0)}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="animate-fade-in">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-investment" />
-              <div className="text-sm text-muted-foreground">Inversión Total</div>
-            </div>
-            <div className="text-2xl font-bold text-investment mt-1">
-              {formatCurrency(filteredInvestments.reduce((acc, inv) => acc + inv.total_amount, 0))}
-            </div>
+         <Card className="animate-fade-in">
+           <CardContent className="p-4">
+             <div className="flex items-center gap-2">
+               <TrendingUp className="h-4 w-4 text-investment" />
+               <div className="text-sm text-muted-foreground">{t('investments.totalInvestment')}</div>
+             </div>
+             <div className="text-2xl font-bold text-investment mt-1">
+               {formatCurrency(filteredInvestments.reduce((acc, inv) => acc + inv.total_amount, 0))}
+             </div>
+           </CardContent>
+         </Card>
+
+         <Card className="animate-fade-in">
+           <CardContent className="p-4">
+             <div className="flex items-center gap-2">
+               <TrendingUp className="h-4 w-4 text-profit" />
+               <div className="text-sm text-muted-foreground">{t('investments.currentValue')}</div>
+             </div>
+             <div className="text-2xl font-bold text-profit mt-1">
+               {t('investments.useSimulator')}
+             </div>
           </CardContent>
         </Card>
 
         <Card className="animate-fade-in">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-profit" />
-              <div className="text-sm text-muted-foreground">Valor Actual</div>
-            </div>
-            <div className="text-2xl font-bold text-profit mt-1">
-              Usar simulador
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-fade-in">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-contrast" />
-              <div className="text-sm text-muted-foreground">CO₂ Capturado</div>
-            </div>
+             <div className="flex items-center gap-2">
+               <Leaf className="h-4 w-4 text-contrast" />
+               <div className="text-sm text-muted-foreground">{t('investments.co2Captured')}</div>
+             </div>
             <div className="text-2xl font-bold text-contrast mt-1">
               {formatNumber(filteredInvestments.reduce((acc, inv) => acc + (inv.plant_species?.carbon_capture_per_plant || 0.5) * inv.plant_count, 0), 1)} t
             </div>
@@ -231,12 +281,12 @@ const Investments = () => {
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Inversión Inicial</div>
-                  <div className="text-lg font-bold text-investment">
-                    {formatCurrency(investment.total_amount)} MXN
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatCurrency(investment.price_per_plant)} MXN por planta
-                  </div>
+                   <div className="text-lg font-bold text-investment">
+                     {formatCurrency(investment.total_amount)}
+                   </div>
+                   <div className="text-xs text-muted-foreground">
+                     {formatCurrency(investment.price_per_plant)} por planta
+                   </div>
                 </div>
               </div>
 
