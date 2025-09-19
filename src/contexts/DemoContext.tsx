@@ -79,7 +79,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         status: 'active',
         created_at: '2020-03-15T10:00:00Z',
         plant_species: {
-          name: 'Agave Azul Tequilana',
+          name: 'Agave Angustifolia Haw (Espadín)',
           maturation_years: 8,
         },
       },
@@ -96,7 +96,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         status: 'active',
         created_at: '2022-07-20T14:30:00Z',
         plant_species: {
-          name: 'Agave Azul Tequilana',
+          name: 'Agave Angustifolia Haw (Espadín)',
           maturation_years: 8,
         },
       },
