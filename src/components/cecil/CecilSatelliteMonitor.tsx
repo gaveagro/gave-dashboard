@@ -64,34 +64,60 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
   // Create AOI mutation
   const createAOIMutation = useMutation({
     mutationFn: async () => {
-      const response = await supabase.functions.invoke('cecil-integration', {
-        body: {
-          action: 'create_aoi_for_plot',
-          plotId,
-          datasets: ['KANOP'] // Free dataset with NDVI, EVI, SAVI, NDWI
+      console.log('Creating AOI for plot:', plotId);
+      
+      // First test Cecil connection
+      console.log('Testing Cecil API connection...');
+      const testResult = await supabase.functions.invoke('cecil-test-connection');
+      
+      if (testResult.error || !testResult.data?.success) {
+        console.error('Cecil connection test failed:', testResult);
+        throw new Error('No se pudo conectar con Cecil API. Verificar configuración.');
+      }
+
+      console.log('Cecil connection successful, available datasets:', testResult.data.data.datasets?.length || 0);
+
+      // Create AOI with available datasets
+      const availableDatasets = testResult.data.data.datasets || [];
+      const datasetsToUse = availableDatasets.slice(0, 2).map((d: any) => d.id); // Use first 2 datasets
+
+      const { data, error } = await supabase.functions.invoke('cecil-integration', {
+        body: { 
+          action: 'create_aoi_for_plot', 
+          plotId: plotId,
+          datasets: datasetsToUse
         }
       });
 
-      if (response.error) {
-        throw new Error(response.error.message || 'Error creating AOI');
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to create AOI');
       }
 
-      return response.data;
+      if (!data?.success) {
+        console.error('AOI creation failed:', data);
+        throw new Error(data?.error || 'Failed to create AOI in Cecil');
+      }
+
+      console.log('AOI created successfully:', data);
+      return data;
     },
     onSuccess: () => {
       toast({
-        title: "AOI Creado",
-        description: "Se ha creado el AOI para monitoreo satelital de esta parcela."
+        title: "Monitoreo Conectado",
+        description: "El monitoreo satelital ha sido configurado exitosamente para esta parcela.",
       });
       queryClient.invalidateQueries({ queryKey: ['cecil-aoi', plotId] });
+      queryClient.invalidateQueries({ queryKey: ['cecil-satellite-data'] });
     },
     onError: (error) => {
+      console.error('Mutation error:', error);
       toast({
         title: "Error",
-        description: `No se pudo crear el AOI: ${error.message}`,
-        variant: "destructive"
+        description: error.message || "No se pudo configurar el monitoreo satelital.",
+        variant: "destructive",
       });
-    }
+    },
   });
 
   if (aoiLoading) {

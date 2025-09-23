@@ -72,7 +72,7 @@ serve(async (req) => {
           console.log(`Syncing data for request: ${request.id}`);
 
           // Check if request is ready in Cecil
-          const statusResponse = await fetch(`https://api.cecil.ag/v1/data-requests/${request.cecil_request_id}`, {
+          const statusResponse = await fetch(`https://api.cecil.app/data_requests/${request.cecil_request_id}`, {
             headers: {
               'Authorization': `Bearer ${cecilApiKey}`,
             },
@@ -91,71 +91,60 @@ serve(async (req) => {
             continue;
           }
 
-          // Get transformations for this request
-          const transformationsResponse = await fetch(`https://api.cecil.ag/v1/data-requests/${request.cecil_request_id}/transformations`, {
+          // Use new query API to get satellite data directly (no transformations)
+          console.log(`Querying satellite data for request ${request.id}...`);
+          
+          // Query satellite data using the new API
+          const queryPayload = {
+            aoi_id: statusData.aoi_id,
+            dataset_id: request.dataset_id,
+            start_date: '2020-01-01',
+            end_date: new Date().toISOString().split('T')[0] // Current date
+          };
+
+          const queryResponse = await fetch('https://api.cecil.app/query', {
+            method: 'POST',
             headers: {
               'Authorization': `Bearer ${cecilApiKey}`,
+              'Content-Type': 'application/json',
             },
+            body: JSON.stringify(queryPayload)
           });
 
-          if (!transformationsResponse.ok) {
-            console.error(`Failed to get transformations for request ${request.id}`);
+          if (!queryResponse.ok) {
+            const errorText = await queryResponse.text();
+            console.error(`Failed to query data for request ${request.id}:`, errorText);
             continue;
           }
 
-          const transformations = await transformationsResponse.json();
-          console.log(`Found ${transformations.length} transformations for request ${request.id}`);
+          const queryData = await queryResponse.json();
+          console.log(`Got query response for request ${request.id}:`, queryData);
 
-          // Process each transformation
-          for (const transformation of transformations) {
-            // Store transformation info
-            const { data: storedTransformation, error: transformError } = await supabase
-              .from('cecil_transformations')
-              .upsert({
-                data_request_id: request.id,
-                cecil_transformation_id: transformation.id,
-                spatial_resolution: transformation.spatial_resolution || 0.00025,
-                crs: transformation.crs || 'EPSG:4326',
-                status: transformation.status || 'completed',
-                created_by: '00000000-0000-0000-0000-000000000000'
-              })
-              .select()
-              .single();
+          // Process the returned data
+          if (queryData && queryData.data && Array.isArray(queryData.data)) {
+            console.log(`Processing ${queryData.data.length} data points for request ${request.id}`);
 
-            if (transformError) {
-              console.error(`Error storing transformation ${transformation.id}:`, transformError);
-              continue;
-            }
-
-            // Get satellite data for this transformation
-            const dataResponse = await fetch(`https://api.cecil.ag/v1/transformations/${transformation.id}/data`, {
-              headers: {
-                'Authorization': `Bearer ${cecilApiKey}`,
-              },
-            });
-
-            if (!dataResponse.ok) {
-              console.error(`Failed to get data for transformation ${transformation.id}`);
-              continue;
-            }
-
-            const satelliteData: CecilSatelliteData[] = await dataResponse.json();
-            console.log(`Got ${satelliteData.length} data points for transformation ${transformation.id}`);
-
-            // Store satellite data
-            for (const dataPoint of satelliteData) {
+            // Store satellite data points
+            for (const dataPoint of queryData.data) {
               try {
+                // Convert date format if needed
+                let measurementDate = dataPoint.date || dataPoint.measurement_date;
+                if (measurementDate && typeof measurementDate === 'string') {
+                  const dateObj = new Date(measurementDate);
+                  measurementDate = dateObj.toISOString().split('T')[0];
+                }
+
                 const { error: dataError } = await supabase
                   .from('cecil_satellite_data')
                   .upsert({
                     cecil_aoi_id: request.cecil_aoi_id,
-                    transformation_id: storedTransformation.id,
-                    x: dataPoint.x,
-                    y: dataPoint.y,
-                    year: dataPoint.year,
-                    month: dataPoint.month,
-                    day: dataPoint.day,
-                    measurement_date: dataPoint.measurement_date,
+                    transformation_id: null, // No longer using transformations
+                    x: dataPoint.x || dataPoint.longitude || 0,
+                    y: dataPoint.y || dataPoint.latitude || 0,
+                    year: dataPoint.year || (measurementDate ? new Date(measurementDate).getFullYear() : null),
+                    month: dataPoint.month || (measurementDate ? new Date(measurementDate).getMonth() + 1 : null),
+                    day: dataPoint.day || (measurementDate ? new Date(measurementDate).getDate() : null),
+                    measurement_date: measurementDate,
                     dataset_name: request.dataset_name,
                     ndvi: dataPoint.ndvi,
                     evi: dataPoint.evi,
@@ -167,7 +156,9 @@ serve(async (req) => {
                     canopy_cover: dataPoint.canopy_cover,
                     cloud_coverage: dataPoint.cloud_coverage,
                     data_quality: dataPoint.data_quality || 'good',
-                    pixel_boundary: dataPoint.pixel_boundary
+                    pixel_boundary: dataPoint.pixel_boundary || dataPoint.geometry
+                  }, {
+                    onConflict: 'cecil_aoi_id,x,y,measurement_date,dataset_name'
                   });
 
                 if (dataError) {
@@ -177,6 +168,8 @@ serve(async (req) => {
                 console.error(`Error processing data point:`, pointError);
               }
             }
+          } else {
+            console.log(`No data returned for request ${request.id}`);
           }
 
           // Update request status

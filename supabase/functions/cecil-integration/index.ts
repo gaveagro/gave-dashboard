@@ -8,13 +8,22 @@ const corsHeaders = {
 
 interface CecilCreateAOIRequest {
   name: string;
-  geometry: any;
-  hectares?: number;
+  geometry: {
+    type: string;
+    coordinates: number[][][];
+  };
+  external_ref?: string;
 }
 
 interface CecilDataRequest {
   aoi_id: string;
-  dataset_name: string;
+  dataset_id: string;
+}
+
+interface CecilDataset {
+  id: string;
+  name: string;
+  description?: string;
 }
 
 serve(async (req) => {
@@ -29,7 +38,7 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, plotId, datasets = ['kanop', 'planet'] } = await req.json();
+    const { action, plotId, datasets } = await req.json();
 
     if (action === 'create_aoi_for_plot') {
       // Get plot details
@@ -92,16 +101,38 @@ serve(async (req) => {
         };
       }
 
+      // Get available datasets first
+      console.log('Fetching available datasets from Cecil...');
+      const datasetsResponse = await fetch('https://api.cecil.app/datasets', {
+        headers: {
+          'Authorization': `Bearer ${cecilApiKey}`,
+        },
+      });
+
+      if (!datasetsResponse.ok) {
+        throw new Error(`Failed to fetch datasets: ${datasetsResponse.status}`);
+      }
+
+      const availableDatasets: CecilDataset[] = await datasetsResponse.json();
+      console.log('Available datasets:', availableDatasets.map(d => d.id));
+
+      // Use provided datasets or default to first 2 available
+      const datasetsToUse = datasets && datasets.length > 0 
+        ? datasets.filter((d: string) => availableDatasets.some(ad => ad.id === d))
+        : availableDatasets.slice(0, 2).map(d => d.id);
+
+      console.log('Datasets to use:', datasetsToUse);
+
       // Create AOI in Cecil
       const cecilAOIPayload: CecilCreateAOIRequest = {
-        name: `plot-${plot.id}`,
+        name: plot.name,
         geometry: geometry,
-        hectares: plot.area
+        external_ref: `plot-${plot.id}`
       };
 
       console.log('Creating AOI in Cecil:', cecilAOIPayload);
 
-      const cecilResponse = await fetch('https://api.cecil.ag/v1/aois', {
+      const cecilResponse = await fetch('https://api.cecil.app/aois', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${cecilApiKey}`,
@@ -141,16 +172,16 @@ serve(async (req) => {
 
       // Create data requests for specified datasets
       const dataRequests = [];
-      for (const dataset of datasets) {
+      for (const datasetId of datasetsToUse) {
         try {
           const dataRequestPayload: CecilDataRequest = {
             aoi_id: cecilAOI.id,
-            dataset_name: dataset
+            dataset_id: datasetId
           };
 
-          console.log(`Creating data request for ${dataset}:`, dataRequestPayload);
+          console.log(`Creating data request for ${datasetId}:`, dataRequestPayload);
 
-          const dataResponse = await fetch('https://api.cecil.ag/v1/data-requests', {
+          const dataResponse = await fetch('https://api.cecil.app/data_requests', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${cecilApiKey}`,
@@ -161,33 +192,37 @@ serve(async (req) => {
 
           if (!dataResponse.ok) {
             const errorText = await dataResponse.text();
-            console.error(`Data request failed for ${dataset}:`, errorText);
+            console.error(`Data request failed for ${datasetId}:`, errorText);
             continue;
           }
 
           const dataRequest = await dataResponse.json();
-          console.log(`Data request created for ${dataset}:`, dataRequest);
+          console.log(`Data request created for ${datasetId}:`, dataRequest);
+
+          // Get dataset name from available datasets
+          const datasetInfo = availableDatasets.find(d => d.id === datasetId);
+          const datasetName = datasetInfo ? datasetInfo.name : datasetId;
 
           // Store data request in our database
           const { error: requestError } = await supabase
             .from('cecil_data_requests')
             .insert({
-              external_ref: `${plot.id}-${dataset}`,
+              external_ref: `${plot.id}-${datasetId}`,
               cecil_aoi_id: newAOI.id,
-              dataset_name: dataset,
-              dataset_id: dataset,
+              dataset_name: datasetName,
+              dataset_id: datasetId,
               cecil_request_id: dataRequest.id,
               status: 'pending',
               created_by: '00000000-0000-0000-0000-000000000000'
             });
 
           if (requestError) {
-            console.error(`Error storing data request for ${dataset}:`, requestError);
+            console.error(`Error storing data request for ${datasetId}:`, requestError);
           } else {
             dataRequests.push(dataRequest);
           }
         } catch (error) {
-          console.error(`Error processing dataset ${dataset}:`, error);
+          console.error(`Error processing dataset ${datasetId}:`, error);
         }
       }
 

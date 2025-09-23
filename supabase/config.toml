@@ -79,5 +79,8 @@ verify_jwt = false
 [functions.cecil-weather-update]
 verify_jwt = false
 
+[functions.cecil-test-connection]
+verify_jwt = false
+
 [edge-runtime]
 inspector_port = 8083
