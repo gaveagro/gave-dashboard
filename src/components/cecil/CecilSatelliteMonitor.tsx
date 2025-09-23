@@ -120,7 +120,7 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
           <div className="text-center">
             <AlertTriangle className="h-8 w-8 mx-auto text-amber-500 mb-2" />
             <p className="text-sm text-muted-foreground mb-4">
-              Esta parcela no está conectada al sistema de monitoreo satelital Cecil.
+              Esta parcela no está conectada al sistema de monitoreo satelital.
             </p>
             <Button 
               onClick={() => createAOIMutation.mutate()}
