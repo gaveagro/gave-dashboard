@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { MapPin, ExternalLink, Camera, Thermometer, Droplets, Mountain, Upload, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PhotoModal from '@/components/PhotoModal';
+import CecilSatelliteMonitor from '@/components/cecil/CecilSatelliteMonitor';
 
 const Plots = () => {
   const { profile } = useAuth();
@@ -379,6 +380,16 @@ const Plots = () => {
                       <span>{plot.elevation}m</span>
                     </div>
                   )}
+                </div>
+
+                {/* Cecil Satellite Monitoring */}
+                <div className="pt-4">
+                  <CecilSatelliteMonitor
+                    plotId={plot.id}
+                    plotName={plot.name}
+                    plotCoordinates={plot.coordinates}
+                    plotArea={plot.area}
+                  />
                 </div>
 
                 {/* Admin photo upload */}
