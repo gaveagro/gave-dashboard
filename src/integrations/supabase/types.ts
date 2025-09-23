@@ -14,6 +14,368 @@ export type Database = {
   }
   public: {
     Tables: {
+      cecil_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          cecil_aoi_id: string
+          created_at: string
+          current_value: number | null
+          description: string
+          id: string
+          recommendation: string | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          threshold_value: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          cecil_aoi_id: string
+          created_at?: string
+          current_value?: number | null
+          description: string
+          id?: string
+          recommendation?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          threshold_value?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          cecil_aoi_id?: string
+          created_at?: string
+          current_value?: number | null
+          description?: string
+          id?: string
+          recommendation?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          threshold_value?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cecil_alerts_cecil_aoi_id_fkey"
+            columns: ["cecil_aoi_id"]
+            isOneToOne: false
+            referencedRelation: "cecil_aois"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cecil_aois: {
+        Row: {
+          cecil_aoi_id: string | null
+          created_at: string
+          created_by: string
+          error_message: string | null
+          external_ref: string
+          geometry: Json
+          hectares: number | null
+          id: string
+          name: string
+          plot_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cecil_aoi_id?: string | null
+          created_at?: string
+          created_by: string
+          error_message?: string | null
+          external_ref: string
+          geometry: Json
+          hectares?: number | null
+          id?: string
+          name: string
+          plot_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cecil_aoi_id?: string | null
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          external_ref?: string
+          geometry?: Json
+          hectares?: number | null
+          id?: string
+          name?: string
+          plot_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cecil_data_requests: {
+        Row: {
+          cecil_aoi_id: string
+          cecil_request_id: string | null
+          created_at: string
+          created_by: string
+          dataset_id: string
+          dataset_name: string
+          error_message: string | null
+          external_ref: string | null
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cecil_aoi_id: string
+          cecil_request_id?: string | null
+          created_at?: string
+          created_by: string
+          dataset_id: string
+          dataset_name: string
+          error_message?: string | null
+          external_ref?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cecil_aoi_id?: string
+          cecil_request_id?: string | null
+          created_at?: string
+          created_by?: string
+          dataset_id?: string
+          dataset_name?: string
+          error_message?: string | null
+          external_ref?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cecil_data_requests_cecil_aoi_id_fkey"
+            columns: ["cecil_aoi_id"]
+            isOneToOne: false
+            referencedRelation: "cecil_aois"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cecil_satellite_data: {
+        Row: {
+          biomass: number | null
+          canopy_cover: number | null
+          carbon_capture: number | null
+          cecil_aoi_id: string
+          cloud_coverage: number | null
+          created_at: string
+          data_quality: string | null
+          dataset_name: string
+          day: number | null
+          evi: number | null
+          id: string
+          measurement_date: string | null
+          month: number | null
+          msavi: number | null
+          ndvi: number | null
+          ndwi: number | null
+          pixel_boundary: Json | null
+          savi: number | null
+          transformation_id: string | null
+          updated_at: string
+          x: number
+          y: number
+          year: number
+        }
+        Insert: {
+          biomass?: number | null
+          canopy_cover?: number | null
+          carbon_capture?: number | null
+          cecil_aoi_id: string
+          cloud_coverage?: number | null
+          created_at?: string
+          data_quality?: string | null
+          dataset_name: string
+          day?: number | null
+          evi?: number | null
+          id?: string
+          measurement_date?: string | null
+          month?: number | null
+          msavi?: number | null
+          ndvi?: number | null
+          ndwi?: number | null
+          pixel_boundary?: Json | null
+          savi?: number | null
+          transformation_id?: string | null
+          updated_at?: string
+          x: number
+          y: number
+          year: number
+        }
+        Update: {
+          biomass?: number | null
+          canopy_cover?: number | null
+          carbon_capture?: number | null
+          cecil_aoi_id?: string
+          cloud_coverage?: number | null
+          created_at?: string
+          data_quality?: string | null
+          dataset_name?: string
+          day?: number | null
+          evi?: number | null
+          id?: string
+          measurement_date?: string | null
+          month?: number | null
+          msavi?: number | null
+          ndvi?: number | null
+          ndwi?: number | null
+          pixel_boundary?: Json | null
+          savi?: number | null
+          transformation_id?: string | null
+          updated_at?: string
+          x?: number
+          y?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cecil_satellite_data_cecil_aoi_id_fkey"
+            columns: ["cecil_aoi_id"]
+            isOneToOne: false
+            referencedRelation: "cecil_aois"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cecil_satellite_data_transformation_id_fkey"
+            columns: ["transformation_id"]
+            isOneToOne: false
+            referencedRelation: "cecil_transformations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cecil_transformations: {
+        Row: {
+          cecil_transformation_id: string | null
+          created_at: string
+          created_by: string
+          crs: string
+          data_request_id: string
+          error_message: string | null
+          id: string
+          spatial_resolution: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cecil_transformation_id?: string | null
+          created_at?: string
+          created_by: string
+          crs?: string
+          data_request_id: string
+          error_message?: string | null
+          id?: string
+          spatial_resolution?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cecil_transformation_id?: string | null
+          created_at?: string
+          created_by?: string
+          crs?: string
+          data_request_id?: string
+          error_message?: string | null
+          id?: string
+          spatial_resolution?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cecil_transformations_data_request_id_fkey"
+            columns: ["data_request_id"]
+            isOneToOne: false
+            referencedRelation: "cecil_data_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cecil_weather_data: {
+        Row: {
+          cecil_aoi_id: string
+          created_at: string
+          data_source: string
+          forecast_hours: number | null
+          humidity_percent: number | null
+          id: string
+          measurement_timestamp: string
+          precipitation_mm: number | null
+          pressure_hpa: number | null
+          soil_moisture_percent: number | null
+          soil_temperature_celsius: number | null
+          solar_radiation_wm2: number | null
+          temperature_celsius: number | null
+          updated_at: string
+          wind_direction_degrees: number | null
+          wind_speed_kmh: number | null
+        }
+        Insert: {
+          cecil_aoi_id: string
+          created_at?: string
+          data_source: string
+          forecast_hours?: number | null
+          humidity_percent?: number | null
+          id?: string
+          measurement_timestamp: string
+          precipitation_mm?: number | null
+          pressure_hpa?: number | null
+          soil_moisture_percent?: number | null
+          soil_temperature_celsius?: number | null
+          solar_radiation_wm2?: number | null
+          temperature_celsius?: number | null
+          updated_at?: string
+          wind_direction_degrees?: number | null
+          wind_speed_kmh?: number | null
+        }
+        Update: {
+          cecil_aoi_id?: string
+          created_at?: string
+          data_source?: string
+          forecast_hours?: number | null
+          humidity_percent?: number | null
+          id?: string
+          measurement_timestamp?: string
+          precipitation_mm?: number | null
+          pressure_hpa?: number | null
+          soil_moisture_percent?: number | null
+          soil_temperature_celsius?: number | null
+          solar_radiation_wm2?: number | null
+          temperature_celsius?: number | null
+          updated_at?: string
+          wind_direction_degrees?: number | null
+          wind_speed_kmh?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cecil_weather_data_cecil_aoi_id_fkey"
+            columns: ["cecil_aoi_id"]
+            isOneToOne: false
+            referencedRelation: "cecil_aois"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           contract_type: string | null
