@@ -61,18 +61,36 @@ serve(async (req) => {
       }
 
       // Create geometry from plot coordinates
-      const [lat, lng] = plot.coordinates.split(', ').map(parseFloat);
-      const buffer = 0.001; // Small buffer around the point
-      const geometry = {
-        type: "Polygon",
-        coordinates: [[
-          [lng - buffer, lat - buffer],
-          [lng + buffer, lat - buffer],
-          [lng + buffer, lat + buffer],
-          [lng - buffer, lat + buffer],
-          [lng - buffer, lat - buffer]
-        ]]
-      };
+      let geometry;
+      
+      // Special handling for La Sierra plot with specific coordinates
+      if (plot.name === 'La Sierra') {
+        // Use the specific polygon coordinates provided by the user
+        geometry = {
+          type: "Polygon",
+          coordinates: [[
+            [-99.13166666666666, 21.734166666666667],
+            [-99.13111111111111, 21.734722222222224],
+            [-99.12972222222221, 21.732499999999998],
+            [-99.12972222222221, 21.73222222222222],
+            [-99.13166666666666, 21.734166666666667] // Close the polygon
+          ]]
+        };
+      } else {
+        // Default polygon creation for other plots
+        const [lat, lng] = plot.coordinates.split(', ').map(parseFloat);
+        const buffer = 0.001; // Small buffer around the point
+        geometry = {
+          type: "Polygon",
+          coordinates: [[
+            [lng - buffer, lat - buffer],
+            [lng + buffer, lat - buffer],
+            [lng + buffer, lat + buffer],
+            [lng - buffer, lat + buffer],
+            [lng - buffer, lat - buffer]
+          ]]
+        };
+      }
 
       // Create AOI in Cecil
       const cecilAOIPayload: CecilCreateAOIRequest = {
