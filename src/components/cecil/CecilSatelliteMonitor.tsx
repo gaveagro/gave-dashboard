@@ -140,8 +140,12 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
         title: "Monitoreo Conectado",
         description: "El monitoreo satelital ha sido configurado exitosamente para esta parcela.",
       });
-      queryClient.invalidateQueries({ queryKey: ['cecil-aoi', plotId] });
+      // Invalidate all related caches with unified keys
+      queryClient.invalidateQueries({ queryKey: ['cecil-aoi'] });
       queryClient.invalidateQueries({ queryKey: ['cecil-satellite-data'] });
+      queryClient.invalidateQueries({ queryKey: ['cecil-satellite-previous'] });
+      queryClient.invalidateQueries({ queryKey: ['cecil-weather-data'] });
+      queryClient.invalidateQueries({ queryKey: ['cecil-alerts'] });
     },
     onError: (error) => {
       console.error('Mutation error:', error);
@@ -205,10 +209,21 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
   }
 
   const handleRefresh = async () => {
-    console.log('Refreshing Cecil data...');
+    console.log('CecilSatelliteMonitor: Refreshing all Cecil data...');
+    // Force refetch of current data
     await Promise.all([refetchAoi(), refetchSatelliteData()]);
-    queryClient.invalidateQueries({ queryKey: ['cecil-satellite-data'] });
+    
+    // Invalidate all related caches to ensure fresh data across all components
     queryClient.invalidateQueries({ queryKey: ['cecil-aoi'] });
+    queryClient.invalidateQueries({ queryKey: ['cecil-satellite-data'] });
+    queryClient.invalidateQueries({ queryKey: ['cecil-satellite-previous'] });
+    queryClient.invalidateQueries({ queryKey: ['cecil-weather-data'] });
+    queryClient.invalidateQueries({ queryKey: ['cecil-alerts'] });
+    
+    toast({
+      title: "Datos Actualizados",
+      description: "Los datos satelitales han sido actualizados.",
+    });
   };
 
   return (

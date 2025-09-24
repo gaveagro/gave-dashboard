@@ -44,35 +44,54 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
     fetchMapboxToken();
   }, []);
 
-  // Fetch Cecil AOI and satellite data for this plot
+  // Fetch Cecil AOI and satellite data for this plot - unified cache key
   const { data: aoi, isLoading: aoiLoading } = useQuery({
-    queryKey: ['cecil-aoi-map', plotId],
+    queryKey: ['cecil-aoi', plotId], // Unified cache key with CecilSatelliteMonitor
     queryFn: async () => {
       if (!plotId) return null;
-      console.log('Fetching AOI for plot:', plotId);
+      console.log('PlotMap: Fetching AOI for plot:', plotId);
       const { data, error } = await supabase
         .from('cecil_aois')
         .select('*')
         .eq('plot_id', plotId)
         .maybeSingle();
       if (error) {
-        console.error('AOI fetch error:', error);
+        console.error('PlotMap: AOI fetch error:', error);
         throw error;
       }
-      console.log('AOI found:', data);
+      console.log('PlotMap: AOI found:', data);
       return data;
     },
-    enabled: !!plotId
+    enabled: !!plotId,
+    staleTime: 1 * 60 * 1000, // Cache for 1 minute - force fresh data
+    gcTime: 2 * 60 * 1000, // Keep in cache for 2 minutes (gcTime is the new name for cacheTime)
   });
 
-  // Fetch latest satellite data - use demo data for now
+  // Fetch latest satellite data - unified cache key
   const { data: satelliteData } = useQuery({
-    queryKey: ['cecil-satellite-data-map', aoi?.id],
+    queryKey: ['cecil-satellite-data', aoi?.id], // Unified cache key
     queryFn: async () => {
-      // For now, return empty array since we're using synthetic data
-      return [];
+      if (!aoi?.id) return null;
+      
+      console.log('PlotMap: Fetching satellite data for AOI:', aoi.id);
+      const { data, error } = await supabase
+        .from('cecil_satellite_data')
+        .select('*')
+        .eq('cecil_aoi_id', aoi.id)
+        .order('measurement_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('PlotMap: Satellite data fetch error:', error);
+        return null; // Don't throw, just return null
+      }
+      
+      console.log('PlotMap: Satellite data found:', data);
+      return data;
     },
-    enabled: !!aoi?.id
+    enabled: !!aoi?.id,
+    staleTime: 1 * 60 * 1000, // Fresh data every minute
   });
 
   useEffect(() => {
@@ -144,7 +163,10 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
 
       // Add Cecil data layers - always add if we have AOI
       if (aoi?.geometry) {
-        addCecilDataLayers(map.current!, []);
+        console.log('PlotMap: Adding Cecil data layers for AOI geometry');
+        addCecilDataLayers(map.current!, satelliteData ? [satelliteData] : []);
+      } else {
+        console.log('PlotMap: No AOI geometry available for Cecil layers');
       }
     });
 
@@ -227,13 +249,19 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
 
   // Function to add Cecil data layers
   const addCecilDataLayers = (mapInstance: mapboxgl.Map, data: any[]) => {
-    mapInstance.on('load', () => {
-      // Generate synthetic data grid covering the polygon area - always generate for demo
+    // Don't wait for load if map is already loaded
+    const addLayers = () => {
+      // Generate data grid covering the actual polygon area
       const polygonData = generatePolygonGrid(aoi?.geometry);
-      console.log('Generated polygon data points:', polygonData.length);
+      console.log('PlotMap: Generated polygon data points:', polygonData.length);
       
-      // NDVI Layer - Always create if we have polygon data
-      if (polygonData.length > 0) {
+      if (polygonData.length === 0) {
+        console.log('PlotMap: No polygon data generated, skipping Cecil layers');
+        return;
+      }
+      
+      // NDVI Layer
+      console.log('PlotMap: Creating NDVI layer with', polygonData.length, 'points');
         const ndviFeatures = polygonData.map(point => ({
           type: 'Feature' as const,
           geometry: {
@@ -276,10 +304,9 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
             'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 5, 15, 30]
           }
         });
-      }
 
-      // Biomass Layer - Always create if we have polygon data
-      if (polygonData.length > 0) {
+      // Biomass Layer
+      console.log('PlotMap: Creating Biomass layer');
         const biomassFeatures = polygonData.map(point => ({
           type: 'Feature' as const,
           geometry: {
@@ -322,10 +349,9 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
             'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 5, 15, 30]
           }
         });
-      }
 
-      // Carbon Capture Layer - Always create if we have polygon data
-      if (polygonData.length > 0) {
+      // Carbon Capture Layer
+      console.log('PlotMap: Creating Carbon layer');
         const carbonFeatures = polygonData.map(point => ({
           type: 'Feature' as const,
           geometry: {
@@ -368,19 +394,34 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
             'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 5, 15, 30]
           }
         });
-      }
-    });
+    };
+    
+    // Add layers immediately if map is loaded, otherwise wait for load event
+    if (mapInstance.isStyleLoaded()) {
+      addLayers();
+    } else {
+      mapInstance.on('load', addLayers);
+    }
   };
 
   // Function to generate a grid of points within the polygon
   const generatePolygonGrid = (geometry: any) => {
-    if (!geometry || !geometry.coordinates) return [];
+    console.log('PlotMap: Generating polygon grid with geometry:', geometry);
     
-    // Try to use actual geometry coordinates first, fall back to La Sierra if needed
+    if (!geometry || !geometry.coordinates) {
+      console.log('PlotMap: No geometry coordinates found');
+      return [];
+    }
+    
+    // Use actual geometry coordinates - this should be the real AOI polygon
     let polygonCoords = geometry?.coordinates?.[0];
     
-    // If no valid coordinates in geometry, use La Sierra as fallback
+    // Debug log the coordinates
+    console.log('PlotMap: Using polygon coordinates:', polygonCoords);
+    
+    // Only use fallback if absolutely no coordinates
     if (!polygonCoords || polygonCoords.length < 3) {
+      console.log('PlotMap: Invalid coordinates, using La Sierra fallback');
       polygonCoords = [
         [-99.13166666666666, 21.734166666666667],
         [-99.13111111111111, 21.734722222222224],
