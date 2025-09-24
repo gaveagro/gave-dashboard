@@ -63,8 +63,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
       return data;
     },
     enabled: !!plotId,
-    staleTime: 0, // Always fetch fresh data - unified with CecilSatelliteMonitor
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes - unified with CecilSatelliteMonitor
+    staleTime: 30 * 1000, // Cache for 30 seconds to avoid excessive queries
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
   // Fetch latest satellite data - unified cache key
@@ -91,8 +91,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
       return data;
     },
     enabled: !!aoi?.id,
-    staleTime: 0, // Always fetch fresh data - unified with CecilSatelliteMonitor
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes - unified with CecilSatelliteMonitor
+    staleTime: 30 * 1000, // Cache for 30 seconds to avoid excessive queries
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
   useEffect(() => {
@@ -557,7 +557,7 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
           <Card className="p-2 bg-background/95 backdrop-blur-sm border-muted">
             <div className="flex items-center gap-2 mb-2">
               <Layers className="h-4 w-4" />
-              <span className="text-xs font-medium hidden sm:inline">Capas Cecil</span>
+              <span className="text-xs font-medium hidden sm:inline">Capas de monitoreo satelital</span>
               <span className="text-xs font-medium sm:hidden">Cecil</span>
               <Button
                 variant="ghost"

@@ -45,7 +45,7 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
       return data;
     },
     retry: 1,
-    staleTime: 0, // Always fetch fresh data
+    staleTime: 30 * 1000, // Cache for 30 seconds to avoid excessive queries
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
@@ -71,29 +71,13 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
       
       console.log('CecilSatelliteMonitor: Satellite data found:', data);
       
-      // If no real data, use demo data for visualization
-      if (!data && aoi?.id) {
-        console.log('CecilSatelliteMonitor: No satellite data found, using demo data with real La Sierra values');
-        return {
-          id: 'demo-data',
-          cecil_aoi_id: aoi.id,
-          measurement_date: new Date().toISOString().split('T')[0],
-          year: new Date().getFullYear(),
-          month: new Date().getMonth() + 1,
-          week: Math.ceil(new Date().getDate() / 7),
-          ndvi: 0.312,
-          evi: 0.219,
-          savi: 0.248,
-          ndwi: 0.156,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-      }
+      // Return real data only - no demo data fallback
+      console.log('CecilSatelliteMonitor: Real satellite data result:', data);
       
       return data;
     },
     enabled: !!aoi?.id,
-    staleTime: 0, // Always fetch fresh data
+    staleTime: 30 * 1000, // Cache for 30 seconds to avoid excessive queries
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
@@ -237,9 +221,9 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
             <CardTitle className="flex items-center gap-2">
               <Satellite className="h-5 w-5 text-primary" />
               Monitoreo Satelital
-              {latestSatelliteData?.id === 'demo-data' && (
+              {!latestSatelliteData && (
                 <Badge variant="secondary" className="ml-2 text-xs">
-                  Demo
+                  Sin datos
                 </Badge>
               )}
             </CardTitle>
