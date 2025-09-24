@@ -83,12 +83,32 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
     // Set Mapbox access token
     mapboxgl.accessToken = mapboxToken;
 
+    // Calculate center point - use polygon center if available, otherwise lat/lng
+    let center: [number, number] = [longitude, latitude];
+    let bounds: mapboxgl.LngLatBoundsLike | undefined;
+
+    if (aoi?.geometry && typeof aoi.geometry === 'object' && 'coordinates' in aoi.geometry) {
+      // Calculate bounds from polygon coordinates
+      const coordinates = (aoi.geometry as any).coordinates[0]; // First ring of polygon
+      const lngs = coordinates.map((coord: number[]) => coord[0]);
+      const lats = coordinates.map((coord: number[]) => coord[1]);
+      
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      
+      bounds = [[minLng, minLat], [maxLng, maxLat]];
+      center = [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+    }
+
     // Initialize map
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: [longitude, latitude],
-      zoom: 16,
+      center: center,
+      zoom: bounds ? undefined : 16,
+      bounds: bounds,
       pitch: 45,
     });
 
@@ -100,28 +120,35 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
       'top-right'
     );
 
-    // Add a marker for the plot location
-    new mapboxgl.Marker({
-      color: '#10b981',
-      scale: 1.2,
-    })
-      .setLngLat([longitude, latitude])
-      .setPopup(
-        new mapboxgl.Popup().setHTML(`
-          <div class="p-2">
-            <h3 class="font-semibold text-sm">${name}</h3>
-            <p class="text-xs text-gray-600">
-              ${latitude.toFixed(4)}°, ${longitude.toFixed(4)}°
-            </p>
-          </div>
-        `)
-      )
-      .addTo(map.current);
+    map.current.on('load', () => {
+      // Add plot polygon if available
+      if (aoi?.geometry && typeof aoi.geometry === 'object') {
+        addPlotPolygon(map.current!, aoi.geometry, name);
+      } else {
+        // Fallback to point marker
+        new mapboxgl.Marker({
+          color: '#10b981',
+          scale: 1.2,
+        })
+          .setLngLat([longitude, latitude])
+          .setPopup(
+            new mapboxgl.Popup().setHTML(`
+              <div class="p-2">
+                <h3 class="font-semibold text-sm">${name}</h3>
+                <p class="text-xs text-gray-600">
+                  ${latitude.toFixed(4)}°, ${longitude.toFixed(4)}°
+                </p>
+              </div>
+            `)
+          )
+          .addTo(map.current!);
+      }
 
-    // Add Cecil data layers if available
-    if (satelliteData && satelliteData.length > 0) {
-      addCecilDataLayers(map.current, satelliteData);
-    }
+      // Add Cecil data layers if available
+      if (satelliteData && satelliteData.length > 0) {
+        addCecilDataLayers(map.current!, satelliteData);
+      }
+    });
 
     // Cleanup function
     return () => {
@@ -130,7 +157,75 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
         map.current = null;
       }
     };
-  }, [latitude, longitude, name, mapboxToken, satelliteData]);
+  }, [latitude, longitude, name, mapboxToken, satelliteData, aoi]);
+
+  // Function to add plot polygon
+  const addPlotPolygon = (mapInstance: mapboxgl.Map, geometry: any, plotName: string) => {
+    // Add polygon source
+    mapInstance.addSource('plot-polygon', {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        geometry: geometry,
+        properties: {
+          name: plotName
+        }
+      }
+    });
+
+    // Add polygon fill
+    mapInstance.addLayer({
+      id: 'plot-fill',
+      type: 'fill',
+      source: 'plot-polygon',
+      paint: {
+        'fill-color': '#10b981',
+        'fill-opacity': 0.2
+      }
+    });
+
+    // Add polygon outline
+    mapInstance.addLayer({
+      id: 'plot-outline',
+      type: 'line',
+      source: 'plot-polygon',
+      paint: {
+        'line-color': '#10b981',
+        'line-width': 3,
+        'line-opacity': 0.8
+      }
+    });
+
+    // Add label at polygon center
+    const coordinates = geometry.coordinates[0];
+    const centerLng = coordinates.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coordinates.length;
+    const centerLat = coordinates.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coordinates.length;
+
+    new mapboxgl.Marker({
+      element: createCustomLabel(plotName),
+    })
+      .setLngLat([centerLng, centerLat])
+      .addTo(mapInstance);
+  };
+
+  // Function to create custom label
+  const createCustomLabel = (text: string) => {
+    const el = document.createElement('div');
+    el.className = 'custom-marker';
+    el.style.cssText = `
+      background: rgba(16, 185, 129, 0.9);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      border: 2px solid white;
+    `;
+    el.textContent = text;
+    return el;
+  };
 
   // Function to add Cecil data layers
   const addCecilDataLayers = (mapInstance: mapboxgl.Map, data: any[]) => {
