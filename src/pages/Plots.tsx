@@ -14,6 +14,7 @@ import { MapPin, ExternalLink, Camera, Thermometer, Droplets, Mountain, Upload, 
 import { useToast } from '@/hooks/use-toast';
 import PhotoModal from '@/components/PhotoModal';
 import CecilSatelliteMonitor from '@/components/cecil/CecilSatelliteMonitor';
+import PlotMap from '@/components/PlotMap';
 
 const Plots = () => {
   const { profile } = useAuth();
@@ -381,6 +382,21 @@ const Plots = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Mapa de ubicación */}
+                {plot.latitude && plot.longitude && (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Ubicación de la parcela</span>
+                    </div>
+                    <PlotMap
+                      latitude={plot.latitude}
+                      longitude={plot.longitude}
+                      name={plot.name}
+                    />
+                  </div>
+                )}
 
                 {/* Cecil Satellite Monitoring */}
                 <div className="pt-4">
