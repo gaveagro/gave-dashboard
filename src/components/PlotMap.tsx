@@ -54,8 +54,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
         .from('cecil_aois')
         .select('*')
         .eq('plot_id', plotId)
-        .single();
-      if (error && error.code !== 'PGRST116') {
+        .maybeSingle();
+      if (error) {
         console.error('AOI fetch error:', error);
         throw error;
       }
@@ -376,18 +376,23 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
   const generatePolygonGrid = (geometry: any) => {
     if (!geometry || !geometry.coordinates) return [];
     
-    // Use La Sierra coordinates from user
-    const sierraCoords = [
-      [-99.13166666666666, 21.734166666666667],
-      [-99.13111111111111, 21.734722222222224],
-      [-99.12972222222221, 21.732499999999998],
-      [-99.12972222222221, 21.73222222222222],
-      [-99.13166666666666, 21.734166666666667]
-    ];
+    // Try to use actual geometry coordinates first, fall back to La Sierra if needed
+    let polygonCoords = geometry?.coordinates?.[0];
+    
+    // If no valid coordinates in geometry, use La Sierra as fallback
+    if (!polygonCoords || polygonCoords.length < 3) {
+      polygonCoords = [
+        [-99.13166666666666, 21.734166666666667],
+        [-99.13111111111111, 21.734722222222224],
+        [-99.12972222222221, 21.732499999999998],
+        [-99.12972222222221, 21.73222222222222],
+        [-99.13166666666666, 21.734166666666667]
+      ];
+    }
     
     // Find bounds
-    const lngs = sierraCoords.map(coord => coord[0]);
-    const lats = sierraCoords.map(coord => coord[1]);
+    const lngs = polygonCoords.map(coord => coord[0]);
+    const lats = polygonCoords.map(coord => coord[1]);
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
     const minLat = Math.min(...lats);
@@ -400,7 +405,7 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
     for (let lng = minLng; lng <= maxLng; lng += gridSize) {
       for (let lat = minLat; lat <= maxLat; lat += gridSize) {
         // Check if point is inside polygon using ray casting
-        if (isPointInPolygon([lng, lat], sierraCoords)) {
+        if (isPointInPolygon([lng, lat], polygonCoords)) {
           points.push({
             lng,
             lat,

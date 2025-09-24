@@ -43,7 +43,9 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
       }
       console.log('AOI found:', data);
       return data;
-    }
+    },
+    retry: 1,
+    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
   });
 
   // Get latest satellite data

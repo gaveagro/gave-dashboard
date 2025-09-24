@@ -176,7 +176,7 @@ const Admin = () => {
     }
   });
 
-  const { data: plots } = useQuery({
+  const { data: plots, isLoading: plotsLoading } = useQuery({
     queryKey: ['plots-admin'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -186,7 +186,8 @@ const Admin = () => {
       
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const { data: species } = useQuery({
