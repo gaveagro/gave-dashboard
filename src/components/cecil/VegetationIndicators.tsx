@@ -117,9 +117,16 @@ const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
       <CardHeader>
         <CardTitle className="text-sm">Indicadores de Vegetación</CardTitle>
         {latestData.measurement_date && (
-          <p className="text-xs text-muted-foreground">
-            Última actualización: {new Date(latestData.measurement_date).toLocaleDateString('es-ES')}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Última actualización: {new Date(latestData.measurement_date).toLocaleDateString('es-ES')}
+            </p>
+            {latestData.id === 'demo-data' && (
+              <Badge variant="secondary" className="text-xs">
+                Datos de Demostración
+              </Badge>
+            )}
+          </div>
         )}
       </CardHeader>
       <CardContent>

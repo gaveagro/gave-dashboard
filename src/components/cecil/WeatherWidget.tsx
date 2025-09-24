@@ -23,6 +23,7 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ aoiId }) => {
   const { data: currentWeather } = useQuery({
     queryKey: ['cecil-current-weather', aoiId],
     queryFn: async () => {
+      console.log('Fetching weather data for AOI:', aoiId);
       const { data, error } = await supabase
         .from('cecil_weather_data')
         .select('*')
@@ -33,6 +34,28 @@ const WeatherWidget: React.FC<WeatherWidgetProps> = ({ aoiId }) => {
         .maybeSingle();
       
       if (error) throw error;
+      
+      console.log('Weather data found:', data);
+      
+      // If no real data, use demo weather data
+      if (!data && aoiId) {
+        console.log('No weather data found, using demo data');
+        return {
+          id: 'demo-weather',
+          cecil_aoi_id: aoiId,
+          measurement_timestamp: new Date().toISOString(),
+          temperature_celsius: 24,
+          humidity_percent: 65,
+          precipitation_mm: 0,
+          wind_speed_kmh: 12,
+          soil_temperature_celsius: 22,
+          soil_moisture_percent: 45,
+          forecast_hours: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+      
       return data;
     },
     enabled: !!aoiId

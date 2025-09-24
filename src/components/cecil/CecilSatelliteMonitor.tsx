@@ -27,26 +27,32 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
   const queryClient = useQueryClient();
 
   // Check if AOI exists for this plot
-  const { data: aoi, isLoading: aoiLoading } = useQuery({
+  const { data: aoi, isLoading: aoiLoading, refetch: refetchAoi } = useQuery({
     queryKey: ['cecil-aoi', plotId],
     queryFn: async () => {
+      console.log('Fetching AOI for plot:', plotId);
       const { data, error } = await supabase
         .from('cecil_aois')
         .select('*')
         .eq('plot_id', plotId)
         .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        console.error('AOI fetch error:', error);
+        throw error;
+      }
+      console.log('AOI found:', data);
       return data;
     }
   });
 
   // Get latest satellite data
-  const { data: latestSatelliteData } = useQuery({
+  const { data: latestSatelliteData, refetch: refetchSatelliteData } = useQuery({
     queryKey: ['cecil-satellite-data', aoi?.id],
     queryFn: async () => {
       if (!aoi?.id) return null;
       
+      console.log('Fetching satellite data for AOI:', aoi.id);
       const { data, error } = await supabase
         .from('cecil_satellite_data')
         .select('*')
@@ -55,7 +61,32 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
         .limit(1)
         .maybeSingle();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Satellite data fetch error:', error);
+        throw error;
+      }
+      
+      console.log('Satellite data found:', data);
+      
+      // If no real data, use demo data for visualization
+      if (!data && aoi?.id) {
+        console.log('No satellite data found, using demo data');
+        return {
+          id: 'demo-data',
+          cecil_aoi_id: aoi.id,
+          measurement_date: new Date().toISOString().split('T')[0],
+          year: new Date().getFullYear(),
+          month: new Date().getMonth() + 1,
+          week: Math.ceil(new Date().getDate() / 7),
+          ndvi: 0.65,
+          evi: 0.58,
+          savi: 0.62,
+          ndwi: 0.45,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+      
       return data;
     },
     enabled: !!aoi?.id
@@ -171,6 +202,13 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
     );
   }
 
+  const handleRefresh = async () => {
+    console.log('Refreshing Cecil data...');
+    await Promise.all([refetchAoi(), refetchSatelliteData()]);
+    queryClient.invalidateQueries({ queryKey: ['cecil-satellite-data'] });
+    queryClient.invalidateQueries({ queryKey: ['cecil-aoi'] });
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -179,11 +217,21 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
             <CardTitle className="flex items-center gap-2">
               <Satellite className="h-5 w-5 text-primary" />
               Monitoreo Satelital
+              {latestSatelliteData?.id === 'demo-data' && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  Demo
+                </Badge>
+              )}
             </CardTitle>
-            <Badge variant="outline" className="text-green-600 border-green-600">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              Conectado
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-green-600 border-green-600">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                Conectado
+              </Badge>
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                Actualizar
+              </Button>
+            </div>
           </div>
         </CardHeader>
       </Card>
