@@ -394,6 +394,7 @@ const Plots = () => {
                       latitude={plot.latitude}
                       longitude={plot.longitude}
                       name={plot.name}
+                      plotId={plot.id}
                     />
                   </div>
                 )}
