@@ -63,8 +63,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
       return data;
     },
     enabled: !!plotId,
-    staleTime: 1 * 60 * 1000, // Cache for 1 minute - force fresh data
-    gcTime: 2 * 60 * 1000, // Keep in cache for 2 minutes (gcTime is the new name for cacheTime)
+    staleTime: 0, // Always fetch fresh data - unified with CecilSatelliteMonitor
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes - unified with CecilSatelliteMonitor
   });
 
   // Fetch latest satellite data - unified cache key
@@ -91,7 +91,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
       return data;
     },
     enabled: !!aoi?.id,
-    staleTime: 1 * 60 * 1000, // Fresh data every minute
+    staleTime: 0, // Always fetch fresh data - unified with CecilSatelliteMonitor
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes - unified with CecilSatelliteMonitor
   });
 
   useEffect(() => {
@@ -161,12 +162,12 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
           .addTo(map.current!);
       }
 
-      // Add Cecil data layers - always add if we have AOI
-      if (aoi?.geometry) {
-        console.log('PlotMap: Adding Cecil data layers for AOI geometry');
+      // Add Cecil data layers - always add if we have plotId (La Sierra has known geometry)
+      if (plotId) {
+        console.log('PlotMap: Adding Cecil data layers for plot:', plotId);
         addCecilDataLayers(map.current!, satelliteData ? [satelliteData] : []);
       } else {
-        console.log('PlotMap: No AOI geometry available for Cecil layers');
+        console.log('PlotMap: No plotId available for Cecil layers');
       }
     });
 
@@ -550,14 +551,14 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
         className="w-full h-64 md:h-80 lg:h-96 rounded-lg overflow-hidden border border-muted" 
       />
       
-      {/* Layer Controls - positioned at bottom left to avoid zoom controls */}
-      {aoi && (
+      {/* Layer Controls - Always show if we have plotId (Cecil connection exists) */}
+      {plotId && (
         <div className="absolute bottom-4 left-4 z-10 max-w-[200px]">
           <Card className="p-2 bg-background/95 backdrop-blur-sm border-muted">
             <div className="flex items-center gap-2 mb-2">
               <Layers className="h-4 w-4" />
-              <span className="text-xs font-medium hidden sm:inline">Capas de Indicadores de Vegetación</span>
-              <span className="text-xs font-medium sm:hidden">Capas</span>
+              <span className="text-xs font-medium hidden sm:inline">Capas Cecil</span>
+              <span className="text-xs font-medium sm:hidden">Cecil</span>
               <Button
                 variant="ghost"
                 size="sm"

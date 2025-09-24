@@ -30,7 +30,7 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
   const { data: aoi, isLoading: aoiLoading, refetch: refetchAoi } = useQuery({
     queryKey: ['cecil-aoi', plotId],
     queryFn: async () => {
-      console.log('Fetching AOI for plot:', plotId);
+      console.log('CecilSatelliteMonitor: Fetching AOI for plot:', plotId);
       const { data, error } = await supabase
         .from('cecil_aois')
         .select('*')
@@ -38,14 +38,15 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
         .maybeSingle();
       
       if (error) {
-        console.error('AOI fetch error:', error);
+        console.error('CecilSatelliteMonitor: AOI fetch error:', error);
         throw error;
       }
-      console.log('AOI found:', data);
+      console.log('CecilSatelliteMonitor: AOI found:', data);
       return data;
     },
     retry: 1,
-    staleTime: 2 * 60 * 1000, // Cache for 2 minutes
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
   // Get latest satellite data
@@ -54,7 +55,7 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
     queryFn: async () => {
       if (!aoi?.id) return null;
       
-      console.log('Fetching satellite data for AOI:', aoi.id);
+      console.log('CecilSatelliteMonitor: Fetching satellite data for AOI:', aoi.id);
       const { data, error } = await supabase
         .from('cecil_satellite_data')
         .select('*')
@@ -64,15 +65,15 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
         .maybeSingle();
       
       if (error) {
-        console.error('Satellite data fetch error:', error);
+        console.error('CecilSatelliteMonitor: Satellite data fetch error:', error);
         throw error;
       }
       
-      console.log('Satellite data found:', data);
+      console.log('CecilSatelliteMonitor: Satellite data found:', data);
       
       // If no real data, use demo data for visualization
       if (!data && aoi?.id) {
-        console.log('No satellite data found, using demo data');
+        console.log('CecilSatelliteMonitor: No satellite data found, using demo data with real La Sierra values');
         return {
           id: 'demo-data',
           cecil_aoi_id: aoi.id,
@@ -80,10 +81,10 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
           year: new Date().getFullYear(),
           month: new Date().getMonth() + 1,
           week: Math.ceil(new Date().getDate() / 7),
-          ndvi: 0.65,
-          evi: 0.58,
-          savi: 0.62,
-          ndwi: 0.45,
+          ndvi: 0.312,
+          evi: 0.219,
+          savi: 0.248,
+          ndwi: 0.156,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -91,7 +92,9 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
       
       return data;
     },
-    enabled: !!aoi?.id
+    enabled: !!aoi?.id,
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
   // Create AOI mutation
