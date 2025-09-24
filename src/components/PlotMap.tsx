@@ -49,12 +49,17 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
     queryKey: ['cecil-aoi', plotId],
     queryFn: async () => {
       if (!plotId) return null;
+      console.log('Fetching AOI for plot:', plotId);
       const { data, error } = await supabase
         .from('cecil_aois')
         .select('*')
         .eq('plot_id', plotId)
         .maybeSingle();
-      if (error) throw error;
+      if (error) {
+        console.error('AOI fetch error:', error);
+        throw error;
+      }
+      console.log('AOI found:', data);
       return data;
     },
     enabled: !!plotId
@@ -64,7 +69,7 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
   const { data: satelliteData } = useQuery({
     queryKey: ['cecil-satellite-data-map', aoi?.id],
     queryFn: async () => {
-      if (!aoi?.id) return null;
+      if (!aoi?.id) return [];
       const { data, error } = await supabase
         .from('cecil_satellite_data')
         .select('*')
@@ -72,7 +77,7 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
         .order('measurement_date', { ascending: false })
         .limit(50); // Get recent data points for heatmap
       if (error) throw error;
-      return data;
+      return data || [];
     },
     enabled: !!aoi?.id
   });
@@ -230,11 +235,12 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
   // Function to add Cecil data layers
   const addCecilDataLayers = (mapInstance: mapboxgl.Map, data: any[]) => {
     mapInstance.on('load', () => {
-      // Generate synthetic data grid covering the polygon area
+      // Generate synthetic data grid covering the polygon area - always generate for demo
       const polygonData = generatePolygonGrid(aoi?.geometry);
+      console.log('Generated polygon data points:', polygonData.length);
       
-      // NDVI Layer
-      if (data.some(d => d.ndvi !== null) || polygonData.length > 0) {
+      // NDVI Layer - Always create if we have polygon data
+      if (polygonData.length > 0) {
         const ndviFeatures = polygonData.map(point => ({
           type: 'Feature' as const,
           geometry: {
@@ -279,8 +285,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
         });
       }
 
-      // Biomass Layer
-      if (data.some(d => d.biomass !== null) || polygonData.length > 0) {
+      // Biomass Layer - Always create if we have polygon data
+      if (polygonData.length > 0) {
         const biomassFeatures = polygonData.map(point => ({
           type: 'Feature' as const,
           geometry: {
@@ -325,8 +331,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
         });
       }
 
-      // Carbon Capture Layer
-      if (data.some(d => d.carbon_capture !== null) || polygonData.length > 0) {
+      // Carbon Capture Layer - Always create if we have polygon data
+      if (polygonData.length > 0) {
         const carbonFeatures = polygonData.map(point => ({
           type: 'Feature' as const,
           geometry: {
@@ -502,7 +508,7 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
       <div ref={mapContainer} className="w-full h-64 rounded-lg overflow-hidden" />
       
       {/* Layer Controls - positioned at bottom left to avoid zoom controls */}
-      {satelliteData && satelliteData.length > 0 && (
+      {aoi && (
         <div className="absolute bottom-4 left-4 z-10">
           <Card className="p-2">
             <div className="flex items-center gap-2 mb-2">
