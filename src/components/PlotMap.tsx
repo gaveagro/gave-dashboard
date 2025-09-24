@@ -45,8 +45,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
   }, []);
 
   // Fetch Cecil AOI and satellite data for this plot
-  const { data: aoi } = useQuery({
-    queryKey: ['cecil-aoi', plotId],
+  const { data: aoi, isLoading: aoiLoading } = useQuery({
+    queryKey: ['cecil-aoi-map', plotId],
     queryFn: async () => {
       if (!plotId) return null;
       console.log('Fetching AOI for plot:', plotId);
@@ -54,8 +54,8 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
         .from('cecil_aois')
         .select('*')
         .eq('plot_id', plotId)
-        .maybeSingle();
-      if (error) {
+        .single();
+      if (error && error.code !== 'PGRST116') {
         console.error('AOI fetch error:', error);
         throw error;
       }
@@ -65,19 +65,12 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
     enabled: !!plotId
   });
 
-  // Fetch latest satellite data
+  // Fetch latest satellite data - use demo data for now
   const { data: satelliteData } = useQuery({
     queryKey: ['cecil-satellite-data-map', aoi?.id],
     queryFn: async () => {
-      if (!aoi?.id) return [];
-      const { data, error } = await supabase
-        .from('cecil_satellite_data')
-        .select('*')
-        .eq('cecil_aoi_id', aoi.id)
-        .order('measurement_date', { ascending: false })
-        .limit(50); // Get recent data points for heatmap
-      if (error) throw error;
-      return data || [];
+      // For now, return empty array since we're using synthetic data
+      return [];
     },
     enabled: !!aoi?.id
   });
@@ -149,9 +142,9 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
           .addTo(map.current!);
       }
 
-      // Add Cecil data layers if available
-      if (satelliteData && satelliteData.length > 0) {
-        addCecilDataLayers(map.current!, satelliteData);
+      // Add Cecil data layers - always add if we have AOI
+      if (aoi?.geometry) {
+        addCecilDataLayers(map.current!, []);
       }
     });
 
@@ -504,16 +497,21 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
   }
 
   return (
-    <div className="relative">
-      <div ref={mapContainer} className="w-full h-64 rounded-lg overflow-hidden" />
+    <div className="relative w-full">
+      {/* Map container with responsive height */}
+      <div 
+        ref={mapContainer} 
+        className="w-full h-64 md:h-80 lg:h-96 rounded-lg overflow-hidden border border-muted" 
+      />
       
       {/* Layer Controls - positioned at bottom left to avoid zoom controls */}
       {aoi && (
-        <div className="absolute bottom-4 left-4 z-10">
-          <Card className="p-2">
+        <div className="absolute bottom-4 left-4 z-10 max-w-[200px]">
+          <Card className="p-2 bg-background/95 backdrop-blur-sm border-muted">
             <div className="flex items-center gap-2 mb-2">
               <Layers className="h-4 w-4" />
-              <span className="text-xs font-medium">Capas de Indicadores de Vegetación</span>
+              <span className="text-xs font-medium hidden sm:inline">Capas de Indicadores de Vegetación</span>
+              <span className="text-xs font-medium sm:hidden">Capas</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -547,6 +545,15 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
               </div>
             )}
           </Card>
+        </div>
+      )}
+      
+      {/* Loading indicator */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center rounded-lg">
+          <div className="text-center p-4">
+            <div className="text-sm text-muted-foreground">Cargando mapa...</div>
+          </div>
         </div>
       )}
     </div>

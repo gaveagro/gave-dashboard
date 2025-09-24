@@ -281,15 +281,16 @@ const Plots = () => {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Parcelas</h1>
-        <p className="text-muted-foreground">
+    <div className="container mx-auto py-4 md:py-6 px-4 space-y-6">
+      <div className="space-y-2">
+        <h1 className="text-2xl md:text-3xl font-bold">Parcelas</h1>
+        <p className="text-muted-foreground text-sm md:text-base">
           Información detallada sobre nuestras parcelas de cultivo
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      {/* Single column layout for better mobile experience and map prominence */}
+      <div className="grid grid-cols-1 gap-4 md:gap-6">
         {plots?.map((plot) => {
           const recentPhotos = plotPhotos?.filter(photo => photo.plot_id === plot.id) || [];
           const plotProgress = getPlotProgress(plot.id);
@@ -383,24 +384,26 @@ const Plots = () => {
                   )}
                 </div>
 
-                {/* Mapa de ubicación */}
+                {/* Mapa de ubicación - Increased prominence */}
                 {plot.latitude && plot.longitude && (
                   <div className="pt-4 border-t">
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-4">
                       <MapPin className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">Ubicación de la parcela</span>
                     </div>
-                    <PlotMap
-                      latitude={plot.latitude}
-                      longitude={plot.longitude}
-                      name={plot.name}
-                      plotId={plot.id}
-                    />
+                    <div className="mb-4">
+                      <PlotMap
+                        latitude={plot.latitude}
+                        longitude={plot.longitude}
+                        name={plot.name}
+                        plotId={plot.id}
+                      />
+                    </div>
                   </div>
                 )}
 
-                {/* Cecil Satellite Monitoring */}
-                <div className="pt-4">
+                {/* Cecil Satellite Monitoring - Moved after map */}
+                <div className="pt-4 border-t">
                   <CecilSatelliteMonitor
                     plotId={plot.id}
                     plotName={plot.name}
@@ -432,8 +435,9 @@ const Plots = () => {
                       <Camera className="h-4 w-4" />
                       <span className="text-sm font-medium">{t('plots.recentPhotos')}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {recentPhotos.slice(0, 6).map((photo) => (
+                    {/* Mobile: 2 columns, Desktop: 4 columns for more compact layout */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {recentPhotos.slice(0, 4).map((photo) => (
                         <div key={photo.id} className="relative aspect-square group">
                           <img
                             src={photo.photo_url}
