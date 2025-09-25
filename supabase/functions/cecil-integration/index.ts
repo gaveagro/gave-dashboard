@@ -72,7 +72,7 @@ serve(async (req) => {
       // Create geometry from plot coordinates
       let geometry;
       
-      // Special handling for La Sierra plot with specific coordinates
+      // Special handling for specific plots with defined coordinates
       if (plot.name === 'La Sierra') {
         // Use the specific polygon coordinates provided by the user
         geometry = {
@@ -83,6 +83,18 @@ serve(async (req) => {
             [-99.12972222222221, 21.732499999999998],
             [-99.12972222222221, 21.73222222222222],
             [-99.13166666666666, 21.734166666666667] // Close the polygon
+          ]]
+        };
+      } else if (plot.name === 'Aurelio Manrique') {
+        // Use the specific polygon coordinates for Aurelio Manrique
+        geometry = {
+          type: "Polygon",
+          coordinates: [[
+            [-98.65944444444445, 22.30638888888889],
+            [-98.65777777777778, 22.307222222222222], 
+            [-98.65777777777778, 22.305555555555557],
+            [-98.66111111111111, 22.305555555555557],
+            [-98.65944444444445, 22.30638888888889] // Close the polygon
           ]]
         };
       } else {
