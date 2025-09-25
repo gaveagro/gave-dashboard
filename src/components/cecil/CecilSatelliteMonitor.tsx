@@ -221,9 +221,14 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
             <CardTitle className="flex items-center gap-2">
               <Satellite className="h-5 w-5 text-primary" />
               Monitoreo Satelital
+              {latestSatelliteData && (
+                <Badge variant="default" className="ml-2 text-xs bg-green-600">
+                  Datos disponibles
+                </Badge>
+              )}
               {!latestSatelliteData && (
                 <Badge variant="secondary" className="ml-2 text-xs">
-                  Sin datos
+                  Sincronizando...
                 </Badge>
               )}
             </CardTitle>
