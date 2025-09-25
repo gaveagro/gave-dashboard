@@ -21,9 +21,9 @@ serve(async (req) => {
 
     // Test multiple possible API base URLs for Cecil
     const possibleBaseUrls = [
+      'https://api.cecil.app',
       'https://api.cecil.earth',
-      'https://cecil.earth/api',
-      'https://api.cecil.app'
+      'https://cecil.earth/api'
     ];
 
     let testResponse = null;
