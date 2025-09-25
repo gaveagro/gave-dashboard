@@ -223,10 +223,10 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Satellite className="h-5 w-5 text-primary" />
-              Monitoreo Satelital
+              Monitoreo Satelital Avanzado
               {latestSatelliteData && (
                 <Badge variant="default" className="ml-2 text-xs bg-green-600">
-                  Datos disponibles
+                  Sistema Activo
                 </Badge>
               )}
               {!latestSatelliteData && (
@@ -238,13 +238,16 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-green-600 border-green-600">
                 <TrendingUp className="h-3 w-3 mr-1" />
-                Conectado
+                Datos en Tiempo Real
               </Badge>
               <Button variant="outline" size="sm" onClick={handleRefresh}>
                 Actualizar
               </Button>
             </div>
           </div>
+          <p className="text-sm text-muted-foreground">
+            Sistema integrado de monitoreo forestal, meteorológico y de alertas para {plotName}
+          </p>
         </CardHeader>
       </Card>
 
