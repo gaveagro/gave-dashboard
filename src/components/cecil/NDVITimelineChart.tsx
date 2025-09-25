@@ -7,13 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Calendar, TrendingUp } from 'lucide-react';
 
-interface NDVITimelineChartProps {
+interface ForestTimelineChartProps {
   aoiId: string;
 }
 
-const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
+const ForestTimelineChart: React.FC<ForestTimelineChartProps> = ({ aoiId }) => {
   const [timeRange, setTimeRange] = useState<string>('12'); // months
-  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['ndvi', 'evi']);
+  const [selectedMetrics, setSelectedMetrics] = useState<string[]>(['biomass', 'canopy_cover']);
 
   // Get historical satellite data (last 3 years)
   const { data: historicalData, isLoading } = useQuery({
@@ -54,10 +54,10 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
             year: date.getFullYear(),
             month: date.getMonth() + 1,
             week: Math.ceil(date.getDate() / 7),
-            ndvi: Math.min(0.95, (0.6 * seasonalFactor * randomVariation)),
-            evi: Math.min(0.9, (0.55 * seasonalFactor * randomVariation)),
-            savi: Math.min(0.85, (0.58 * seasonalFactor * randomVariation)),
-            ndwi: Math.min(0.8, (0.4 * seasonalFactor * randomVariation)),
+            biomass: Math.min(120, (80 * seasonalFactor * randomVariation)),
+            canopy_cover: Math.min(95, (75 * seasonalFactor * randomVariation)),
+            carbon_capture: Math.min(50, (35 * seasonalFactor * randomVariation)),
+            forest_change: (Math.random() - 0.5) * 2, // Can be positive or negative
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
@@ -72,18 +72,18 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
         
         if (existing) {
           // Average the values for the month
-          existing.ndvi = ((existing.ndvi || 0) + (item.ndvi || 0)) / 2;
-          existing.evi = ((existing.evi || 0) + (item.evi || 0)) / 2;
-          existing.savi = ((existing.savi || 0) + (item.savi || 0)) / 2;
-          existing.ndwi = ((existing.ndwi || 0) + (item.ndwi || 0)) / 2;
+          existing.biomass = ((existing.biomass || 0) + (item.biomass || 0)) / 2;
+          existing.canopy_cover = ((existing.canopy_cover || 0) + (item.canopy_cover || 0)) / 2;
+          existing.carbon_capture = ((existing.carbon_capture || 0) + (item.carbon_capture || 0)) / 2;
+          existing.forest_change = ((existing.forest_change || 0) + (item.forest_change || 0)) / 2;
           existing.count++;
         } else {
           acc.push({
             month: monthKey,
-            ndvi: item.ndvi,
-            evi: item.evi,
-            savi: item.savi,
-            ndwi: item.ndwi,
+            biomass: item.biomass,
+            canopy_cover: item.canopy_cover,
+            carbon_capture: item.carbon_capture,
+            forest_change: item.forest_change,
             measurement_date: item.measurement_date,
             count: 1
           });
@@ -104,10 +104,10 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
   });
 
   const metrics = [
-    { key: 'ndvi', name: 'NDVI', color: '#22c55e' },
-    { key: 'evi', name: 'EVI', color: '#3b82f6' },
-    { key: 'savi', name: 'SAVI', color: '#f59e0b' },
-    { key: 'ndwi', name: 'NDWI', color: '#06b6d4' }
+    { key: 'biomass', name: 'Biomasa', color: '#22c55e' },
+    { key: 'canopy_cover', name: 'Cobertura', color: '#3b82f6' },
+    { key: 'carbon_capture', name: 'Carbono', color: '#f59e0b' },
+    { key: 'forest_change', name: 'Cambio', color: '#ef4444' }
   ];
 
   const toggleMetric = (metricKey: string) => {
@@ -147,10 +147,10 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
             <div className="text-center">
               <Calendar className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">
-                No hay datos históricos disponibles aún.
+                No hay datos forestales históricos disponibles aún.
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Los datos se recopilan automáticamente cada semana.
+                Los datos de biomasa se recopilan automáticamente cada semana.
               </p>
             </div>
           </div>
@@ -165,7 +165,7 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-sm">
             <Calendar className="h-4 w-4" />
-            Línea de Tiempo - Índices de Vegetación
+            Línea de Tiempo - Indicadores Forestales
           </CardTitle>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-32">
@@ -212,7 +212,7 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
                 stroke="#64748b"
               />
               <YAxis 
-                domain={[-1, 1]}
+                domain={[0, 'dataMax']}
                 fontSize={10}
                 stroke="#64748b"
               />
@@ -224,7 +224,7 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
                   fontSize: '12px'
                 }}
                 formatter={(value: any, name: string) => [
-                  value?.toFixed(3) || 'N/A',
+                  value?.toFixed(1) || 'N/A',
                   metrics.find(m => m.key === name)?.name || name
                 ]}
               />
@@ -254,7 +254,7 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
         </div>
 
         <div className="mt-4 text-xs text-muted-foreground">
-          <p>💡 Los datos se agrupan por mes para mostrar tendencias más claras.</p>
+          <p>💡 Los datos forestales se agrupan por mes para mostrar tendencias más claras.</p>
           <p>Haz clic en las métricas para mostrar/ocultar las líneas del gráfico.</p>
         </div>
       </CardContent>
@@ -262,4 +262,4 @@ const NDVITimelineChart: React.FC<NDVITimelineChartProps> = ({ aoiId }) => {
   );
 };
 
-export default NDVITimelineChart;
+export default ForestTimelineChart;

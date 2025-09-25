@@ -128,10 +128,18 @@ serve(async (req) => {
       const availableDatasets: CecilDataset[] = await datasetsResponse.json();
       console.log('Available datasets:', availableDatasets.map(d => d.id));
 
-      // Use provided datasets or default to first 2 available
+      // Filter to use only free datasets, prioritizing forest biomass data
+      const forestDatasets = availableDatasets.filter(d => 
+        d.name?.toLowerCase().includes('hansen') || 
+        d.name?.toLowerCase().includes('forest') || 
+        d.name?.toLowerCase().includes('biomass')
+      );
+      
       const datasetsToUse = datasets && datasets.length > 0 
         ? datasets.filter((d: string) => availableDatasets.some(ad => ad.id === d))
-        : availableDatasets.slice(0, 2).map(d => d.id);
+        : forestDatasets.length > 0 
+          ? forestDatasets.slice(0, 2).map(d => d.id)
+          : availableDatasets.slice(0, 2).map(d => d.id);
 
       console.log('Datasets to use:', datasetsToUse);
 

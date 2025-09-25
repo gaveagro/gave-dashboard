@@ -3,14 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Minus, Leaf, Droplets, Eye, TreePine } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Trees, Shield, Leaf, BarChart3 } from 'lucide-react';
 
-interface VegetationIndicatorsProps {
+interface ForestIndicatorsProps {
   aoiId: string;
   latestData: any;
 }
 
-const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
+const ForestIndicators: React.FC<ForestIndicatorsProps> = ({
   aoiId,
   latestData
 }) => {
@@ -38,15 +38,15 @@ const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
     enabled: !!latestData?.measurement_date
   });
 
-  const getIndicatorColor = (value: number) => {
-    if (value >= 0.6) return 'text-green-600';
-    if (value >= 0.3) return 'text-yellow-600';
+  const getBiomassColor = (value: number) => {
+    if (value >= 80) return 'text-green-600';
+    if (value >= 50) return 'text-yellow-600';
     return 'text-red-600';
   };
 
-  const getIndicatorBadgeColor = (value: number) => {
-    if (value >= 0.6) return 'bg-green-100 text-green-800 border-green-200';
-    if (value >= 0.3) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+  const getBiomassBadgeColor = (value: number) => {
+    if (value >= 80) return 'bg-green-100 text-green-800 border-green-200';
+    if (value >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
@@ -57,43 +57,60 @@ const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
     return <Minus className="h-3 w-3 text-gray-400" />;
   };
 
-  const formatValue = (value: number | null) => {
+  const formatBiomassValue = (value: number | null) => {
     if (value === null || value === undefined) return 'N/A';
-    return value.toFixed(3);
+    return value.toFixed(1) + ' t/ha';
+  };
+
+  const formatCoverValue = (value: number | null) => {
+    if (value === null || value === undefined) return 'N/A';
+    return value.toFixed(1) + '%';
   };
 
   const indicators = [
     {
-      name: 'NDVI',
-      description: 'Índice de Vegetación',
-      value: latestData?.ndvi,
-      previous: previousData?.ndvi,
+      name: 'Biomasa Forestal',
+      description: 'Biomasa sobre el suelo',
+      value: latestData?.biomass,
+      previous: previousData?.biomass,
+      icon: Trees,
+      explanation: 'Cantidad de biomasa vegetal por hectárea',
+      formatter: formatBiomassValue,
+      colorFn: getBiomassColor,
+      badgeColorFn: getBiomassBadgeColor
+    },
+    {
+      name: 'Cobertura Forestal',
+      description: 'Porcentaje de cobertura',
+      value: latestData?.canopy_cover,
+      previous: previousData?.canopy_cover,
+      icon: Shield,
+      explanation: 'Porcentaje del área cubierta por dosel forestal',
+      formatter: formatCoverValue,
+      colorFn: getBiomassColor,
+      badgeColorFn: getBiomassBadgeColor
+    },
+    {
+      name: 'Carbono Capturado',
+      description: 'Captura de carbono',
+      value: latestData?.carbon_capture,
+      previous: previousData?.carbon_capture,
       icon: Leaf,
-      explanation: 'Mide la densidad y salud de la vegetación'
+      explanation: 'Cantidad de carbono capturado por la vegetación',
+      formatter: formatBiomassValue,
+      colorFn: getBiomassColor,
+      badgeColorFn: getBiomassBadgeColor
     },
     {
-      name: 'EVI',
-      description: 'Índice Mejorado de Vegetación',
-      value: latestData?.evi,
-      previous: previousData?.evi,
-      icon: TreePine,
-      explanation: 'Versión mejorada del NDVI, menos sensible a la atmósfera'
-    },
-    {
-      name: 'SAVI',
-      description: 'Índice Ajustado del Suelo',
-      value: latestData?.savi,
-      previous: previousData?.savi,
-      icon: Eye,
-      explanation: 'Corrige la influencia del suelo en zonas de poca vegetación'
-    },
-    {
-      name: 'NDWI',
-      description: 'Índice de Agua',
-      value: latestData?.ndwi,
-      previous: previousData?.ndwi,
-      icon: Droplets,
-      explanation: 'Mide el contenido de humedad en la vegetación'
+      name: 'Cambio Forestal',
+      description: 'Cambio en cobertura',
+      value: latestData?.forest_change,
+      previous: previousData?.forest_change,
+      icon: BarChart3,
+      explanation: 'Cambios en la cobertura forestal detectados',
+      formatter: formatCoverValue,
+      colorFn: getBiomassColor,
+      badgeColorFn: getBiomassBadgeColor
     }
   ];
 
@@ -101,11 +118,11 @@ const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Indicadores de Vegetación</CardTitle>
+          <CardTitle className="text-sm">Indicadores Forestales</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            No hay datos satelitales disponibles aún. Los datos se actualizan semanalmente.
+            No hay datos de biomasa forestal disponibles aún. Los datos se actualizan semanalmente.
           </p>
         </CardContent>
       </Card>
@@ -115,7 +132,7 @@ const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Indicadores de Vegetación</CardTitle>
+        <CardTitle className="text-sm">Indicadores Forestales</CardTitle>
         {latestData.measurement_date && (
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
@@ -144,9 +161,9 @@ const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
                 <div className="space-y-1">
                   <Badge 
                     variant="outline" 
-                    className={`${getIndicatorBadgeColor(indicator.value || 0)} text-xs`}
+                    className={`${indicator.badgeColorFn(indicator.value || 0)} text-xs`}
                   >
-                    {formatValue(indicator.value)}
+                    {indicator.formatter(indicator.value)}
                   </Badge>
                   <p className="text-xs text-muted-foreground">
                     {indicator.description}
@@ -159,9 +176,9 @@ const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
 
         <div className="mt-4 pt-4 border-t">
           <div className="text-xs text-muted-foreground space-y-1">
-            <p><span className="text-green-600">●</span> Excelente: ≥0.6</p>
-            <p><span className="text-yellow-600">●</span> Moderado: 0.3-0.6</p>
-            <p><span className="text-red-600">●</span> Bajo: &lt;0.3</p>
+            <p><span className="text-green-600">●</span> Alto: ≥80 t/ha biomasa</p>
+            <p><span className="text-yellow-600">●</span> Moderado: 50-80 t/ha</p>
+            <p><span className="text-red-600">●</span> Bajo: &lt;50 t/ha</p>
           </div>
         </div>
       </CardContent>
@@ -169,4 +186,4 @@ const VegetationIndicators: React.FC<VegetationIndicatorsProps> = ({
   );
 };
 
-export default VegetationIndicators;
+export default ForestIndicators;
