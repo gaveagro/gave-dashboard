@@ -1,12 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Thermometer, Droplets, Wind, Leaf, Zap, Eye } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Thermometer, Droplets, Leaf } from 'lucide-react';
 
 interface MonitoringMapProps {
   plots?: any[];
@@ -14,33 +10,13 @@ interface MonitoringMapProps {
 
 const MonitoringMap: React.FC<MonitoringMapProps> = ({ plots = [] }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const [mapboxToken, setMapboxToken] = useState<string>('');
   const [selectedLayer, setSelectedLayer] = useState<string>('temperature');
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Get Mapbox token from Supabase function
-  useEffect(() => {
-    const getMapboxToken = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-        if (error) throw error;
-        setMapboxToken(data.token);
-      } catch (error) {
-        console.error('Error getting Mapbox token:', error);
-        // For demo purposes, we'll proceed without a token
-        setMapboxToken('demo');
-      }
-    };
-
-    getMapboxToken();
-  }, []);
-
-  // Initialize map
+  // Initialize demo map visualization
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // Always show demo version for mockup purposes
+    // Show demo version for mockup purposes
     if (mapContainer.current) {
       mapContainer.current.innerHTML = `
         <div class="w-full h-full bg-gradient-to-br from-green-100 via-blue-50 to-green-50 rounded-lg relative overflow-hidden">
@@ -100,7 +76,6 @@ const MonitoringMap: React.FC<MonitoringMapProps> = ({ plots = [] }) => {
         </div>
       `;
     }
-    setIsLoading(false);
   }, []);
 
   // These functions are preserved for potential future real Mapbox integration
