@@ -567,18 +567,26 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
   const toggleLayer = (layerId: string) => {
     if (!map.current) return;
     
-    const visibility = map.current.getLayoutProperty(layerId, 'visibility');
+    // Get current visibility - default to 'none' if undefined
+    const visibility = map.current.getLayoutProperty(layerId, 'visibility') || 'none';
     const newVisibility = visibility === 'visible' ? 'none' : 'visible';
     
+    console.log(`Toggling layer ${layerId}: ${visibility} -> ${newVisibility}`);
+    
+    // Set the new visibility
     map.current.setLayoutProperty(layerId, 'visibility', newVisibility);
     
-    const newActiveLayers = new Set(activeLayers);
-    if (newVisibility === 'visible') {
-      newActiveLayers.add(layerId);
-    } else {
-      newActiveLayers.delete(layerId);
-    }
-    setActiveLayers(newActiveLayers);
+    // Update state to match the actual visibility
+    setActiveLayers(prev => {
+      const newActiveLayers = new Set(prev);
+      if (newVisibility === 'visible') {
+        newActiveLayers.add(layerId);
+      } else {
+        newActiveLayers.delete(layerId);
+      }
+      console.log(`Active layers updated:`, Array.from(newActiveLayers));
+      return newActiveLayers;
+    });
   };
 
   // Professional satellite monitoring layers for AgTech presentation
@@ -640,7 +648,7 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
           <Card className="p-3 bg-background/95 backdrop-blur-sm border-muted shadow-lg">
             <div className="flex items-center gap-2 mb-3">
               <Layers className="h-4 w-4 text-primary" />
-              <span className="text-sm font-semibold">Monitoreo Satelital</span>
+              <span className="text-sm font-semibold">Capas de monitoreo satelital</span>
               <Button
                 variant="ghost"
                 size="sm"
