@@ -75,7 +75,7 @@ const ForestTimelineChart: React.FC<ForestTimelineChartProps> = ({ aoiId }) => {
           existing.biomass = ((existing.biomass || 0) + (item.biomass || 0)) / 2;
           existing.canopy_cover = ((existing.canopy_cover || 0) + (item.canopy_cover || 0)) / 2;
           existing.carbon_capture = ((existing.carbon_capture || 0) + (item.carbon_capture || 0)) / 2;
-          existing.forest_change = ((existing.forest_change || 0) + (item.forest_change || 0)) / 2;
+          existing.forest_change = ((existing.forest_change || 0) + ((item as any).forest_change || 0)) / 2;
           existing.count++;
         } else {
           acc.push({
@@ -83,7 +83,7 @@ const ForestTimelineChart: React.FC<ForestTimelineChartProps> = ({ aoiId }) => {
             biomass: item.biomass,
             canopy_cover: item.canopy_cover,
             carbon_capture: item.carbon_capture,
-            forest_change: item.forest_change,
+            forest_change: (item as any).forest_change,
             measurement_date: item.measurement_date,
             count: 1
           });

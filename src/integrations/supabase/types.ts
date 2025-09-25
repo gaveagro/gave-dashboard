@@ -183,6 +183,7 @@ export type Database = {
           dataset_name: string
           day: number | null
           evi: number | null
+          forest_change: number | null
           id: string
           measurement_date: string | null
           month: number | null
@@ -208,6 +209,7 @@ export type Database = {
           dataset_name: string
           day?: number | null
           evi?: number | null
+          forest_change?: number | null
           id?: string
           measurement_date?: string | null
           month?: number | null
@@ -233,6 +235,7 @@ export type Database = {
           dataset_name?: string
           day?: number | null
           evi?: number | null
+          forest_change?: number | null
           id?: string
           measurement_date?: string | null
           month?: number | null

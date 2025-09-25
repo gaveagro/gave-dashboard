@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Satellite, TrendingUp, AlertTriangle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import VegetationIndicators from './VegetationIndicators';
-import NDVITimelineChart from './NDVITimelineChart';
+import ForestIndicators from './VegetationIndicators';
+import ForestTimelineChart from './NDVITimelineChart';
 import WeatherWidget from './WeatherWidget';
 
 interface CecilSatelliteMonitorProps {
@@ -248,14 +248,14 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
         </CardHeader>
       </Card>
 
-      {/* Vegetation Indicators */}
-      <VegetationIndicators 
+      {/* Forest Indicators */}
+      <ForestIndicators 
         aoiId={aoi.id} 
         latestData={latestSatelliteData}
       />
 
-      {/* Timeline Chart */}
-      <NDVITimelineChart aoiId={aoi.id} />
+      {/* Forest Timeline Chart */}
+      <ForestTimelineChart aoiId={aoi.id} />
 
       {/* Weather Widget */}
       <WeatherWidget aoiId={aoi.id} />

@@ -104,8 +104,8 @@ const ForestIndicators: React.FC<ForestIndicatorsProps> = ({
     {
       name: 'Cambio Forestal',
       description: 'Cambio en cobertura',
-      value: latestData?.forest_change,
-      previous: previousData?.forest_change,
+      value: (latestData as any)?.forest_change,
+      previous: (previousData as any)?.forest_change,
       icon: BarChart3,
       explanation: 'Cambios en la cobertura forestal detectados',
       formatter: formatCoverValue,
