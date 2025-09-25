@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import MonitoringDashboard from '@/components/monitoring/MonitoringDashboard';
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
@@ -411,6 +412,25 @@ const Dashboard = () => {
           </Card>
         </div>
       )}
+
+      {/* Monitoring Dashboard Section */}
+      <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950 dark:to-cyan-950 border-blue-200 dark:border-blue-800">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+            <BarChart3 className="h-5 w-5" />
+            Sistema de Monitoreo Satelital
+          </CardTitle>
+          <CardDescription className="text-blue-600 dark:text-blue-400">
+            Monitoreo en tiempo real de condiciones ambientales y crecimiento de cultivos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MonitoringDashboard 
+            plotId="demo-el-sabinal"
+            plotName="El Sabinal"
+          />
+        </CardContent>
+      </Card>
 
       {investments && investments.length === 0 && (
         <Card className="bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-900 dark:to-slate-900">
