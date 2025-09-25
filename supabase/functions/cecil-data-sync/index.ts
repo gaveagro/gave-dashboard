@@ -190,7 +190,7 @@ serve(async (req) => {
             .from('cecil_data_requests')
             .update({ 
               status: 'error',
-              error_message: error.message 
+              error_message: (error as Error).message 
             })
             .eq('id', request.id);
         }
@@ -216,7 +216,7 @@ serve(async (req) => {
     console.error('Error in cecil-data-sync:', error);
     return new Response(JSON.stringify({ 
       success: false,
-      error: error.message 
+      error: (error as Error).message 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
