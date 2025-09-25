@@ -45,7 +45,7 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
       return data;
     },
     retry: 1,
-    staleTime: 30 * 1000, // Cache for 30 seconds to avoid excessive queries
+    staleTime: 10 * 1000, // Reduced cache time to 10 seconds for faster updates
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 
@@ -53,7 +53,10 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
   const { data: latestSatelliteData, refetch: refetchSatelliteData } = useQuery({
     queryKey: ['cecil-satellite-data', aoi?.id],
     queryFn: async () => {
-      if (!aoi?.id) return null;
+      if (!aoi?.id) {
+        console.log('CecilSatelliteMonitor: No AOI ID available for satellite data fetch');
+        return null;
+      }
       
       console.log('CecilSatelliteMonitor: Fetching satellite data for AOI:', aoi.id);
       const { data, error } = await supabase
@@ -77,7 +80,7 @@ const CecilSatelliteMonitor: React.FC<CecilSatelliteMonitorProps> = ({
       return data;
     },
     enabled: !!aoi?.id,
-    staleTime: 30 * 1000, // Cache for 30 seconds to avoid excessive queries
+    staleTime: 10 * 1000, // Reduced cache time to 10 seconds for faster updates
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
   });
 

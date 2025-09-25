@@ -141,15 +141,18 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
       'top-right'
     );
 
+    // Reset active layers state when map reloads
+    setActiveLayers(new Set());
+
     map.current.on('load', () => {
       // Prioritize polygon rendering - critical for MVP presentation
       if (aoi?.geometry && typeof aoi.geometry === 'object') {
         console.log('PlotMap: Rendering AOI polygon for professional display');
         addPlotPolygon(map.current!, aoi.geometry, name);
         
-        // Add satellite data layers for AgTech metrics
-        if (plotId && satelliteData) {
-          console.log('PlotMap: Adding satellite monitoring layers with real data');
+        // Add satellite data layers for AgTech metrics (even without data for layer controls)
+        if (plotId) {
+          console.log('PlotMap: Adding satellite monitoring layers');
           addSatelliteDataLayers(map.current!, satelliteData);
         }
       } else {
@@ -184,7 +187,7 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
         map.current = null;
       }
     };
-  }, [latitude, longitude, name, mapboxToken, satelliteData, aoi]);
+  }, [latitude, longitude, name, mapboxToken, plotId, aoi?.id, satelliteData?.id]); // Fixed dependencies
 
   // Enhanced polygon rendering for MVP presentation
   const addPlotPolygon = (mapInstance: mapboxgl.Map, geometry: any, plotName: string) => {
@@ -567,26 +570,37 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
   const toggleLayer = (layerId: string) => {
     if (!map.current) return;
     
-    // Get current visibility - default to 'none' if undefined
-    const visibility = map.current.getLayoutProperty(layerId, 'visibility') || 'none';
-    const newVisibility = visibility === 'visible' ? 'none' : 'visible';
-    
-    console.log(`Toggling layer ${layerId}: ${visibility} -> ${newVisibility}`);
-    
-    // Set the new visibility
-    map.current.setLayoutProperty(layerId, 'visibility', newVisibility);
-    
-    // Update state to match the actual visibility
-    setActiveLayers(prev => {
-      const newActiveLayers = new Set(prev);
-      if (newVisibility === 'visible') {
-        newActiveLayers.add(layerId);
-      } else {
-        newActiveLayers.delete(layerId);
+    try {
+      // Check if layer exists before trying to access it
+      const layerExists = map.current.getLayer(layerId);
+      if (!layerExists) {
+        console.warn(`Layer ${layerId} does not exist on map`);
+        return;
       }
-      console.log(`Active layers updated:`, Array.from(newActiveLayers));
-      return newActiveLayers;
-    });
+
+      // Get current visibility - default to 'none' if undefined
+      const visibility = map.current.getLayoutProperty(layerId, 'visibility') || 'none';
+      const newVisibility = visibility === 'visible' ? 'none' : 'visible';
+      
+      console.log(`Toggling layer ${layerId}: ${visibility} -> ${newVisibility}`);
+      
+      // Set the new visibility
+      map.current.setLayoutProperty(layerId, 'visibility', newVisibility);
+      
+      // Update state to match the actual visibility
+      setActiveLayers(prev => {
+        const newActiveLayers = new Set(prev);
+        if (newVisibility === 'visible') {
+          newActiveLayers.add(layerId);
+        } else {
+          newActiveLayers.delete(layerId);
+        }
+        console.log(`Active layers updated:`, Array.from(newActiveLayers));
+        return newActiveLayers;
+      });
+    } catch (error) {
+      console.error(`Error toggling layer ${layerId}:`, error);
+    }
   };
 
   // Professional satellite monitoring layers for AgTech presentation
