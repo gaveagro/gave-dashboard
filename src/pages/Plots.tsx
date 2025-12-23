@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,10 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
-import { MapPin, ExternalLink, Camera, Thermometer, Droplets, Mountain, Upload, Trash2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { MapPin, Camera, Thermometer, Droplets, Mountain, Upload, Trash2, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PhotoModal from '@/components/PhotoModal';
-import CecilSatelliteMonitor from '@/components/cecil/CecilSatelliteMonitor';
+import AgromonitoringMonitor from '@/components/monitoring/AgromonitoringMonitor';
 import PlotMap from '@/components/PlotMap';
 
 const Plots = () => {
@@ -24,17 +24,19 @@ const Plots = () => {
   const queryClient = useQueryClient();
   const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; description?: string; year?: number } | null>(null);
 
+  // Optimized query with select only needed fields
   const { data: plots, isLoading } = useQuery({
     queryKey: ['plots'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plots')
-        .select('*')
+        .select('id, name, location, status, area, total_plants, latitude, longitude, coordinates, temperature, rainfall, elevation')
         .order('name');
       
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 60 * 1000 // Cache for 1 minute
   });
 
   const { data: plotPhotos } = useQuery({
@@ -42,12 +44,14 @@ const Plots = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plot_photos')
-        .select('*')
-        .order('year', { ascending: false });
+        .select('id, plot_id, photo_url, year, description')
+        .order('year', { ascending: false })
+        .limit(50);
       
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 60 * 1000
   });
 
   const { data: investments } = useQuery({
@@ -55,12 +59,13 @@ const Plots = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('investments')
-        .select('*')
+        .select('id, plot_id, species_id, plantation_year, expected_harvest_year')
         .eq('status', 'active');
       
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 60 * 1000
   });
 
   const { data: plantSpecies } = useQuery({
@@ -68,11 +73,12 @@ const Plots = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('plant_species')
-        .select('*');
+        .select('id, name, maturation_years');
       
       if (error) throw error;
       return data;
-    }
+    },
+    staleTime: 5 * 60 * 1000 // Cache for 5 minutes - rarely changes
   });
 
   const deletePlotMutation = useMutation({
@@ -270,12 +276,30 @@ const Plots = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-6">
-        <Card>
-          <CardContent className="pt-6">
-            <p>Cargando parcelas...</p>
-          </CardContent>
-        </Card>
+      <div className="container mx-auto py-4 md:py-6 px-4 space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-2xl md:text-3xl font-bold">Parcelas</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
+            Cargando información...
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:gap-6">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <Skeleton className="h-[200px] w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
@@ -402,13 +426,11 @@ const Plots = () => {
                   </div>
                 )}
 
-                {/* Cecil Satellite Monitoring - Moved after map */}
+                {/* Agromonitoring Satellite Monitoring */}
                 <div className="pt-4 border-t">
-                  <CecilSatelliteMonitor
+                  <AgromonitoringMonitor
                     plotId={plot.id}
                     plotName={plot.name}
-                    plotCoordinates={plot.coordinates}
-                    plotArea={plot.area}
                   />
                 </div>
 

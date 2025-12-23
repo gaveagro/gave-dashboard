@@ -214,11 +214,7 @@ const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
         </TabsList>
 
         <TabsContent value="satellite" className="space-y-4">
-          {plotId && plotId !== 'demo-plot' ? (
-            <AgromonitoringMonitor plotId={plotId} plotName={plotName} />
-          ) : (
-            <AgromonitoringMonitor plotId="demo-plot" plotName={plotName} />
-          )}
+          <AgromonitoringMonitor plotName={plotName} />
         </TabsContent>
 
         <TabsContent value="overview" className="space-y-4">
