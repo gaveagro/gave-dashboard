@@ -14,6 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      agromonitoring_data: {
+        Row: {
+          cloud_coverage: number | null
+          created_at: string
+          data_type: string
+          evi_max: number | null
+          evi_mean: number | null
+          evi_median: number | null
+          evi_min: number | null
+          humidity_percent: number | null
+          id: string
+          measurement_date: string
+          ndvi_max: number | null
+          ndvi_mean: number | null
+          ndvi_median: number | null
+          ndvi_min: number | null
+          ndwi_mean: number | null
+          polygon_id: string
+          precipitation_mm: number | null
+          pressure_hpa: number | null
+          raw_data: Json | null
+          satellite_image_type: string | null
+          satellite_image_url: string | null
+          soil_moisture: number | null
+          soil_temperature: number | null
+          temperature_celsius: number | null
+          updated_at: string
+          weather_description: string | null
+          wind_speed_kmh: number | null
+        }
+        Insert: {
+          cloud_coverage?: number | null
+          created_at?: string
+          data_type: string
+          evi_max?: number | null
+          evi_mean?: number | null
+          evi_median?: number | null
+          evi_min?: number | null
+          humidity_percent?: number | null
+          id?: string
+          measurement_date: string
+          ndvi_max?: number | null
+          ndvi_mean?: number | null
+          ndvi_median?: number | null
+          ndvi_min?: number | null
+          ndwi_mean?: number | null
+          polygon_id: string
+          precipitation_mm?: number | null
+          pressure_hpa?: number | null
+          raw_data?: Json | null
+          satellite_image_type?: string | null
+          satellite_image_url?: string | null
+          soil_moisture?: number | null
+          soil_temperature?: number | null
+          temperature_celsius?: number | null
+          updated_at?: string
+          weather_description?: string | null
+          wind_speed_kmh?: number | null
+        }
+        Update: {
+          cloud_coverage?: number | null
+          created_at?: string
+          data_type?: string
+          evi_max?: number | null
+          evi_mean?: number | null
+          evi_median?: number | null
+          evi_min?: number | null
+          humidity_percent?: number | null
+          id?: string
+          measurement_date?: string
+          ndvi_max?: number | null
+          ndvi_mean?: number | null
+          ndvi_median?: number | null
+          ndvi_min?: number | null
+          ndwi_mean?: number | null
+          polygon_id?: string
+          precipitation_mm?: number | null
+          pressure_hpa?: number | null
+          raw_data?: Json | null
+          satellite_image_type?: string | null
+          satellite_image_url?: string | null
+          soil_moisture?: number | null
+          soil_temperature?: number | null
+          temperature_celsius?: number | null
+          updated_at?: string
+          weather_description?: string | null
+          wind_speed_kmh?: number | null
+        }
+        Relationships: []
+      }
+      agromonitoring_polygons: {
+        Row: {
+          area_hectares: number | null
+          center_lat: number | null
+          center_lng: number | null
+          created_at: string
+          geo_json: Json
+          id: string
+          name: string
+          plot_id: string
+          polygon_id: string
+          updated_at: string
+        }
+        Insert: {
+          area_hectares?: number | null
+          center_lat?: number | null
+          center_lng?: number | null
+          created_at?: string
+          geo_json: Json
+          id?: string
+          name: string
+          plot_id: string
+          polygon_id: string
+          updated_at?: string
+        }
+        Update: {
+          area_hectares?: number | null
+          center_lat?: number | null
+          center_lng?: number | null
+          created_at?: string
+          geo_json?: Json
+          id?: string
+          name?: string
+          plot_id?: string
+          polygon_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agromonitoring_polygons_plot_id_fkey"
+            columns: ["plot_id"]
+            isOneToOne: false
+            referencedRelation: "plots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cecil_alerts: {
         Row: {
           acknowledged_at: string | null

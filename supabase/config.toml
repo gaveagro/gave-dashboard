@@ -82,5 +82,17 @@ verify_jwt = false
 [functions.cecil-test-connection]
 verify_jwt = false
 
+[functions.agromonitoring-polygon]
+verify_jwt = false
+
+[functions.agromonitoring-satellite]
+verify_jwt = false
+
+[functions.agromonitoring-weather]
+verify_jwt = false
+
+[functions.get-mapbox-token]
+verify_jwt = false
+
 [edge-runtime]
 inspector_port = 8083
