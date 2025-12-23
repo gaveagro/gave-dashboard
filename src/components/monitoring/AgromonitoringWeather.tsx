@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Thermometer, Droplets, Wind, Gauge, Cloud, CloudRain } from 'lucide-react';
 import { AgromonitoringData } from '@/lib/agromonitoring';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface AgromonitoringWeatherProps {
   polygonId: string;
@@ -16,6 +17,8 @@ const AgromonitoringWeather: React.FC<AgromonitoringWeatherProps> = ({
   weatherData,
   isLoading
 }) => {
+  const { t } = useLanguage();
+
   const getTemperatureColor = (temp: number) => {
     if (temp < 10) return 'text-blue-600';
     if (temp < 20) return 'text-blue-400';
@@ -33,7 +36,7 @@ const AgromonitoringWeather: React.FC<AgromonitoringWeatherProps> = ({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Datos Meteorológicos</CardTitle>
+          <CardTitle className="text-sm">{t('monitoring.weatherData')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -63,7 +66,7 @@ const AgromonitoringWeather: React.FC<AgromonitoringWeatherProps> = ({
     soil_temperature: 22 + 6 * seasonalFactor + 2 * dailyFactor + (Math.random() - 0.5) * 2,
     soil_moisture: 45 + 20 * Math.sin(seasonalFactor + Math.PI/4) + (Math.random() - 0.5) * 8,
     cloud_coverage: Math.random() * 50,
-    weather_description: 'Parcialmente nublado',
+    weather_description: null,
     measurement_date: new Date().toISOString().split('T')[0]
   } : null;
 
@@ -72,42 +75,42 @@ const AgromonitoringWeather: React.FC<AgromonitoringWeatherProps> = ({
 
   const metrics = [
     {
-      label: 'Temperatura',
+      label: t('monitoring.temperature'),
       value: data?.temperature_celsius?.toFixed(1),
       unit: '°C',
       icon: Thermometer,
       color: getTemperatureColor(data?.temperature_celsius || 0)
     },
     {
-      label: 'Humedad',
+      label: t('monitoring.humidity'),
       value: data?.humidity_percent?.toFixed(0),
       unit: '%',
       icon: Droplets,
       color: getHumidityColor(data?.humidity_percent || 0)
     },
     {
-      label: 'Viento',
+      label: t('monitoring.wind'),
       value: data?.wind_speed_kmh?.toFixed(1),
       unit: 'km/h',
       icon: Wind,
       color: 'text-gray-600'
     },
     {
-      label: 'Presión',
+      label: t('monitoring.pressure'),
       value: data?.pressure_hpa?.toFixed(0),
       unit: 'hPa',
       icon: Gauge,
       color: 'text-purple-600'
     },
     {
-      label: 'Precipitación',
+      label: t('monitoring.precipitation'),
       value: data?.precipitation_mm?.toFixed(1),
       unit: 'mm',
       icon: CloudRain,
       color: 'text-blue-600'
     },
     {
-      label: 'Nubes',
+      label: t('monitoring.clouds'),
       value: data?.cloud_coverage?.toFixed(0),
       unit: '%',
       icon: Cloud,
@@ -117,14 +120,14 @@ const AgromonitoringWeather: React.FC<AgromonitoringWeatherProps> = ({
 
   const soilMetrics = [
     {
-      label: 'Temp. Suelo',
+      label: t('monitoring.soilTemp'),
       value: data?.soil_temperature?.toFixed(1),
       unit: '°C',
       icon: Thermometer,
       color: getTemperatureColor(data?.soil_temperature || 0)
     },
     {
-      label: 'Humedad Suelo',
+      label: t('monitoring.soilHumidity'),
       value: data?.soil_moisture?.toFixed(0),
       unit: '%',
       icon: Droplets,
@@ -136,24 +139,24 @@ const AgromonitoringWeather: React.FC<AgromonitoringWeatherProps> = ({
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm">Datos Meteorológicos Agromonitoring</CardTitle>
+          <CardTitle className="text-sm">{t('monitoring.weatherData')}</CardTitle>
           <div className="flex items-center gap-2">
             {isDemo && (
               <Badge variant="secondary" className="text-xs">
-                Demo
+                {t('monitoring.demo')}
               </Badge>
             )}
             {!isDemo && (
               <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
                 <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-                API Activa
+                {t('monitoring.apiActive')}
               </Badge>
             )}
           </div>
         </div>
         {data?.measurement_date && (
           <p className="text-xs text-muted-foreground">
-            Última actualización: {new Date(data.measurement_date).toLocaleDateString('es-ES')}
+            {t('monitoring.lastUpdate')}: {new Date(data.measurement_date).toLocaleDateString()}
           </p>
         )}
       </CardHeader>
@@ -184,7 +187,7 @@ const AgromonitoringWeather: React.FC<AgromonitoringWeatherProps> = ({
 
         {/* Soil metrics */}
         <div className="pt-4 border-t">
-          <p className="text-xs font-medium mb-3">Datos del Suelo</p>
+          <p className="text-xs font-medium mb-3">{t('monitoring.soilData')}</p>
           <div className="grid grid-cols-2 gap-4">
             {soilMetrics.map((metric) => {
               const IconComponent = metric.icon;
