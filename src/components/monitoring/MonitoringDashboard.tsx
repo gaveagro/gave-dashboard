@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Map, BarChart3, AlertTriangle, Cloud } from 'lucide-react';
+import { RefreshCw, Map, BarChart3, AlertTriangle, Cloud, Satellite } from 'lucide-react';
 import MonitoringMap from './MonitoringMap';
 import WeatherMetrics from './WeatherMetrics';
 import AlertsPanel from './AlertsPanel';
 import ForestIndicators from '../cecil/VegetationIndicators';
 import ForestTimelineChart from '../cecil/NDVITimelineChart';
+import AgromonitoringMonitor from './AgromonitoringMonitor';
 
 interface MonitoringDashboardProps {
   plotId?: string;
@@ -188,8 +189,12 @@ const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
       </div>
 
       {/* Main Dashboard */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="satellite" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="satellite" className="flex items-center gap-2">
+            <Satellite className="h-4 w-4" />
+            Satelital
+          </TabsTrigger>
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Resumen
@@ -207,6 +212,14 @@ const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
             Alertas
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="satellite" className="space-y-4">
+          {plotId && plotId !== 'demo-plot' ? (
+            <AgromonitoringMonitor plotId={plotId} plotName={plotName} />
+          ) : (
+            <AgromonitoringMonitor plotId="demo-plot" plotName={plotName} />
+          )}
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
