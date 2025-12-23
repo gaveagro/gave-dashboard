@@ -31,21 +31,21 @@ const AgromonitoringMonitor: React.FC<AgromonitoringMonitorProps> = ({ plotId, p
   const isValidUUID = plotId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(plotId);
 
   // Check if polygon exists for this plot
-  const { data: polygon, isLoading: isLoadingPolygon } = useQuery({
+  const { data: polygon, isLoading: isLoadingPolygon, error: polygonError } = useQuery({
     queryKey: ['agromonitoring-polygon', plotId],
     queryFn: () => getPolygonByPlotId(plotId!),
     enabled: !!isValidUUID
   });
 
   // Get latest satellite data if polygon exists
-  const { data: satelliteData, isLoading: isLoadingSatellite } = useQuery({
+  const { data: satelliteData, isLoading: isLoadingSatellite, error: satelliteError } = useQuery({
     queryKey: ['agromonitoring-satellite-data', polygon?.polygon_id],
     queryFn: () => getLatestSatelliteData(polygon!.polygon_id),
     enabled: !!polygon?.polygon_id
   });
 
   // Get latest weather data if polygon exists
-  const { data: weatherData, isLoading: isLoadingWeather } = useQuery({
+  const { data: weatherData, isLoading: isLoadingWeather, error: weatherError } = useQuery({
     queryKey: ['agromonitoring-weather-data', polygon?.polygon_id],
     queryFn: () => getLatestWeatherData(polygon!.polygon_id),
     enabled: !!polygon?.polygon_id
@@ -69,6 +69,23 @@ const AgromonitoringMonitor: React.FC<AgromonitoringMonitorProps> = ({ plotId, p
       <Card>
         <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // If Agromonitoring queries fail, don't crash the Plots page — fallback to demo UI
+  if (isValidUUID && polygonError) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Satellite className="h-4 w-4" />
+            {t('monitoring.satelliteMonitoring')} - {plotName}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{t('monitoring.demo')}</p>
         </CardContent>
       </Card>
     );

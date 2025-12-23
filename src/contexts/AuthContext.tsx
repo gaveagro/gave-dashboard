@@ -56,51 +56,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Set up auth state listener for regular users
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        // Don't override demo mode
-        if (localStorage.getItem('demo_mode') === 'true') {
-          return;
-        }
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Fetch user profile
-          setTimeout(async () => {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            setProfile(profileData);
-            setLoading(false);
-          }, 0);
-        } else {
-          setProfile(null);
-          setLoading(false);
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Don't override demo mode
+      if (localStorage.getItem('demo_mode') === 'true') return;
+
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        // Fetch user profile (defer Supabase calls)
+        setTimeout(() => {
+          void (async () => {
+            try {
+              const { data: profileData, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .maybeSingle();
+
+              if (error) {
+                console.warn('Profile fetch error:', error.message);
+                setProfile(null);
+              } else {
+                setProfile(profileData ?? null);
+              }
+            } catch (err: any) {
+              console.warn('Profile fetch error:', err?.message ?? String(err));
+              setProfile(null);
+            } finally {
+              setLoading(false);
+            }
+          })();
+        }, 0);
+      } else {
+        setProfile(null);
+        setLoading(false);
       }
-    );
+    });
 
     // Get initial session for regular users
     if (!isDemoMode) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single()
-            .then(({ data: profileData }) => {
-              setProfile(profileData);
-              setLoading(false);
-            });
+          setTimeout(() => {
+            void (async () => {
+              try {
+                const { data: profileData, error } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('user_id', session.user.id)
+                  .maybeSingle();
+
+                if (error) {
+                  console.warn('Profile fetch error:', error.message);
+                  setProfile(null);
+                } else {
+                  setProfile(profileData ?? null);
+                }
+              } catch (err: any) {
+                console.warn('Profile fetch error:', err?.message ?? String(err));
+                setProfile(null);
+              } finally {
+                setLoading(false);
+              }
+            })();
+          }, 0);
         } else {
           setLoading(false);
         }

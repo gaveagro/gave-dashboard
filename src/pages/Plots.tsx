@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import PhotoModal from '@/components/PhotoModal';
 import AgromonitoringMonitor from '@/components/monitoring/AgromonitoringMonitor';
 import PlotMap from '@/components/PlotMap';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const Plots = () => {
   const { profile } = useAuth();
@@ -428,10 +429,17 @@ const Plots = () => {
 
                 {/* Agromonitoring Satellite Monitoring */}
                 <div className="pt-4 border-t">
-                  <AgromonitoringMonitor
-                    plotId={plot.id}
-                    plotName={plot.name}
-                  />
+                  <ErrorBoundary
+                    fallback={
+                      <Card>
+                        <CardContent className="pt-6">
+                          <p className="text-sm text-muted-foreground">{t('monitoring.demo')}</p>
+                        </CardContent>
+                      </Card>
+                    }
+                  >
+                    <AgromonitoringMonitor plotId={plot.id} plotName={plot.name} />
+                  </ErrorBoundary>
                 </div>
 
                 {/* Admin photo upload */}
