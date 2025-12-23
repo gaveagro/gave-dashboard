@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface MonitoringMapProps {
   plots?: any[];
@@ -8,17 +9,18 @@ interface MonitoringMapProps {
 
 const MonitoringMap: React.FC<MonitoringMapProps> = ({ plots = [] }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
+  const { t } = useLanguage();
 
   return (
     <Card className="w-full">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
-            🌍 Vista General de Parcelas
+            🌍 {t('monitoring.plotsOverview')}
           </CardTitle>
           <Badge variant="outline" className="text-green-600 border-green-600">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-            {plots?.length || 0} Parcelas
+            {plots?.length || 0} {t('nav.plots')}
           </Badge>
         </div>
       </CardHeader>
@@ -38,31 +40,24 @@ const MonitoringMap: React.FC<MonitoringMapProps> = ({ plots = [] }) => {
           <div className="relative z-10 h-full flex items-center justify-center">
             <div className="text-center p-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg max-w-sm">
               <div className="text-2xl mb-2">🗺️</div>
-              <div className="text-lg font-bold mb-1 text-gray-800">Mapa de Parcelas</div>
+              <div className="text-lg font-bold mb-1 text-gray-800">{t('monitoring.plotsOverview')}</div>
               <div className="text-sm text-gray-600">
-                Visualización integrada de todas las parcelas monitoreadas
-              </div>
-              
-              {/* Demo indicators */}
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="flex justify-center items-center gap-3 text-xs">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>Activas</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span>Monitoreadas</span>
-                  </div>
-                </div>
+                {t('monitoring.integratedDescription')}
               </div>
             </div>
           </div>
           
           {/* Mock parcel markers */}
-          <div className="absolute top-1/4 left-1/3 w-3 h-3 bg-green-600 rounded-full border-2 border-white shadow-lg"></div>
-          <div className="absolute top-1/2 right-1/3 w-3 h-3 bg-green-600 rounded-full border-2 border-white shadow-lg"></div>
-          <div className="absolute bottom-1/3 left-1/2 w-3 h-3 bg-green-600 rounded-full border-2 border-white shadow-lg"></div>
+          {plots?.slice(0, 5).map((_, i) => (
+            <div 
+              key={i}
+              className="absolute w-3 h-3 bg-green-600 rounded-full border-2 border-white shadow-lg"
+              style={{
+                top: `${20 + (i * 15) % 60}%`,
+                left: `${25 + (i * 20) % 50}%`
+              }}
+            ></div>
+          ))}
         </div>
       </CardContent>
     </Card>
