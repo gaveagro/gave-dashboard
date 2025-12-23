@@ -1441,13 +1441,22 @@ const Admin = () => {
                       color: "hsl(var(--chart-2))",
                     },
                   }}
-                  className="h-[300px]"
+                  className="h-[350px]"
                 >
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.investmentsByUser} layout="horizontal">
+                    <BarChart data={chartData.investmentsByUser}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="user" type="category" width={100} />
+                      <XAxis 
+                        dataKey="user" 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={100}
+                        interval={0}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <YAxis 
+                        tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                      />
                       <ChartTooltip
                         content={<ChartTooltipContent />}
                         formatter={(value) => [formatCurrency(Number(value)), "Inversión"]}
