@@ -208,6 +208,8 @@ const translations = {
     'plots.uploadDronePhoto': 'Subir foto con dron',
     
     // Monitoring translations
+    'monitoring.title': 'Sistema de Monitoreo Satelital',
+    'monitoring.description': 'Monitoreo en tiempo real de condiciones ambientales y crecimiento de cultivos',
     'monitoring.satelliteMonitoring': 'Monitoreo Satelital',
     'monitoring.vegetationIndices': 'Índices de Vegetación Satelital',
     'monitoring.weatherData': 'Datos Meteorológicos Agromonitoring',
@@ -496,6 +498,8 @@ const translations = {
     'plots.uploadDronePhoto': 'Upload drone photo',
     
     // Monitoring translations
+    'monitoring.title': 'Satellite Monitoring System',
+    'monitoring.description': 'Real-time monitoring of environmental conditions and crop growth',
     'monitoring.satelliteMonitoring': 'Satellite Monitoring',
     'monitoring.vegetationIndices': 'Satellite Vegetation Indices',
     'monitoring.weatherData': 'Agromonitoring Weather Data',

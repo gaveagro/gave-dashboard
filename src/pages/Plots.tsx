@@ -307,9 +307,9 @@ const Plots = () => {
   return (
     <div className="container mx-auto py-4 md:py-6 px-4 space-y-6">
       <div className="space-y-2">
-        <h1 className="text-2xl md:text-3xl font-bold">Parcelas</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">{t('plots.title')}</h1>
         <p className="text-muted-foreground text-sm md:text-base">
-          Información detallada sobre nuestras parcelas de cultivo
+          {t('plots.description')}
         </p>
       </div>
 
@@ -364,7 +364,7 @@ const Plots = () => {
                   </div>
                   {plotSpecies.length > 0 && (
                     <div className="col-span-2">
-                      <span className="font-medium">Especies establecidas:</span>
+                      <span className="font-medium">{t('plots.speciesEstablished')}:</span>
                       <p>{plotSpecies.join(', ')}</p>
                     </div>
                   )}
@@ -374,13 +374,13 @@ const Plots = () => {
                 {plotProgress > 0 && (
                   <div className="space-y-2 pt-3 border-t">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium">Progreso hacia cosecha</span>
+                      <span className="font-medium">{t('plots.harvestProgress')}</span>
                       <span>{plotProgress}%</span>
                     </div>
                     <Progress value={plotProgress} className="h-2" />
                     {nextHarvest && (
                       <p className="text-xs text-muted-foreground">
-                        Próxima cosecha estimada: {nextHarvest}
+                        {t('plots.nextHarvestEstimate')}: {nextHarvest}
                       </p>
                     )}
                   </div>
@@ -413,7 +413,7 @@ const Plots = () => {
                   <div className="pt-4 border-t">
                     <div className="flex items-center gap-2 mb-4">
                       <MapPin className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Ubicación de la parcela</span>
+                      <span className="text-sm font-medium">{t('plots.plotLocation')}</span>
                     </div>
                     <div className="mb-4">
                       <PlotMap
@@ -439,7 +439,7 @@ const Plots = () => {
                   <div className="pt-3 border-t">
                     <div className="flex items-center gap-2 mb-2">
                       <Upload className="h-4 w-4" />
-                      <span className="text-sm font-medium">Subir foto con dron</span>
+                      <span className="text-sm font-medium">{t('plots.uploadDronePhoto')}</span>
                     </div>
                     <Input
                       type="file"

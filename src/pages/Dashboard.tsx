@@ -418,15 +418,14 @@ const Dashboard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
             <BarChart3 className="h-5 w-5" />
-            Sistema de Monitoreo Satelital
+            {t('monitoring.title')}
           </CardTitle>
           <CardDescription className="text-blue-600 dark:text-blue-400">
-            Monitoreo en tiempo real de condiciones ambientales y crecimiento de cultivos
+            {t('monitoring.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <MonitoringDashboard 
-            plotId="demo-el-sabinal"
             plotName="El Sabinal"
           />
         </CardContent>
