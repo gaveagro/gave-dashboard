@@ -792,25 +792,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      bulk_import_users: {
-        Args: { users_data: Json }
-        Returns: Json
-      }
-      create_user_with_profile: {
-        Args:
-          | {
+      bulk_import_users: { Args: { users_data: Json }; Returns: Json }
+      create_user_with_profile:
+        | {
+            Args: {
+              user_email: string
+              user_name: string
+              user_role?: Database["public"]["Enums"]["app_role"]
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
               user_balance?: number
               user_email: string
               user_name: string
               user_role?: Database["public"]["Enums"]["app_role"]
             }
-          | {
-              user_email: string
-              user_name: string
-              user_role?: Database["public"]["Enums"]["app_role"]
-            }
-        Returns: Json
-      }
+            Returns: Json
+          }
       create_user_with_profile_v2: {
         Args: {
           user_balance?: number
@@ -827,10 +827,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      request_password_reset: {
-        Args: { user_email: string }
-        Returns: Json
-      }
+      request_password_reset: { Args: { user_email: string }; Returns: Json }
       send_investment_notification: {
         Args: {
           establishment_year: number
