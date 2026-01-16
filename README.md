@@ -1,73 +1,195 @@
-# Welcome to your Lovable project
+# 🌵 Gavé Agrotecnología
 
-## Project info
+> Regenerative Agriculture Investment Platform for Sustainable Agave Cultivation in Oaxaca, Mexico
 
-**URL**: https://lovable.dev/projects/8cedc32f-e657-4c36-a7b8-7149e5d1beac
+[![Live Demo](https://img.shields.io/badge/demo-live-green)](https://agave-growth-dashboard.lovable.app)
+[![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Backend-green)](https://supabase.com/)
 
-## How can I edit this code?
+## 🌱 Overview
 
-There are several ways of editing your application.
+Gavé Agrotecnología is a comprehensive AgTech platform that bridges the gap between private investors and regenerative agave farming in Oaxaca, Mexico. The platform provides real-time satellite monitoring, investment tracking, carbon capture metrics, and transparent cultivation management.
 
-**Use Lovable**
+### Problem We Solve
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8cedc32f-e657-4c36-a7b8-7149e5d1beac) and start prompting.
+Traditional agricultural investments lack transparency and real-time monitoring capabilities. Gavé Agrotecnología addresses this by providing:
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Real-time satellite data** for vegetation health monitoring
+- **Transparent investment tracking** with ROI projections
+- **Environmental impact metrics** including carbon capture calculations
+- **Direct connection** between investors and cultivation plots
 
-**Use your preferred IDE**
+## ✨ Key Features
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+| Feature | Description |
+|---------|-------------|
+| 📊 **Investment Simulator** | Project ROI based on species, plant count, establishment year, and market prices |
+| 🛰️ **Satellite Monitoring** | Real-time NDVI/EVI/NDWI indices via Agromonitoring API |
+| 🗺️ **Interactive Plot Maps** | Detailed cultivation site visualization with Mapbox GL |
+| 📸 **Drone Photography** | Time-series photo documentation of plot development |
+| 🌍 **Carbon Tracking** | Monitor CO₂ capture per investment and plant |
+| 🌐 **Bilingual Interface** | Full Spanish/English language support |
+| 👨‍💼 **Admin Dashboard** | User verification, investment approvals, species management |
+| 🌤️ **Weather Integration** | Real-time and forecast weather data for each plot |
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🖥️ Live Demo
 
-Follow these steps:
+**[agave-growth-dashboard.lovable.app](https://agave-growth-dashboard.lovable.app)**
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Use demo mode to explore the platform without authentication.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🏗️ Architecture
 
-# Step 3: Install the necessary dependencies.
-npm i
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Frontend (React)                         │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │Dashboard │ │  Plots   │ │Simulator │ │ Admin Dashboard  │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Supabase Backend                             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │PostgreSQL│ │   Auth   │ │ Storage  │ │  Edge Functions  │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    External APIs                                │
+│  ┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐     │
+│  │Agromonitoring│ │  Mapbox  │ │  Cecil   │ │   Resend   │     │
+│  │  (Satellite) │ │ (Maps)   │ │(Weather) │ │  (Email)   │     │
+│  └──────────────┘ └──────────┘ └──────────┘ └────────────┘     │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+## 🛠️ Technology Stack
+
+### Frontend
+- **React 18** - Modern UI library with hooks
+- **TypeScript** - Type-safe development
+- **Vite** - Fast build tooling
+- **Tailwind CSS** - Utility-first styling
+- **Shadcn UI** - Accessible component primitives
+- **TanStack Query** - Async state management
+- **Recharts** - Data visualization
+
+### Backend
+- **Supabase** - PostgreSQL database, authentication, storage
+- **Edge Functions** - Serverless API endpoints (Deno)
+- **Row Level Security** - Fine-grained access control
+
+### Integrations
+- **Agromonitoring API** - Satellite imagery and vegetation indices
+- **Mapbox GL JS** - Interactive mapping
+- **Cecil API** - Weather data and forecasts
+- **Resend** - Transactional emails
+
+## 📊 Database Schema
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   profiles   │     │  investments │     │    plots     │
+├──────────────┤     ├──────────────┤     ├──────────────┤
+│ user_id (FK) │◄────│ user_id      │     │ id           │
+│ email        │     │ plot_id (FK) │────►│ name         │
+│ name         │     │ species_id   │     │ location     │
+│ role         │     │ plant_count  │     │ coordinates  │
+│ balance      │     │ total_amount │     │ area         │
+└──────────────┘     └──────────────┘     └──────────────┘
+                            │
+                            ▼
+                     ┌──────────────┐
+                     │plant_species │
+                     ├──────────────┤
+                     │ name         │
+                     │ maturation   │
+                     │ carbon_capture│
+                     └──────────────┘
+```
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- npm or bun
+- Supabase account
+- API keys for Mapbox and Agromonitoring
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/agave-growth-dashboard.git
+
+# Navigate to project directory
+cd agave-growth-dashboard
+
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Environment Variables
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Additional secrets are configured in Supabase Edge Functions:
+- `AGROMONITORING_API_KEY`
+- `MAPBOX_PUBLIC_TOKEN`
+- `CECIL_API_KEY`
 
-**Use GitHub Codespaces**
+## 📁 Project Structure
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```
+src/
+├── components/
+│   ├── monitoring/      # Satellite & weather monitoring
+│   ├── simulator/       # Investment calculator
+│   ├── admin/           # Admin management panels
+│   ├── layout/          # App shell & navigation
+│   └── ui/              # Shadcn UI components
+├── contexts/
+│   ├── AuthContext.tsx  # Authentication state
+│   ├── DemoContext.tsx  # Demo mode handling
+│   └── LanguageContext.tsx # i18n
+├── pages/
+│   ├── Dashboard.tsx    # Main investor view
+│   ├── Plots.tsx        # Plot details & photos
+│   ├── Simulator.tsx    # ROI calculator
+│   └── Admin.tsx        # Admin panel
+├── lib/
+│   └── agromonitoring.ts # Satellite API client
+└── integrations/
+    └── supabase/        # Database client & types
+```
 
-## What technologies are used for this project?
+## 🤝 Contributing
 
-This project is built with:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## How can I deploy this project?
+## 📄 License
 
-Simply open [Lovable](https://lovable.dev/projects/8cedc32f-e657-4c36-a7b8-7149e5d1beac) and click on Share -> Publish.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Can I connect a custom domain to my Lovable project?
+## 📬 Contact
 
-Yes, you can!
+**Gavé Agrotecnología**
+- Website: [agave-growth-dashboard.lovable.app](https://agave-growth-dashboard.lovable.app)
+- Email: info@gaveagro.com
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+<p align="center">
+  <sub>Built with ❤️ for sustainable agriculture in Oaxaca, Mexico</sub>
+</p>
