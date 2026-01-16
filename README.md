@@ -2,10 +2,7 @@
 
 > Regenerative Agriculture Investment Platform for Sustainable Agave Cultivation in Oaxaca, Mexico
 
-[![Live Demo](https://img.shields.io/badge/demo-live-green)](https://agave-growth-dashboard.lovable.app)
-[![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-Backend-green)](https://supabase.com/)
+[![Live Demo](https://dashboard.gaveagro.com
 
 ## 🌱 Overview
 
@@ -35,7 +32,7 @@ Traditional agricultural investments lack transparency and real-time monitoring 
 
 ## 🖥️ Live Demo
 
-**[agave-growth-dashboard.lovable.app](https://agave-growth-dashboard.lovable.app)**
+https://dashboard.gaveagro.com
 
 Use demo mode to explore the platform without authentication.
 
@@ -168,25 +165,11 @@ src/
     └── supabase/        # Database client & types
 ```
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 📬 Contact
 
 **Gavé Agrotecnología**
-- Website: [agave-growth-dashboard.lovable.app](https://agave-growth-dashboard.lovable.app)
-- Email: info@gaveagro.com
+- Website: https://www.gaveagro.com
+- Email: hola@gaveagro.com
 
 ---
 
