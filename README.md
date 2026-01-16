@@ -1,8 +1,8 @@
 # 🌵 Gavé Agrotecnología
 
-> Regenerative Agriculture Investment Platform for Sustainable Agave Cultivation in Oaxaca, Mexico
+> Regenerative Agriculture Investment Platform for Sustainable Agave Cultivation in Mexico
 
-[![Live Demo](https://dashboard.gaveagro.com
+[![Live Demo](https://dashboard.gaveagro.com)
 
 ## 🌱 Overview
 
