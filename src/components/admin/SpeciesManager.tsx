@@ -317,8 +317,9 @@ export function SpeciesManager() {
                   <Input
                     id="maturation_years"
                     type="number"
+                    step="0.5"
                     value={newSpeciesData.maturation_years}
-                    onChange={(e) => setNewSpeciesData(prev => ({ ...prev, maturation_years: parseInt(e.target.value) }))}
+                    onChange={(e) => setNewSpeciesData(prev => ({ ...prev, maturation_years: parseFloat(e.target.value) || 5.5 }))}
                   />
                 </div>
                 <div>
@@ -385,9 +386,10 @@ export function SpeciesManager() {
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
+                          step="0.5"
                           value={editingSpecies.maturation_years}
-                          onChange={(e) => setEditingSpecies(prev => prev ? { ...prev, maturation_years: parseInt(e.target.value) } : null)}
-                          className="w-16 text-center"
+                          onChange={(e) => setEditingSpecies(prev => prev ? { ...prev, maturation_years: parseFloat(e.target.value) || 5.5 } : null)}
+                          className="w-20 text-center"
                         />
                         <span className="text-sm">años</span>
                       </div>

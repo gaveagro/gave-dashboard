@@ -62,7 +62,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       email: 'demo@gaveagro.com',
       name: 'Usuario Demo',
       role: 'demo' as const,
-      account_balance: 1079850, // Total of all demo investments: 7500*15.99 + 2500*300 + 3200*300
+      account_balance: 890000, // Total of demo investments: 250000 + 400000 + 240000
       phone: '+52 555 123 4567',
     },
     investments: [
@@ -70,51 +70,51 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
         id: '10000000-0000-0000-0000-000000000001',
         user_id: '00000000-0000-0000-0000-000000000001',
         species_id: 'demo-species-1',
-        plant_count: 7500, // Updated to match the balance calculation
-        total_amount: 119925, // 7500 * 15.99
-        price_per_plant: 15.99,
-        plantation_year: 2020,
-        expected_harvest_year: 2028,
+        plant_count: 500,
+        total_amount: 250000, // 500 * $500 (2021 price)
+        price_per_plant: 500,
+        plantation_year: 2021,
+        expected_harvest_year: 2026, // April 2021 + 5.5 years = October 2026
         weight_per_plant_kg: 50,
         status: 'active',
-        created_at: '2020-03-15T10:00:00Z',
+        created_at: '2021-04-15T10:00:00Z',
         plant_species: {
           name: 'Agave Angustifolia Haw (Espadín)',
-          maturation_years: 8,
+          maturation_years: 5.5,
         },
       },
       {
         id: '10000000-0000-0000-0000-000000000002',
         user_id: '00000000-0000-0000-0000-000000000001',
         species_id: 'demo-species-1',
-        plant_count: 2500,
-        total_amount: 750000,
-        price_per_plant: 300,
-        plantation_year: 2022,
-        expected_harvest_year: 2030,
+        plant_count: 1000,
+        total_amount: 400000, // 1000 * $400 (2023 price)
+        price_per_plant: 400,
+        plantation_year: 2023,
+        expected_harvest_year: 2028, // April 2023 + 5.5 years = October 2028
         weight_per_plant_kg: 50,
         status: 'active',
-        created_at: '2022-07-20T14:30:00Z',
+        created_at: '2023-04-20T14:30:00Z',
         plant_species: {
           name: 'Agave Angustifolia Haw (Espadín)',
-          maturation_years: 8,
+          maturation_years: 5.5,
         },
       },
       {
         id: '10000000-0000-0000-0000-000000000003',
         user_id: '00000000-0000-0000-0000-000000000001',
-        species_id: 'demo-species-2',
-        plant_count: 3200,
-        total_amount: 960000,
+        species_id: 'demo-species-1',
+        plant_count: 800,
+        total_amount: 240000, // 800 * $300 (2025 price)
         price_per_plant: 300,
-        plantation_year: 2021,
-        expected_harvest_year: 2029,
+        plantation_year: 2025,
+        expected_harvest_year: 2030, // April 2025 + 5.5 years = October 2030
         weight_per_plant_kg: 50,
         status: 'active',
-        created_at: '2021-11-10T09:15:00Z',
+        created_at: '2025-04-10T09:15:00Z',
         plant_species: {
-          name: 'Agave Americana',
-          maturation_years: 8,
+          name: 'Agave Angustifolia Haw (Espadín)',
+          maturation_years: 5.5,
         },
       },
     ],

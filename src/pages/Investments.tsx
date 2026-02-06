@@ -331,23 +331,38 @@ const Investments = () => {
                 </div>
               </div>
 
-              {/* Progreso de Maduración */}
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium">Progreso de Maduración</div>
-                  <div className="text-sm text-muted-foreground">
-                    {Math.max(0, investment.expected_harvest_year - new Date().getFullYear())} {t('investments.remainingYears')}
+              {/* Progreso de Maduración - calculated from April */}
+              {(() => {
+                const now = new Date();
+                const plantingDate = new Date(investment.plantation_year, 3, 1); // April
+                const harvestDate = new Date(investment.expected_harvest_year, 9, 1); // October (expected)
+                const totalMonths = (harvestDate.getFullYear() - plantingDate.getFullYear()) * 12 + 
+                                   (harvestDate.getMonth() - plantingDate.getMonth());
+                const monthsGrown = Math.max(0,
+                  (now.getFullYear() - plantingDate.getFullYear()) * 12 +
+                  (now.getMonth() - plantingDate.getMonth())
+                );
+                const progress = Math.min(100, Math.max(0, (monthsGrown / totalMonths) * 100));
+                const monthsRemaining = Math.max(0, totalMonths - monthsGrown);
+                const yearsRemaining = (monthsRemaining / 12).toFixed(1);
+                
+                return (
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium">Progreso de Maduración</div>
+                      <div className="text-sm text-muted-foreground">
+                        {yearsRemaining} {t('investments.remainingYears')}
+                      </div>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-gradient-agave h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
                   </div>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="bg-gradient-agave h-2 rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${Math.max(0, Math.min(100, ((new Date().getFullYear() - investment.plantation_year) / (investment.expected_harvest_year - investment.plantation_year)) * 100))}%` 
-                    }}
-                  ></div>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Calculadora de Valuación - Solo para usuarios no admin */}
               {profile?.role !== 'admin' && (
