@@ -147,12 +147,29 @@ export const InvestmentSimulator: React.FC = () => {
       };
     }
 
-    const currentYear = new Date().getFullYear();
+    const now = new Date();
+    const currentYear = now.getFullYear();
     const establishmentYear = parseInt(selectedYear);
-    const yearsGrown = currentYear - establishmentYear;
-    const yearsToHarvest = Math.max(0, currentSpecies.maturation_years - yearsGrown);
-    const isReadyForHarvest = yearsToHarvest === 0;
-    const actualHarvestYear = isReadyForHarvest ? currentYear : currentYear + yearsToHarvest;
+    
+    // Calculate from April of the establishment year (month 3 = April, 0-indexed)
+    const plantingDate = new Date(establishmentYear, 3, 1);
+    const maturationMonths = currentSpecies.maturation_years * 12; // e.g., 5.5 * 12 = 66 months
+    
+    // Calculate months grown since April of establishment year
+    const monthsGrown = Math.max(0, 
+      (now.getFullYear() - plantingDate.getFullYear()) * 12 + 
+      (now.getMonth() - plantingDate.getMonth())
+    );
+    
+    const yearsGrown = monthsGrown / 12;
+    const monthsToHarvest = Math.max(0, maturationMonths - monthsGrown);
+    const yearsToHarvest = Math.ceil(monthsToHarvest / 12 * 10) / 10; // Round to 1 decimal
+    const isReadyForHarvest = monthsToHarvest <= 0;
+    
+    // Calculate harvest date: April + maturation months
+    const harvestDate = new Date(plantingDate);
+    harvestDate.setMonth(harvestDate.getMonth() + maturationMonths);
+    const actualHarvestYear = harvestDate.getFullYear();
 
     // 1. Datos base
     const pricePerPlant = currentPricePerPlant;
@@ -174,9 +191,10 @@ export const InvestmentSimulator: React.FC = () => {
     
     // 5. Cálculo de CO2: usando carbon_capture_per_plant de la base de datos
     const carbonCapturePerPlant = currentSpecies.carbon_capture_per_plant || 0.072;
-    const totalCarbonCapture = numberOfPlants * carbonCapturePerPlant * Math.max(yearsGrown, currentSpecies.maturation_years);
+    const effectiveYearsGrown = Math.max(yearsGrown, currentSpecies.maturation_years);
+    const totalCarbonCapture = numberOfPlants * carbonCapturePerPlant * effectiveYearsGrown;
     
-    const maturationDate = new Date(actualHarvestYear, 0, 1);
+    const maturationDate = harvestDate;
 
     return {
       totalInvestment,
@@ -424,7 +442,7 @@ export const InvestmentSimulator: React.FC = () => {
                 <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded">
                   <Clock className="h-4 w-4 text-amber-600" />
                   <span className="text-sm text-amber-700">
-                    Faltan {results.yearsToHarvest} años para la cosecha
+                    Faltan {results.yearsToHarvest.toFixed(1)} años para la cosecha (Octubre {results.actualHarvestYear})
                   </span>
                 </div>
               )}

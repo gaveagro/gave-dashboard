@@ -198,11 +198,17 @@ const Dashboard = () => {
     return closest;
   }, null as any);
 
-  // Calculate average progress
+  // Calculate average progress using months since April
+  const now = new Date();
   const averageProgress = investments?.length ? investments.reduce((sum, inv) => {
-    const yearsGrown = currentYear - inv.plantation_year;
-    const maturationYears = inv.plant_species?.maturation_years || 8;
-    const progress = Math.min((yearsGrown / maturationYears) * 100, 100);
+    const plantingDate = new Date(inv.plantation_year, 3, 1); // April of plantation year
+    const maturationYears = inv.plant_species?.maturation_years || 5.5;
+    const maturationMonths = maturationYears * 12;
+    const monthsGrown = Math.max(0, 
+      (now.getFullYear() - plantingDate.getFullYear()) * 12 + 
+      (now.getMonth() - plantingDate.getMonth())
+    );
+    const progress = Math.min((monthsGrown / maturationMonths) * 100, 100);
     return sum + progress;
   }, 0) / investments.length : 0;
 
@@ -371,9 +377,22 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               {investments.map((investment) => {
-                const yearsGrown = currentYear - investment.plantation_year;
-                const maturationYears = investment.plant_species?.maturation_years || 8;
-                const progress = Math.min((yearsGrown / maturationYears) * 100, 100);
+                // Calculate progress using months since April
+                const plantingDate = new Date(investment.plantation_year, 3, 1);
+                const maturationYears = investment.plant_species?.maturation_years || 5.5;
+                const maturationMonths = maturationYears * 12;
+                const monthsGrown = Math.max(0, 
+                  (now.getFullYear() - plantingDate.getFullYear()) * 12 + 
+                  (now.getMonth() - plantingDate.getMonth())
+                );
+                const progress = Math.min((monthsGrown / maturationMonths) * 100, 100);
+                const yearsGrownDisplay = (monthsGrown / 12).toFixed(1);
+                
+                // Calculate harvest date
+                const harvestDate = new Date(plantingDate);
+                harvestDate.setMonth(harvestDate.getMonth() + maturationMonths);
+                const harvestMonth = harvestDate.toLocaleString('es-ES', { month: 'long' });
+                const harvestYear = harvestDate.getFullYear();
                 
                 return (
                   <div key={investment.id} className="space-y-3 p-4 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800">
@@ -383,10 +402,10 @@ const Dashboard = () => {
                           {investment.plant_species?.name}
                         </h4>
                         <p className="text-sm text-green-600 dark:text-green-400">
-                          {investment.plant_count.toLocaleString()} plantas • Establecido en {investment.plantation_year}
+                          {investment.plant_count.toLocaleString()} plantas • Establecido en abril {investment.plantation_year}
                         </p>
                         <p className="text-xs text-green-500 dark:text-green-500">
-                          Inversión: {formatCurrency(investment.total_amount)}
+                          Inversión: {formatCurrency(investment.total_amount)} • Cosecha: {harvestMonth} {harvestYear}
                         </p>
                       </div>
                       <div className="text-right">
@@ -394,7 +413,7 @@ const Dashboard = () => {
                           {Math.round(progress)}%
                         </p>
                         <p className="text-xs text-green-600 dark:text-green-400">
-                          {yearsGrown} de {maturationYears} años
+                          {yearsGrownDisplay} de {maturationYears} años
                         </p>
                       </div>
                     </div>
