@@ -1,146 +1,102 @@
 
-# Plan: Actualizar Tiempo de Maduración y Precios del Espadín
 
-## Resumen de Cambios Solicitados
+# Plan: Calendario de Rentas (Admin Only)
 
-**Maduración:**
-- Cambiar de 5 años a 5.5 años
-- Calcular desde abril de cada año de establecimiento
+## Resumen
 
-**Precios por año de establecimiento:**
-| Año | Precio |
-|-----|--------|
-| 2026 | $250 |
-| 2025 | $300 |
-| 2024 | $350 |
-| 2023 | $400 |
-| 2022 | $450 |
-| 2021 | $500 |
+Crear una nueva seccion "Rentas" en el panel de administracion para gestionar contratos de renta de terrenos, con control de pagos, vencimientos, prioridades de pago y relacion con anos de plantacion.
+
+## Datos del CSV
+
+Se importaran 20 registros de rentas con campos como: ano de plantacion, superficie (ha), costo por ha/ano, renta anual, propietario, ubicacion, fecha inicio/terminacion, frecuencia de pago, saldo pendiente y notas/comentarios.
 
 ---
 
-## Paso 1: Migración de Base de Datos
+## Paso 1: Crear tabla `land_leases` en Supabase
 
-Crear una migración SQL que:
+Nueva tabla con las siguientes columnas:
 
-1. **Cambiar tipo de columna** `maturation_years` de `INTEGER` a `NUMERIC(3,1)` para soportar 5.5
-2. **Actualizar el Espadín** a 5.5 años de maduración
-3. **Actualizar precios existentes:**
-   - 2025: $250 -> $300
-   - 2024: $300 -> $350
-   - 2023: $350 -> $400
-   - 2022: $400 -> $450
-   - 2021: $450 -> $500
-4. **Insertar nuevo precio** para 2026: $250
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| id | UUID (PK) | Identificador |
+| plantation_year | INTEGER | Ano de plantacion |
+| area_hectares | NUMERIC(10,2) | Superficie en hectareas |
+| cost_per_hectare_year | NUMERIC(12,2) | Costo por ha/ano |
+| annual_rent | NUMERIC(12,2) | Renta anual total |
+| owner_name | TEXT | Nombre del propietario |
+| location | TEXT | Ubicacion del predio |
+| start_date | DATE | Fecha de inicio del contrato |
+| end_date | DATE | Fecha de terminacion |
+| payment_frequency | TEXT | Frecuencia de pago (Anual, Mensual, Cada 6 meses) |
+| outstanding_balance | NUMERIC(12,2) | Saldo pendiente actual |
+| notes | TEXT | Comentarios y notas |
+| species_name | TEXT | Especie de agave cultivada (para futuro uso) |
+| status | TEXT | Estado: active, expired, paid_up |
+| created_at | TIMESTAMPTZ | Fecha creacion |
+| updated_at | TIMESTAMPTZ | Fecha actualizacion |
 
----
+- RLS habilitado, con politica solo para admins usando `has_role(auth.uid(), 'admin')`
 
-## Paso 2: Actualizar Lógica del Simulador
+## Paso 2: Crear tabla `lease_payments` para registro de pagos
 
-**Archivo:** `src/components/simulator/InvestmentSimulator.tsx`
+| Columna | Tipo | Descripcion |
+|---------|------|-------------|
+| id | UUID (PK) | Identificador |
+| lease_id | UUID (FK -> land_leases) | Referencia a la renta |
+| amount | NUMERIC(12,2) | Monto pagado |
+| payment_date | DATE | Fecha del pago |
+| period_covered | TEXT | Periodo que cubre (ej: "Oct 2024 - Oct 2025") |
+| notes | TEXT | Notas del pago |
+| created_at | TIMESTAMPTZ | Fecha creacion |
 
-Cambios en el cálculo de fechas (líneas 150-156):
-```text
-// ANTES (cálculo simple por años)
-const yearsGrown = currentYear - establishmentYear;
-const yearsToHarvest = Math.max(0, maturation_years - yearsGrown);
+- RLS habilitado, solo admins
 
-// DESPUÉS (cálculo preciso desde abril)
-const plantingDate = new Date(establishmentYear, 3, 1); // Abril
-const now = new Date();
-const monthsGrown = (now.getFullYear() - plantingDate.getFullYear()) * 12 
-                  + (now.getMonth() - plantingDate.getMonth());
-const yearsGrown = monthsGrown / 12;
-const maturationMonths = maturation_years * 12; // 5.5 * 12 = 66 meses
-const harvestDate = new Date(plantingDate.getTime() + maturationMonths * 30.44 * 24 * 60 * 60 * 1000);
-```
+## Paso 3: Insertar los datos del CSV
 
-Actualizar cálculo de fecha de cosecha (línea 179):
-```text
-// Calcular fecha exacta: abril + 5.5 años = octubre
-const harvestDate = new Date(establishmentYear, 3 + Math.floor(maturation_years * 12), 1);
-```
+Insertar los 20 registros del CSV en la tabla `land_leases` con los datos parseados (convirtiendo formatos de moneda y fechas).
 
----
+## Paso 4: Crear componente `LeaseManager.tsx`
 
-## Paso 3: Actualizar Dashboard
+Nuevo componente en `src/components/admin/LeaseManager.tsx` que incluira:
 
-**Archivo:** `src/pages/Dashboard.tsx`
+**Vista principal (tabla):**
+- Tabla con todas las rentas, ordenadas por prioridad
+- Columnas: Propietario, Ubicacion, Ano Plantacion, Superficie, Renta Anual, Frecuencia, Fecha Vencimiento, Saldo Pendiente, Estado
+- Indicadores visuales con colores:
+  - Rojo: renta vencida con saldo pendiente
+  - Amarillo: renta proxima a vencer (dentro de 3 meses)
+  - Verde: pagada al corriente
+  - Gris: contrato expirado sin deuda
 
-Cambios en el cálculo de progreso (líneas 202-207):
-```text
-// ANTES
-const yearsGrown = currentYear - inv.plantation_year;
-const progress = Math.min((yearsGrown / maturationYears) * 100, 100);
+**Panel de resumen (cards superiores):**
+- Total de rentas activas
+- Total de saldo pendiente
+- Rentas vencidas (cantidad)
+- Proximos vencimientos (cantidad en los proximos 3 meses)
 
-// DESPUÉS (cálculo mensual desde abril)
-const plantingDate = new Date(inv.plantation_year, 3, 1); // Abril
-const now = new Date();
-const monthsGrown = Math.max(0, (now.getFullYear() - plantingDate.getFullYear()) * 12 
-                           + (now.getMonth() - plantingDate.getMonth()));
-const maturationMonths = maturationYears * 12;
-const progress = Math.min((monthsGrown / maturationMonths) * 100, 100);
-```
+**Prioridades:**
+- Ordenar automaticamente por proximidad a cosecha (usando el ano de plantacion + 5.5 anos de maduracion) para identificar que predios son prioritarios de pago
 
-Actualizar también las líneas 373-377 donde se muestra el progreso por inversión.
+**Funcionalidades CRUD:**
+- Crear nueva renta
+- Editar renta existente
+- Registrar pago (reduce saldo pendiente)
+- Eliminar renta
+- Filtrar por ubicacion, estado, ano de plantacion
 
----
+## Paso 5: Integrar en Admin.tsx
 
-## Paso 4: Actualizar Página de Inversiones
-
-**Archivo:** `src/pages/Investments.tsx`
-
-Cambios en el cálculo de progreso (líneas 344-349):
-```text
-// Usar la misma lógica de cálculo mensual desde abril
-// para el progress bar de maduración
-```
-
----
-
-## Paso 5: Actualizar Datos Demo
-
-**Archivo:** `src/contexts/DemoContext.tsx`
-
-1. Cambiar `maturation_years: 8` a `maturation_years: 5.5` en las inversiones demo del Espadín (líneas 82-84, 99-101)
-2. Actualizar `expected_harvest_year` para reflejar los 5.5 años desde abril
-3. Ajustar `price_per_plant` según la nueva escala de precios
+- Agregar nueva tab "Rentas" al TabsList (pasar de grid-cols-7 a grid-cols-8)
+- Importar y renderizar `LeaseManager` en el nuevo TabsContent
 
 ---
 
-## Paso 6: Actualizar Componente Admin (SpeciesManager)
+## Archivos a crear/modificar
 
-**Archivo:** `src/components/admin/SpeciesManager.tsx`
-
-Cambiar `parseInt` a `parseFloat` en el input de años de maduración para permitir valores decimales como 5.5.
-
----
-
-## Detalle Técnico: Cálculo de Fecha de Cosecha
-
-Para un establecimiento en **abril 2024** con **5.5 años** de maduración:
-- Abril 2024 + 5.5 años = Octubre 2029
-- Meses: 4 (abril) + 66 meses = 70 meses desde enero 2024
-- Año: 2024 + 5 = 2029, Mes: 4 + 6 = 10 (octubre)
-
-| Año Plantación | Mes Plantación | + 5.5 años | Cosecha |
-|----------------|----------------|------------|---------|
-| 2021 | Abril | 66 meses | Octubre 2026 |
-| 2022 | Abril | 66 meses | Octubre 2027 |
-| 2023 | Abril | 66 meses | Octubre 2028 |
-| 2024 | Abril | 66 meses | Octubre 2029 |
-| 2025 | Abril | 66 meses | Octubre 2030 |
-| 2026 | Abril | 66 meses | Octubre 2031 |
-
----
-
-## Archivos a Modificar
-
-| Archivo | Cambio |
+| Archivo | Accion |
 |---------|--------|
-| Nueva migración SQL | Tipo de columna + datos |
-| `src/components/simulator/InvestmentSimulator.tsx` | Lógica de fechas |
-| `src/pages/Dashboard.tsx` | Cálculo de progreso |
-| `src/pages/Investments.tsx` | Progress bar |
-| `src/contexts/DemoContext.tsx` | Datos demo |
-| `src/components/admin/SpeciesManager.tsx` | Input decimal |
+| Nueva migracion SQL | Crear tablas `land_leases` y `lease_payments` + RLS + datos iniciales |
+| `src/integrations/supabase/types.ts` | Se actualiza automaticamente |
+| `src/components/admin/LeaseManager.tsx` | **Crear** - Componente principal de gestion de rentas |
+| `src/pages/Admin.tsx` | Agregar tab "Rentas" e importar LeaseManager |
+
