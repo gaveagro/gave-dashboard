@@ -11,9 +11,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { 
   Plus, Edit, Trash2, DollarSign, AlertTriangle, CheckCircle, Clock, 
-  MapPin, Calendar, Filter
+  MapPin, Calendar, Filter, MessageSquare, Send
 } from 'lucide-react';
 
 type Lease = {
@@ -31,30 +33,94 @@ type Lease = {
   notes: string | null;
   species_name: string | null;
   status: string | null;
+  estimated_harvest_month: number | null;
+  estimated_harvest_year: number | null;
   created_at: string;
   updated_at: string;
 };
 
+type LeaseComment = {
+  id: string;
+  lease_id: string;
+  comment: string;
+  created_at: string;
+};
+
 const MATURATION_YEARS = 5.5;
+
+const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MONTH_NAMES_FULL = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
 };
 
-const getHarvestDate = (plantationYear: number | null) => {
-  if (!plantationYear) return null;
-  const monthsToAdd = Math.floor(MATURATION_YEARS * 12); // 66 months
-  const harvestDate = new Date(plantationYear, 3 + monthsToAdd, 1); // April + 66 months
-  return harvestDate;
+const getHarvestDate = (lease: Lease) => {
+  // Use manual override if set
+  if (lease.estimated_harvest_year) {
+    const month = (lease.estimated_harvest_month || 4) - 1; // default April
+    return new Date(lease.estimated_harvest_year, month, 1);
+  }
+  // Fallback to automatic calculation
+  if (!lease.plantation_year) return null;
+  const monthsToAdd = Math.floor(MATURATION_YEARS * 12);
+  return new Date(lease.plantation_year, 3 + monthsToAdd, 1);
 };
 
-const getMonthsToHarvest = (plantationYear: number | null) => {
-  if (!plantationYear) return Infinity;
-  const harvestDate = getHarvestDate(plantationYear);
+const getMonthsToHarvest = (lease: Lease) => {
+  const harvestDate = getHarvestDate(lease);
   if (!harvestDate) return Infinity;
   const now = new Date();
-  const months = (harvestDate.getFullYear() - now.getFullYear()) * 12 + (harvestDate.getMonth() - now.getMonth());
-  return months;
+  return (harvestDate.getFullYear() - now.getFullYear()) * 12 + (harvestDate.getMonth() - now.getMonth());
+};
+
+const getNextRentDueDate = (lease: Lease): Date | null => {
+  if (!lease.start_date) return null;
+  const now = new Date();
+  const endDate = lease.end_date ? new Date(lease.end_date) : null;
+  
+  // If contract expired, no next due date
+  if (endDate && endDate < now) return null;
+  
+  const start = new Date(lease.start_date);
+  const freq = lease.payment_frequency || 'Anual';
+  let monthsIncrement = 12;
+  if (freq === 'Cada 6 meses') monthsIncrement = 6;
+  if (freq === 'Mensual') monthsIncrement = 1;
+  
+  let current = new Date(start);
+  // Find the next due date that is >= today
+  while (current < now) {
+    current = new Date(current.getFullYear(), current.getMonth() + monthsIncrement, current.getDate());
+  }
+  
+  // Don't exceed end date
+  if (endDate && current > endDate) return null;
+  
+  return current;
+};
+
+const generatePeriodOptions = (lease: Lease): string[] => {
+  if (!lease.start_date) return [];
+  const start = new Date(lease.start_date);
+  const endDate = lease.end_date ? new Date(lease.end_date) : null;
+  const freq = lease.payment_frequency || 'Anual';
+  let monthsIncrement = 12;
+  if (freq === 'Cada 6 meses') monthsIncrement = 6;
+  if (freq === 'Mensual') monthsIncrement = 1;
+  
+  const periods: string[] = [];
+  let current = new Date(start);
+  const limit = endDate || new Date(start.getFullYear() + 10, start.getMonth(), start.getDate());
+  
+  while (current < limit && periods.length < 30) {
+    const next = new Date(current.getFullYear(), current.getMonth() + monthsIncrement, current.getDate());
+    const fromStr = `${MONTH_NAMES[current.getMonth()]} ${current.getFullYear()}`;
+    const toStr = `${MONTH_NAMES[next.getMonth()]} ${next.getFullYear()}`;
+    periods.push(`${fromStr} - ${toStr}`);
+    current = next;
+  }
+  return periods;
 };
 
 const getLeaseStatus = (lease: Lease) => {
@@ -84,6 +150,24 @@ const getStatusBadge = (status: string) => {
   }
 };
 
+const getNextRentBadge = (lease: Lease) => {
+  const nextDue = getNextRentDueDate(lease);
+  if (!nextDue) return <span className="text-muted-foreground text-xs">-</span>;
+  
+  const now = new Date();
+  const diffMs = nextDue.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const label = `${MONTH_NAMES[nextDue.getMonth()]} ${nextDue.getFullYear()}`;
+  
+  if (diffDays < 0) {
+    return <span className="text-destructive font-semibold text-xs">{label} (vencida)</span>;
+  }
+  if (diffDays <= 30) {
+    return <span className="text-amber-600 font-semibold text-xs">{label}</span>;
+  }
+  return <span className="text-xs">{label}</span>;
+};
+
 const emptyForm = {
   plantation_year: new Date().getFullYear(),
   area_hectares: 0,
@@ -98,6 +182,8 @@ const emptyForm = {
   notes: '',
   species_name: '',
   status: 'active',
+  estimated_harvest_month: '' as string | number,
+  estimated_harvest_year: '' as string | number,
 };
 
 export const LeaseManager = () => {
@@ -105,10 +191,13 @@ export const LeaseManager = () => {
   const queryClient = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showCommentsDialog, setShowCommentsDialog] = useState(false);
   const [editingLease, setEditingLease] = useState<Lease | null>(null);
   const [payingLease, setPayingLease] = useState<Lease | null>(null);
+  const [commentingLease, setCommentingLease] = useState<Lease | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [paymentForm, setPaymentForm] = useState({ amount: 0, payment_date: '', period_covered: '', notes: '' });
+  const [newComment, setNewComment] = useState('');
   const [filterLocation, setFilterLocation] = useState('all');
   const [filterYear, setFilterYear] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -125,10 +214,24 @@ export const LeaseManager = () => {
     }
   });
 
+  const { data: comments, refetch: refetchComments } = useQuery({
+    queryKey: ['lease-comments', commentingLease?.id],
+    queryFn: async () => {
+      if (!commentingLease) return [];
+      const { data, error } = await supabase
+        .from('lease_comments')
+        .select('*')
+        .eq('lease_id', commentingLease.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as LeaseComment[];
+    },
+    enabled: !!commentingLease,
+  });
+
   const locations = [...new Set(leases?.map(l => l.location).filter(Boolean) || [])];
   const years = [...new Set(leases?.map(l => l.plantation_year).filter(Boolean) || [])].sort();
 
-  // Filter and sort leases
   const filteredLeases = (leases || [])
     .filter(l => filterLocation === 'all' || l.location === filterLocation)
     .filter(l => filterYear === 'all' || String(l.plantation_year) === filterYear)
@@ -136,12 +239,8 @@ export const LeaseManager = () => {
       if (filterStatus === 'all') return true;
       return getLeaseStatus(l) === filterStatus;
     })
-    .sort((a, b) => {
-      // Sort by proximity to harvest (closest first = highest priority)
-      return getMonthsToHarvest(a.plantation_year) - getMonthsToHarvest(b.plantation_year);
-    });
+    .sort((a, b) => getMonthsToHarvest(a) - getMonthsToHarvest(b));
 
-  // Summary stats
   const activeLeases = leases?.filter(l => l.status === 'active') || [];
   const totalBalance = activeLeases.reduce((sum, l) => sum + (l.outstanding_balance || 0), 0);
   const overdueCount = activeLeases.filter(l => getLeaseStatus(l) === 'overdue').length;
@@ -150,9 +249,22 @@ export const LeaseManager = () => {
 
   const handleSave = async () => {
     try {
-      const data = {
-        ...form,
+      const data: any = {
+        plantation_year: form.plantation_year,
+        area_hectares: form.area_hectares,
+        cost_per_hectare_year: form.cost_per_hectare_year,
         annual_rent: form.area_hectares * form.cost_per_hectare_year || form.annual_rent,
+        owner_name: form.owner_name,
+        location: form.location,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+        payment_frequency: form.payment_frequency,
+        outstanding_balance: form.outstanding_balance,
+        notes: form.notes,
+        species_name: form.species_name,
+        status: form.status,
+        estimated_harvest_month: form.estimated_harvest_month ? Number(form.estimated_harvest_month) : null,
+        estimated_harvest_year: form.estimated_harvest_year ? Number(form.estimated_harvest_year) : null,
       };
 
       if (editingLease) {
@@ -214,6 +326,22 @@ export const LeaseManager = () => {
     }
   };
 
+  const handleAddComment = async () => {
+    if (!commentingLease || !newComment.trim()) return;
+    try {
+      const { error } = await supabase.from('lease_comments').insert([{
+        lease_id: commentingLease.id,
+        comment: newComment.trim(),
+      }]);
+      if (error) throw error;
+      setNewComment('');
+      refetchComments();
+      toast({ title: 'Comentario agregado' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const openEdit = (lease: Lease) => {
     setEditingLease(lease);
     setForm({
@@ -230,14 +358,22 @@ export const LeaseManager = () => {
       notes: lease.notes || '',
       species_name: lease.species_name || '',
       status: lease.status || 'active',
+      estimated_harvest_month: lease.estimated_harvest_month || '',
+      estimated_harvest_year: lease.estimated_harvest_year || '',
     });
     setShowDialog(true);
   };
 
   const openPayment = (lease: Lease) => {
     setPayingLease(lease);
-    setPaymentForm({ amount: lease.annual_rent || 0, payment_date: new Date().toISOString().split('T')[0], period_covered: '', notes: '' });
+    setPaymentForm({ amount: 0, payment_date: new Date().toISOString().split('T')[0], period_covered: '', notes: '' });
     setShowPaymentDialog(true);
+  };
+
+  const openComments = (lease: Lease) => {
+    setCommentingLease(lease);
+    setNewComment('');
+    setShowCommentsDialog(true);
   };
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Cargando rentas...</div>;
@@ -343,6 +479,7 @@ export const LeaseManager = () => {
                   <TableHead className="text-right">Ha</TableHead>
                   <TableHead className="text-right">Renta Anual</TableHead>
                   <TableHead>Frecuencia</TableHead>
+                  <TableHead>Próx. Renta</TableHead>
                   <TableHead>Vencimiento</TableHead>
                   <TableHead className="text-right">Saldo</TableHead>
                   <TableHead>Estado</TableHead>
@@ -352,11 +489,12 @@ export const LeaseManager = () => {
               <TableBody>
                 {filteredLeases.map(lease => {
                   const status = getLeaseStatus(lease);
-                  const harvest = getHarvestDate(lease.plantation_year);
+                  const harvest = getHarvestDate(lease);
+                  const isManualHarvest = !!lease.estimated_harvest_year;
                   const harvestStr = harvest 
-                    ? `${harvest.toLocaleString('es-MX', { month: 'short' })} ${harvest.getFullYear()}`
+                    ? `${MONTH_NAMES[harvest.getMonth()]} ${harvest.getFullYear()}`
                     : '-';
-                  const monthsToH = getMonthsToHarvest(lease.plantation_year);
+                  const monthsToH = getMonthsToHarvest(lease);
 
                   return (
                     <TableRow 
@@ -368,16 +506,18 @@ export const LeaseManager = () => {
                       }
                     >
                       <TableCell className="font-medium">{lease.owner_name}</TableCell>
-                      <TableCell className="flex items-center gap-1"><MapPin className="h-3 w-3 text-muted-foreground" />{lease.location}</TableCell>
+                      <TableCell><span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-muted-foreground" />{lease.location}</span></TableCell>
                       <TableCell className="text-center">{lease.plantation_year}</TableCell>
                       <TableCell className="text-center">
                         <span className={monthsToH <= 12 ? 'font-semibold text-amber-600' : ''}>
                           {harvestStr}
+                          {isManualHarvest && <span className="text-xs text-muted-foreground ml-1">✎</span>}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">{lease.area_hectares}</TableCell>
                       <TableCell className="text-right">{formatCurrency(lease.annual_rent || 0)}</TableCell>
                       <TableCell>{lease.payment_frequency}</TableCell>
+                      <TableCell>{getNextRentBadge(lease)}</TableCell>
                       <TableCell>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 text-muted-foreground" />
@@ -395,6 +535,9 @@ export const LeaseManager = () => {
                         <div className="flex gap-1">
                           <Button size="icon" variant="ghost" onClick={() => openPayment(lease)} title="Registrar pago">
                             <DollarSign className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => openComments(lease)} title="Comentarios">
+                            <MessageSquare className="h-4 w-4" />
                           </Button>
                           <Button size="icon" variant="ghost" onClick={() => openEdit(lease)} title="Editar">
                             <Edit className="h-4 w-4" />
@@ -482,6 +625,30 @@ export const LeaseManager = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Harvest override fields */}
+            <div className="space-y-2">
+              <Label>Mes Cosecha Estimado</Label>
+              <Select value={String(form.estimated_harvest_month || '')} onValueChange={v => setForm(f => ({ ...f, estimated_harvest_month: v === '' ? '' : Number(v) }))}>
+                <SelectTrigger><SelectValue placeholder="Auto (Abr)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Automático</SelectItem>
+                  {MONTH_NAMES_FULL.map((m, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Año Cosecha Estimado</Label>
+              <Input 
+                type="number" 
+                placeholder="Auto" 
+                value={form.estimated_harvest_year} 
+                onChange={e => setForm(f => ({ ...f, estimated_harvest_year: e.target.value ? parseInt(e.target.value) : '' }))} 
+              />
+            </div>
+
             <div className="col-span-2 space-y-2">
               <Label>Notas</Label>
               <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
@@ -495,35 +662,119 @@ export const LeaseManager = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Payment Dialog */}
+      {/* Payment Dialog - Enhanced */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Registrar Pago</DialogTitle>
+            <DialogTitle>Registrar Abono / Pago</DialogTitle>
             {payingLease && (
               <p className="text-sm text-muted-foreground">
-                {payingLease.owner_name} — {payingLease.location} — Saldo: {formatCurrency(payingLease.outstanding_balance || 0)}
+                {payingLease.owner_name} — {payingLease.location}
+              </p>
+            )}
+          </DialogHeader>
+          {payingLease && (
+            <div className="space-y-4">
+              {/* Balance info */}
+              <div className="rounded-md border p-3 space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Saldo actual:</span>
+                  <span className="font-semibold text-destructive">{formatCurrency(payingLease.outstanding_balance || 0)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Renta por periodo ({payingLease.payment_frequency}):</span>
+                  <span>{formatCurrency(payingLease.annual_rent || 0)}</span>
+                </div>
+                {paymentForm.amount > 0 && (
+                  <>
+                    <Separator />
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Abono:</span>
+                      <span className="text-emerald-600">- {formatCurrency(paymentForm.amount)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm font-semibold">
+                      <span>Saldo resultante:</span>
+                      <span>{formatCurrency(Math.max(0, (payingLease.outstanding_balance || 0) - paymentForm.amount))}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Monto del Abono</Label>
+                <Input type="number" step="0.01" value={paymentForm.amount} onChange={e => setPaymentForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))} />
+                <p className="text-xs text-muted-foreground">Puede ser un abono parcial, no tiene que ser la renta completa</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha de Pago</Label>
+                <Input type="date" value={paymentForm.payment_date} onChange={e => setPaymentForm(f => ({ ...f, payment_date: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Periodo que Corresponde</Label>
+                <Select value={paymentForm.period_covered} onValueChange={v => setPaymentForm(f => ({ ...f, period_covered: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar periodo..." /></SelectTrigger>
+                  <SelectContent>
+                    {generatePeriodOptions(payingLease).map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">O escribe manualmente:</p>
+                <Input placeholder="Ej: Oct 2024 - Oct 2025" value={paymentForm.period_covered} onChange={e => setPaymentForm(f => ({ ...f, period_covered: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Notas del Pago</Label>
+                <Textarea value={paymentForm.notes} onChange={e => setPaymentForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Ej: Abono parcial, transferencia bancaria" />
+              </div>
+              <Button onClick={handlePayment} className="w-full">Registrar Abono</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Comments Dialog */}
+      <Dialog open={showCommentsDialog} onOpenChange={setShowCommentsDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Comentarios</DialogTitle>
+            {commentingLease && (
+              <p className="text-sm text-muted-foreground">
+                {commentingLease.owner_name} — {commentingLease.location}
               </p>
             )}
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Monto del Pago</Label>
-              <Input type="number" step="0.01" value={paymentForm.amount} onChange={e => setPaymentForm(f => ({ ...f, amount: parseFloat(e.target.value) || 0 }))} />
+            {/* Add comment */}
+            <div className="flex gap-2">
+              <Textarea 
+                value={newComment} 
+                onChange={e => setNewComment(e.target.value)} 
+                placeholder="Agregar comentario..." 
+                rows={2} 
+                className="flex-1"
+              />
+              <Button size="icon" onClick={handleAddComment} disabled={!newComment.trim()} className="self-end">
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label>Fecha de Pago</Label>
-              <Input type="date" value={paymentForm.payment_date} onChange={e => setPaymentForm(f => ({ ...f, payment_date: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Periodo que Cubre</Label>
-              <Input placeholder="Ej: Oct 2024 - Oct 2025" value={paymentForm.period_covered} onChange={e => setPaymentForm(f => ({ ...f, period_covered: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Notas</Label>
-              <Textarea value={paymentForm.notes} onChange={e => setPaymentForm(f => ({ ...f, notes: e.target.value }))} rows={2} />
-            </div>
-            <Button onClick={handlePayment} className="w-full">Registrar Pago</Button>
+            <Separator />
+            {/* Comments list */}
+            <ScrollArea className="max-h-[300px]">
+              {(!comments || comments.length === 0) ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Sin comentarios aún</p>
+              ) : (
+                <div className="space-y-3">
+                  {comments.map(c => (
+                    <div key={c.id} className="rounded-md border p-3 space-y-1">
+                      <p className="text-sm">{c.comment}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(c.created_at).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
           </div>
         </DialogContent>
       </Dialog>
