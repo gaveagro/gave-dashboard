@@ -1,75 +1,113 @@
 
+# Plan: Mejoras al Calendario de Rentas
 
-# Plan: Insertar Datos Reales del CSV en la Tabla de Rentas
+## Resumen
 
-## Situacion Actual
+Agregar cuatro mejoras al componente LeaseManager: (1) calculo automatico de la proxima fecha de vencimiento de renta segun frecuencia de pago, (2) campo editable de mes/ano estimado de cosecha, (3) mejora en el dialogo de pago para aceptar abonos parciales con periodo asociado, y (4) seccion de comentarios/historial por contrato.
 
-La tabla `land_leases` tiene 20 registros de la zona de Ameca/Jalisco, pero el CSV compartido contiene **21 registros adicionales** de otras regiones (San Luis Potosi) que no fueron insertados.
+---
 
-## Registros a Insertar
+## Cambio 1: Columna "Proxima Renta" con calculo automatico
 
-### Grupo 1: La Caldera, Aquismon (8 registros)
+**Logica**: A partir de la fecha de inicio del contrato (`start_date`) y la frecuencia de pago (`payment_frequency`), calcular cual es la proxima fecha en que vence la renta:
 
-| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Saldo | Notas |
-|---|---|---|---|---|---|---|---|
-| Martin Melendrez | 1 | $6,000 | $6,000 | Oct 2021 | Oct 2027 | $6,000 | Renta vencida Oct 2025 |
-| Maricela Anastacio | 1 | $6,000 | $6,000 | Oct 2021 | Oct 2027 | $6,000 | Renta vencida Oct 2025 |
-| Roberto Lucas | 1 | $6,000 | $6,000 | Oct 2021 | Oct 2027 | $6,000 | Renta vencida Oct 2025 |
-| Valentin Anastacio | 0.75 | $6,666.67 | $5,000 | Oct 2021 | Oct 2027 | $5,000 | Renta vencida Oct 2025 |
-| Obispo Anastacio | 0.75 | $6,666.67 | $5,000 | Oct 2021 | Oct 2027 | $5,000 | Renta vencida Oct 2025 |
-| Josefina Lucas | 4 | $6,000 | $24,000 | Sep 2023 | Sep 2030 | $24,000 | Renta vencida Oct 2025 |
-| Santos Liborio | 1 | $12,500 | $12,500 | Oct 2021 | Oct 2027 | $12,500 | Renta vencida Oct 2025 |
+- **Anual**: sumar anos completos desde `start_date` hasta encontrar la proxima fecha futura
+- **Cada 6 meses**: sumar periodos de 6 meses
+- **Mensual**: sumar meses
 
-### Grupo 1b: El Sabinal, Aquismon (1 registro)
+Se agregara una nueva columna "Proxima Renta" en la tabla que muestre esta fecha calculada, con indicador visual si ya vencio (rojo) o esta proxima (amarillo).
 
-| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Saldo |
-|---|---|---|---|---|---|---|
-| Benito Lucas | 0.7 | $7,857.14 | $5,500 | Abr 2023 | Abr 2029 | $5,500 |
+**Archivo**: `src/components/admin/LeaseManager.tsx`
 
-### Grupo 2: Tanchachin, Aquismon (4 registros)
+## Cambio 2: Campo editable de mes/ano estimado de cosecha
 
-| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Frecuencia | Saldo |
-|---|---|---|---|---|---|---|---|
-| Melany Marquez Aguilar | 2 | $12,000 | $24,000 | 22-Sep-2022 | 22-Sep-2028 | Cada 6 meses | $0 |
-| Martin Marquez Aguilar | 1 | $18,000 | $18,000 | Jun 2022 | Jun 2028 | Mensual | $0 |
-| Martin Marquez Aguilar | 1.5 | $20,000 | $30,000 | Sep 2020 | Sep 2023 | Cada 6 meses | $0 |
-| Martin Marquez Aguilar | 3.63 | $9,917.36 | $36,000 | Ago 2020 | Ago 2023 | Cada 6 meses | $0 |
+**Actualmente**: La cosecha se calcula automaticamente con la formula `ano plantacion + 5.5 anos desde abril`. No se puede editar.
 
-Nota: Los dos ultimos contratos de Martin Marquez ya estan expirados (terminaron en 2023).
+**Nuevo**: Agregar dos columnas opcionales a la base de datos (`estimated_harvest_month` y `estimated_harvest_year`) que permitan sobrescribir la estimacion automatica. Si estan vacios, se usa el calculo automatico como fallback.
 
-### Grupo 3: Santa Anita (2 registros)
+Se agregaran campos de mes y ano de cosecha al formulario de edicion de renta.
 
-| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Saldo | Notas |
-|---|---|---|---|---|---|---|---|
-| Pablo Simon | 4 | $5,500 | $22,000 | 30-Abr-2023 | 30-Abr-2029 | $60,000 | Pago parcial en 2023, faltan 2024 y 2025 |
-| Miguel Guzman | 3 | $5,500 | $16,500 | 30-Abr-2023 | 30-Abr-2029 | $43,500 | Pago parcial en 2023, faltan 2024 y 2025 |
+**Archivos**:
+- Nueva migracion SQL para agregar columnas `estimated_harvest_month` (INTEGER, 1-12) y `estimated_harvest_year` (INTEGER) a `land_leases`
+- `src/components/admin/LeaseManager.tsx` - actualizar formulario y logica de cosecha
 
-### Grupo 4: Ebano (4 registros)
+## Cambio 3: Mejora del dialogo de Registrar Pago
 
-| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Saldo | Notas |
-|---|---|---|---|---|---|---|---|
-| Miguel Avila Garcia | 4 | $1,800 | $7,200 | 10-Jul-2021 | 10-Jul-2027 | $11,000 | A partir de julio 2026 seran $18,200 |
-| Carlos Milan Lopez | 5 | $2,000 | $10,000 | 1-Jun-2021 | 1-Jun-2027 | $7,000 | A partir de junio 2026 seran $17,000 |
-| Francisco Jimenez Santillan | 2 | $1,800 | $3,600 | 10-Jul-2021 | 10-Jul-2027 | $13,200 | A partir de junio 2026 seran $26,400 |
-| Ana Laura | 10 | $1,800 | $18,000 | 10-Jul-2021 | 10-Jul-2027 | $0 | Todo pagado hasta julio 2027 |
+El dialogo ya permite montos parciales y tiene campo de periodo. Se mejorara para:
 
-### Grupo 5: Predios sin renta (3 registros)
+- Mostrar claramente que el monto puede ser un abono parcial (no necesariamente la renta completa)
+- Agregar un selector de "Periodo de renta que corresponde" con opciones generadas automaticamente segun la frecuencia (ej: "Oct 2024 - Oct 2025", "Ene 2025 - Jun 2025")
+- Mostrar el saldo actual y el saldo resultante despues del abono
+- Agregar campo de notas para el pago
 
-| Propietario | Ha | Ubicacion | Ano |
-|---|---|---|---|
-| Mauricio Olivares | 3 | Ojo Caliente, Tamasopo | 2023 |
-| Arturo Segoviano | 8 | Pozo de Luna, Soledad de Graciano Sanchez | 2021 |
-| Arturo Segoviano | 10 | El Carpintero, Tamasopo | 2023 |
+**Archivo**: `src/components/admin/LeaseManager.tsx`
 
-Estos 3 tienen renta $0 y sin fechas de contrato. Se insertaran con status "active" y renta $0.
+## Cambio 4: Seccion de comentarios por contrato
 
-## Implementacion
+Agregar una nueva tabla `lease_comments` para registrar un historial de comentarios asociados a cada contrato (negociaciones, pendientes de firma, etc.).
 
-**Paso unico**: Usar la herramienta de insercion de datos para ejecutar un INSERT de los 21 registros en `land_leases`, asignando correctamente:
-- Los contratos expirados (Tanchachin 2020-2023) con status `expired`
-- Ana Laura con saldo $0 y status `active`
-- Los demas con sus saldos pendientes reales del CSV
-- Notas completas del CSV preservadas
+Al hacer clic en una renta, se abrira un panel o dialogo que muestre:
+- Los comentarios existentes, ordenados del mas reciente al mas antiguo
+- Un campo para agregar un nuevo comentario
+- Fecha y hora automatica de cada comentario
 
-No se requieren cambios de esquema ni de codigo frontend.
+**Archivos**:
+- Nueva migracion SQL para crear tabla `lease_comments` con RLS admin-only
+- `src/components/admin/LeaseManager.tsx` - agregar boton de comentarios y dialogo
 
+---
+
+## Detalle tecnico
+
+### Migracion SQL
+
+```text
+Tabla: lease_comments
+- id: UUID (PK)
+- lease_id: UUID (FK -> land_leases.id)
+- comment: TEXT (NOT NULL)
+- created_at: TIMESTAMPTZ (default now())
+
+Columnas nuevas en land_leases:
+- estimated_harvest_month: INTEGER (nullable, 1-12)
+- estimated_harvest_year: INTEGER (nullable)
+
+RLS: Solo admins (has_role(auth.uid(), 'admin'))
+```
+
+### Funcion de calculo de proxima renta
+
+```text
+getNextRentDueDate(startDate, frequency):
+  1. Parsear startDate
+  2. Segun frequency:
+     - "Anual": incrementar anio desde startDate hasta > hoy
+     - "Cada 6 meses": incrementar 6 meses
+     - "Mensual": incrementar 1 mes
+  3. Retornar la proxima fecha futura
+  4. Si el contrato ya expiro (endDate < hoy), retornar null
+```
+
+### Cambios en la tabla visual
+
+Se agregara la columna "Proxima Renta" entre "Frecuencia" y "Saldo", mostrando la fecha calculada con formato corto (ej: "Oct 2026").
+
+### Cambios en el formulario de edicion
+
+Se agregaran dos campos nuevos:
+- "Mes estimado de cosecha" (select 1-12 o vacio para auto)
+- "Ano estimado de cosecha" (input numerico o vacio para auto)
+
+### Boton de comentarios en tabla
+
+Se agregara un icono de "chat/comentario" en las acciones de cada fila que abrira un dialogo con el historial de comentarios y un campo para agregar nuevos.
+
+---
+
+## Archivos a crear/modificar
+
+| Archivo | Accion |
+|---------|--------|
+| Nueva migracion SQL | Crear tabla `lease_comments` + columnas harvest en `land_leases` |
+| `src/components/admin/LeaseManager.tsx` | Agregar columna proxima renta, campos cosecha editables, mejorar pago, agregar comentarios |
+| `src/integrations/supabase/types.ts` | Se actualiza automaticamente |
