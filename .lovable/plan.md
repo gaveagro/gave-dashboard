@@ -1,102 +1,75 @@
 
 
-# Plan: Calendario de Rentas (Admin Only)
+# Plan: Insertar Datos Reales del CSV en la Tabla de Rentas
 
-## Resumen
+## Situacion Actual
 
-Crear una nueva seccion "Rentas" en el panel de administracion para gestionar contratos de renta de terrenos, con control de pagos, vencimientos, prioridades de pago y relacion con anos de plantacion.
+La tabla `land_leases` tiene 20 registros de la zona de Ameca/Jalisco, pero el CSV compartido contiene **21 registros adicionales** de otras regiones (San Luis Potosi) que no fueron insertados.
 
-## Datos del CSV
+## Registros a Insertar
 
-Se importaran 20 registros de rentas con campos como: ano de plantacion, superficie (ha), costo por ha/ano, renta anual, propietario, ubicacion, fecha inicio/terminacion, frecuencia de pago, saldo pendiente y notas/comentarios.
+### Grupo 1: La Caldera, Aquismon (8 registros)
 
----
+| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Saldo | Notas |
+|---|---|---|---|---|---|---|---|
+| Martin Melendrez | 1 | $6,000 | $6,000 | Oct 2021 | Oct 2027 | $6,000 | Renta vencida Oct 2025 |
+| Maricela Anastacio | 1 | $6,000 | $6,000 | Oct 2021 | Oct 2027 | $6,000 | Renta vencida Oct 2025 |
+| Roberto Lucas | 1 | $6,000 | $6,000 | Oct 2021 | Oct 2027 | $6,000 | Renta vencida Oct 2025 |
+| Valentin Anastacio | 0.75 | $6,666.67 | $5,000 | Oct 2021 | Oct 2027 | $5,000 | Renta vencida Oct 2025 |
+| Obispo Anastacio | 0.75 | $6,666.67 | $5,000 | Oct 2021 | Oct 2027 | $5,000 | Renta vencida Oct 2025 |
+| Josefina Lucas | 4 | $6,000 | $24,000 | Sep 2023 | Sep 2030 | $24,000 | Renta vencida Oct 2025 |
+| Santos Liborio | 1 | $12,500 | $12,500 | Oct 2021 | Oct 2027 | $12,500 | Renta vencida Oct 2025 |
 
-## Paso 1: Crear tabla `land_leases` en Supabase
+### Grupo 1b: El Sabinal, Aquismon (1 registro)
 
-Nueva tabla con las siguientes columnas:
+| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Saldo |
+|---|---|---|---|---|---|---|
+| Benito Lucas | 0.7 | $7,857.14 | $5,500 | Abr 2023 | Abr 2029 | $5,500 |
 
-| Columna | Tipo | Descripcion |
-|---------|------|-------------|
-| id | UUID (PK) | Identificador |
-| plantation_year | INTEGER | Ano de plantacion |
-| area_hectares | NUMERIC(10,2) | Superficie en hectareas |
-| cost_per_hectare_year | NUMERIC(12,2) | Costo por ha/ano |
-| annual_rent | NUMERIC(12,2) | Renta anual total |
-| owner_name | TEXT | Nombre del propietario |
-| location | TEXT | Ubicacion del predio |
-| start_date | DATE | Fecha de inicio del contrato |
-| end_date | DATE | Fecha de terminacion |
-| payment_frequency | TEXT | Frecuencia de pago (Anual, Mensual, Cada 6 meses) |
-| outstanding_balance | NUMERIC(12,2) | Saldo pendiente actual |
-| notes | TEXT | Comentarios y notas |
-| species_name | TEXT | Especie de agave cultivada (para futuro uso) |
-| status | TEXT | Estado: active, expired, paid_up |
-| created_at | TIMESTAMPTZ | Fecha creacion |
-| updated_at | TIMESTAMPTZ | Fecha actualizacion |
+### Grupo 2: Tanchachin, Aquismon (4 registros)
 
-- RLS habilitado, con politica solo para admins usando `has_role(auth.uid(), 'admin')`
+| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Frecuencia | Saldo |
+|---|---|---|---|---|---|---|---|
+| Melany Marquez Aguilar | 2 | $12,000 | $24,000 | 22-Sep-2022 | 22-Sep-2028 | Cada 6 meses | $0 |
+| Martin Marquez Aguilar | 1 | $18,000 | $18,000 | Jun 2022 | Jun 2028 | Mensual | $0 |
+| Martin Marquez Aguilar | 1.5 | $20,000 | $30,000 | Sep 2020 | Sep 2023 | Cada 6 meses | $0 |
+| Martin Marquez Aguilar | 3.63 | $9,917.36 | $36,000 | Ago 2020 | Ago 2023 | Cada 6 meses | $0 |
 
-## Paso 2: Crear tabla `lease_payments` para registro de pagos
+Nota: Los dos ultimos contratos de Martin Marquez ya estan expirados (terminaron en 2023).
 
-| Columna | Tipo | Descripcion |
-|---------|------|-------------|
-| id | UUID (PK) | Identificador |
-| lease_id | UUID (FK -> land_leases) | Referencia a la renta |
-| amount | NUMERIC(12,2) | Monto pagado |
-| payment_date | DATE | Fecha del pago |
-| period_covered | TEXT | Periodo que cubre (ej: "Oct 2024 - Oct 2025") |
-| notes | TEXT | Notas del pago |
-| created_at | TIMESTAMPTZ | Fecha creacion |
+### Grupo 3: Santa Anita (2 registros)
 
-- RLS habilitado, solo admins
+| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Saldo | Notas |
+|---|---|---|---|---|---|---|---|
+| Pablo Simon | 4 | $5,500 | $22,000 | 30-Abr-2023 | 30-Abr-2029 | $60,000 | Pago parcial en 2023, faltan 2024 y 2025 |
+| Miguel Guzman | 3 | $5,500 | $16,500 | 30-Abr-2023 | 30-Abr-2029 | $43,500 | Pago parcial en 2023, faltan 2024 y 2025 |
 
-## Paso 3: Insertar los datos del CSV
+### Grupo 4: Ebano (4 registros)
 
-Insertar los 20 registros del CSV en la tabla `land_leases` con los datos parseados (convirtiendo formatos de moneda y fechas).
+| Propietario | Ha | Costo/Ha | Renta Anual | Inicio | Fin | Saldo | Notas |
+|---|---|---|---|---|---|---|---|
+| Miguel Avila Garcia | 4 | $1,800 | $7,200 | 10-Jul-2021 | 10-Jul-2027 | $11,000 | A partir de julio 2026 seran $18,200 |
+| Carlos Milan Lopez | 5 | $2,000 | $10,000 | 1-Jun-2021 | 1-Jun-2027 | $7,000 | A partir de junio 2026 seran $17,000 |
+| Francisco Jimenez Santillan | 2 | $1,800 | $3,600 | 10-Jul-2021 | 10-Jul-2027 | $13,200 | A partir de junio 2026 seran $26,400 |
+| Ana Laura | 10 | $1,800 | $18,000 | 10-Jul-2021 | 10-Jul-2027 | $0 | Todo pagado hasta julio 2027 |
 
-## Paso 4: Crear componente `LeaseManager.tsx`
+### Grupo 5: Predios sin renta (3 registros)
 
-Nuevo componente en `src/components/admin/LeaseManager.tsx` que incluira:
+| Propietario | Ha | Ubicacion | Ano |
+|---|---|---|---|
+| Mauricio Olivares | 3 | Ojo Caliente, Tamasopo | 2023 |
+| Arturo Segoviano | 8 | Pozo de Luna, Soledad de Graciano Sanchez | 2021 |
+| Arturo Segoviano | 10 | El Carpintero, Tamasopo | 2023 |
 
-**Vista principal (tabla):**
-- Tabla con todas las rentas, ordenadas por prioridad
-- Columnas: Propietario, Ubicacion, Ano Plantacion, Superficie, Renta Anual, Frecuencia, Fecha Vencimiento, Saldo Pendiente, Estado
-- Indicadores visuales con colores:
-  - Rojo: renta vencida con saldo pendiente
-  - Amarillo: renta proxima a vencer (dentro de 3 meses)
-  - Verde: pagada al corriente
-  - Gris: contrato expirado sin deuda
+Estos 3 tienen renta $0 y sin fechas de contrato. Se insertaran con status "active" y renta $0.
 
-**Panel de resumen (cards superiores):**
-- Total de rentas activas
-- Total de saldo pendiente
-- Rentas vencidas (cantidad)
-- Proximos vencimientos (cantidad en los proximos 3 meses)
+## Implementacion
 
-**Prioridades:**
-- Ordenar automaticamente por proximidad a cosecha (usando el ano de plantacion + 5.5 anos de maduracion) para identificar que predios son prioritarios de pago
+**Paso unico**: Usar la herramienta de insercion de datos para ejecutar un INSERT de los 21 registros en `land_leases`, asignando correctamente:
+- Los contratos expirados (Tanchachin 2020-2023) con status `expired`
+- Ana Laura con saldo $0 y status `active`
+- Los demas con sus saldos pendientes reales del CSV
+- Notas completas del CSV preservadas
 
-**Funcionalidades CRUD:**
-- Crear nueva renta
-- Editar renta existente
-- Registrar pago (reduce saldo pendiente)
-- Eliminar renta
-- Filtrar por ubicacion, estado, ano de plantacion
-
-## Paso 5: Integrar en Admin.tsx
-
-- Agregar nueva tab "Rentas" al TabsList (pasar de grid-cols-7 a grid-cols-8)
-- Importar y renderizar `LeaseManager` en el nuevo TabsContent
-
----
-
-## Archivos a crear/modificar
-
-| Archivo | Accion |
-|---------|--------|
-| Nueva migracion SQL | Crear tablas `land_leases` y `lease_payments` + RLS + datos iniciales |
-| `src/integrations/supabase/types.ts` | Se actualiza automaticamente |
-| `src/components/admin/LeaseManager.tsx` | **Crear** - Componente principal de gestion de rentas |
-| `src/pages/Admin.tsx` | Agregar tab "Rentas" e importar LeaseManager |
+No se requieren cambios de esquema ni de codigo frontend.
 
