@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SpeciesManager } from '@/components/admin/SpeciesManager';
 import { UserManager } from '@/components/admin/UserManager';
 import { PhotoManager } from '@/components/admin/PhotoManager';
+import { LeaseManager } from '@/components/admin/LeaseManager';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { UserSelector } from '@/components/ui/user-selector';
@@ -600,8 +601,9 @@ const Admin = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="investments">Inversiones</TabsTrigger>
+          <TabsTrigger value="leases">Rentas</TabsTrigger>
           <TabsTrigger value="plots">Parcelas</TabsTrigger>
           <TabsTrigger value="photos">Fotos</TabsTrigger>
           <TabsTrigger value="species">Especies</TabsTrigger>
@@ -1556,6 +1558,10 @@ const Admin = () => {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="leases" className="space-y-6">
+          <LeaseManager />
         </TabsContent>
       </Tabs>
     </div>
