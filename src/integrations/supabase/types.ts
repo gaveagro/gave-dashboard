@@ -680,6 +680,101 @@ export type Database = {
           },
         ]
       }
+      land_leases: {
+        Row: {
+          annual_rent: number | null
+          area_hectares: number | null
+          cost_per_hectare_year: number | null
+          created_at: string
+          end_date: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          outstanding_balance: number | null
+          owner_name: string
+          payment_frequency: string | null
+          plantation_year: number | null
+          species_name: string | null
+          start_date: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          annual_rent?: number | null
+          area_hectares?: number | null
+          cost_per_hectare_year?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          outstanding_balance?: number | null
+          owner_name: string
+          payment_frequency?: string | null
+          plantation_year?: number | null
+          species_name?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          annual_rent?: number | null
+          area_hectares?: number | null
+          cost_per_hectare_year?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          outstanding_balance?: number | null
+          owner_name?: string
+          payment_frequency?: string | null
+          plantation_year?: number | null
+          species_name?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      lease_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          lease_id: string
+          notes: string | null
+          payment_date: string
+          period_covered: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          lease_id: string
+          notes?: string | null
+          payment_date?: string
+          period_covered?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          lease_id?: string
+          notes?: string | null
+          payment_date?: string
+          period_covered?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lease_payments_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "land_leases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
