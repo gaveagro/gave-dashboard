@@ -684,10 +684,10 @@ export const LeaseManager = () => {
             {/* Harvest override fields */}
             <div className="space-y-2">
               <Label>Mes Cosecha Estimado</Label>
-              <Select value={String(form.estimated_harvest_month || '')} onValueChange={v => setForm(f => ({ ...f, estimated_harvest_month: v === '' ? '' : Number(v) }))}>
+              <Select value={form.estimated_harvest_month ? String(form.estimated_harvest_month) : 'auto'} onValueChange={v => setForm(f => ({ ...f, estimated_harvest_month: v === 'auto' ? '' : Number(v) }))}>
                 <SelectTrigger><SelectValue placeholder="Auto (Abr)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Automático</SelectItem>
+                  <SelectItem value="auto">Automático</SelectItem>
                   {MONTH_NAMES_FULL.map((m, i) => (
                     <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
                   ))}
