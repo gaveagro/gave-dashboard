@@ -687,6 +687,8 @@ export type Database = {
           cost_per_hectare_year: number | null
           created_at: string
           end_date: string | null
+          estimated_harvest_month: number | null
+          estimated_harvest_year: number | null
           id: string
           location: string | null
           notes: string | null
@@ -705,6 +707,8 @@ export type Database = {
           cost_per_hectare_year?: number | null
           created_at?: string
           end_date?: string | null
+          estimated_harvest_month?: number | null
+          estimated_harvest_year?: number | null
           id?: string
           location?: string | null
           notes?: string | null
@@ -723,6 +727,8 @@ export type Database = {
           cost_per_hectare_year?: number | null
           created_at?: string
           end_date?: string | null
+          estimated_harvest_month?: number | null
+          estimated_harvest_year?: number | null
           id?: string
           location?: string | null
           notes?: string | null
@@ -736,6 +742,35 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      lease_comments: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          lease_id: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          lease_id: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          lease_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lease_comments_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "land_leases"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lease_payments: {
         Row: {
