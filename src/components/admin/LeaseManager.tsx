@@ -15,7 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { 
   Plus, Edit, Trash2, DollarSign, AlertTriangle, CheckCircle, Clock, 
-  MapPin, Calendar, Filter, MessageSquare, Send
+  MapPin, Calendar, Filter, MessageSquare, Send, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 type Lease = {
@@ -201,6 +201,61 @@ export const LeaseManager = () => {
   const [filterLocation, setFilterLocation] = useState('all');
   const [filterYear, setFilterYear] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else {
+        setSortColumn(null);
+        setSortDirection('asc');
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3 w-3 ml-1" /> 
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
+  const statusPriority: Record<string, number> = { overdue: 0, expiring_soon: 1, active: 2, paid_up: 3 };
+
+  const sortLeases = (list: Lease[]): Lease[] => {
+    if (!sortColumn) return list.sort((a, b) => getMonthsToHarvest(a) - getMonthsToHarvest(b));
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    return list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortColumn) {
+        case 'owner': cmp = (a.owner_name || '').localeCompare(b.owner_name || ''); break;
+        case 'location': cmp = (a.location || '').localeCompare(b.location || ''); break;
+        case 'year': cmp = (a.plantation_year || 0) - (b.plantation_year || 0); break;
+        case 'harvest': cmp = getMonthsToHarvest(a) - getMonthsToHarvest(b); break;
+        case 'area': cmp = (a.area_hectares || 0) - (b.area_hectares || 0); break;
+        case 'rent': cmp = (a.annual_rent || 0) - (b.annual_rent || 0); break;
+        case 'frequency': cmp = (a.payment_frequency || '').localeCompare(b.payment_frequency || ''); break;
+        case 'nextRent': {
+          const da = getNextRentDueDate(a)?.getTime() || Infinity;
+          const db = getNextRentDueDate(b)?.getTime() || Infinity;
+          cmp = da - db; break;
+        }
+        case 'endDate': {
+          const ea = a.end_date ? new Date(a.end_date).getTime() : Infinity;
+          const eb = b.end_date ? new Date(b.end_date).getTime() : Infinity;
+          cmp = ea - eb; break;
+        }
+        case 'balance': cmp = (a.outstanding_balance || 0) - (b.outstanding_balance || 0); break;
+        case 'status': cmp = (statusPriority[getLeaseStatus(a)] ?? 9) - (statusPriority[getLeaseStatus(b)] ?? 9); break;
+      }
+      return cmp * dir;
+    });
+  };
 
   const { data: leases, isLoading } = useQuery({
     queryKey: ['land-leases'],
@@ -232,14 +287,14 @@ export const LeaseManager = () => {
   const locations = [...new Set(leases?.map(l => l.location).filter(Boolean) || [])];
   const years = [...new Set(leases?.map(l => l.plantation_year).filter(Boolean) || [])].sort();
 
-  const filteredLeases = (leases || [])
+  const filteredBase = (leases || [])
     .filter(l => filterLocation === 'all' || l.location === filterLocation)
     .filter(l => filterYear === 'all' || String(l.plantation_year) === filterYear)
     .filter(l => {
       if (filterStatus === 'all') return true;
       return getLeaseStatus(l) === filterStatus;
-    })
-    .sort((a, b) => getMonthsToHarvest(a) - getMonthsToHarvest(b));
+    });
+  const sortedLeases = sortLeases([...filteredBase]);
 
   const activeLeases = leases?.filter(l => l.status === 'active') || [];
   const totalBalance = activeLeases.reduce((sum, l) => sum + (l.outstanding_balance || 0), 0);
@@ -465,29 +520,29 @@ export const LeaseManager = () => {
       <Card>
         <CardHeader>
           <CardTitle>Calendario de Rentas</CardTitle>
-          <p className="text-sm text-muted-foreground">Ordenadas por prioridad de cosecha (más próximas primero)</p>
+          <p className="text-sm text-muted-foreground">{sortColumn ? `Ordenadas por columna seleccionada` : 'Ordenadas por prioridad de cosecha (más próximas primero)'}</p>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Propietario</TableHead>
-                  <TableHead>Ubicación</TableHead>
-                  <TableHead className="text-center">Año Plant.</TableHead>
-                  <TableHead className="text-center">Cosecha Est.</TableHead>
-                  <TableHead className="text-right">Ha</TableHead>
-                  <TableHead className="text-right">Renta Anual</TableHead>
-                  <TableHead>Frecuencia</TableHead>
-                  <TableHead>Próx. Renta</TableHead>
-                  <TableHead>Vencimiento</TableHead>
-                  <TableHead className="text-right">Saldo</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('owner')}><span className="flex items-center">Propietario<SortIcon column="owner" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('location')}><span className="flex items-center">Ubicación<SortIcon column="location" /></span></TableHead>
+                  <TableHead className="text-center cursor-pointer select-none" onClick={() => handleSort('year')}><span className="flex items-center justify-center">Año Plant.<SortIcon column="year" /></span></TableHead>
+                  <TableHead className="text-center cursor-pointer select-none" onClick={() => handleSort('harvest')}><span className="flex items-center justify-center">Cosecha Est.<SortIcon column="harvest" /></span></TableHead>
+                  <TableHead className="text-right cursor-pointer select-none" onClick={() => handleSort('area')}><span className="flex items-center justify-end">Ha<SortIcon column="area" /></span></TableHead>
+                  <TableHead className="text-right cursor-pointer select-none" onClick={() => handleSort('rent')}><span className="flex items-center justify-end">Renta Anual<SortIcon column="rent" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('frequency')}><span className="flex items-center">Frecuencia<SortIcon column="frequency" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('nextRent')}><span className="flex items-center">Próx. Renta<SortIcon column="nextRent" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('endDate')}><span className="flex items-center">Vencimiento<SortIcon column="endDate" /></span></TableHead>
+                  <TableHead className="text-right cursor-pointer select-none" onClick={() => handleSort('balance')}><span className="flex items-center justify-end">Saldo<SortIcon column="balance" /></span></TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => handleSort('status')}><span className="flex items-center">Estado<SortIcon column="status" /></span></TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLeases.map(lease => {
+                {sortedLeases.map(lease => {
                   const status = getLeaseStatus(lease);
                   const harvest = getHarvestDate(lease);
                   const isManualHarvest = !!lease.estimated_harvest_year;
