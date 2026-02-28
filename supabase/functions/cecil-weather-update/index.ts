@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface WeatherAPIResponse {
@@ -24,13 +24,46 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // Verify admin role
+    const { data: profile } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const cecilApiKey = Deno.env.get('CECIL_API_KEY');
-    
     const supabase = createClient(supabaseUrl, supabaseKey);
-
-    console.log('Starting weather data update process...');
 
     // Get all active AOIs
     const { data: aois, error: aoisError } = await supabase
@@ -38,123 +71,75 @@ serve(async (req) => {
       .select('*')
       .eq('status', 'active');
 
-    if (aoisError) {
-      throw new Error(`Failed to fetch AOIs: ${aoisError.message}`);
-    }
-
-    console.log(`Found ${aois?.length || 0} active AOIs`);
+    if (aoisError) throw new Error(`Failed to fetch AOIs: ${aoisError.message}`);
 
     if (!aois || aois.length === 0) {
-      return new Response(JSON.stringify({
-        success: true,
-        message: 'No active AOIs found',
-        updated_count: 0
-      }), {
+      return new Response(JSON.stringify({ success: true, message: 'No active AOIs found', updated_count: 0 }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     let updatedCount = 0;
     let alertsGenerated = 0;
-    const errors: string[] = [];
 
     for (const aoi of aois) {
       try {
-        console.log(`Processing weather data for AOI: ${aoi.name} (${aoi.id})`);
-
-        // Generate realistic weather data based on location and season
         const weatherData = generateRealisticWeatherData(aoi);
 
-        // Store weather data in database
-        const { error: insertError } = await supabase
-          .from('cecil_weather_data')
-          .insert({
-            cecil_aoi_id: aoi.id,
-            measurement_timestamp: new Date().toISOString(),
-            temperature_celsius: weatherData.temperature,
-            humidity_percent: weatherData.humidity,
-            soil_temperature_celsius: weatherData.soil_temperature,
-            soil_moisture_percent: weatherData.soil_moisture,
-            wind_speed_kmh: weatherData.wind_speed,
-            wind_direction_degrees: weatherData.wind_direction,
-            pressure_hpa: weatherData.pressure,
-            solar_radiation_wm2: weatherData.solar_radiation,
-            precipitation_mm: weatherData.precipitation,
-            data_source: 'automated_station'
-          });
+        await supabase.from('cecil_weather_data').insert({
+          cecil_aoi_id: aoi.id,
+          measurement_timestamp: new Date().toISOString(),
+          temperature_celsius: weatherData.temperature,
+          humidity_percent: weatherData.humidity,
+          soil_temperature_celsius: weatherData.soil_temperature,
+          soil_moisture_percent: weatherData.soil_moisture,
+          wind_speed_kmh: weatherData.wind_speed,
+          wind_direction_degrees: weatherData.wind_direction,
+          pressure_hpa: weatherData.pressure,
+          solar_radiation_wm2: weatherData.solar_radiation,
+          precipitation_mm: weatherData.precipitation,
+          data_source: 'automated_station'
+        });
 
-        if (insertError) {
-          console.error(`Error inserting weather data for AOI ${aoi.id}:`, insertError);
-          errors.push(`AOI ${aoi.name}: ${insertError.message}`);
-          continue;
-        }
-
-        // Generate weather-based alerts
         const alerts = generateWeatherAlerts(aoi, weatherData);
-        
         for (const alert of alerts) {
-          const { error: alertError } = await supabase
-            .from('cecil_alerts')
-            .insert({
-              cecil_aoi_id: aoi.id,
-              alert_type: alert.type,
-              title: alert.title,
-              description: alert.description,
-              severity: alert.severity,
-              threshold_value: alert.threshold_value,
-              current_value: alert.current_value,
-              recommendation: alert.recommendation,
-              status: 'active'
-            });
-
-          if (!alertError) {
-            alertsGenerated++;
-          }
+          const { error: alertError } = await supabase.from('cecil_alerts').insert({
+            cecil_aoi_id: aoi.id,
+            alert_type: alert.type,
+            title: alert.title,
+            description: alert.description,
+            severity: alert.severity,
+            threshold_value: alert.threshold_value,
+            current_value: alert.current_value,
+            recommendation: alert.recommendation,
+            status: 'active'
+          });
+          if (!alertError) alertsGenerated++;
         }
 
         updatedCount++;
-        console.log(`Weather data updated successfully for AOI: ${aoi.name}, generated ${alerts.length} alerts`);
-
       } catch (error) {
         console.error(`Error processing AOI ${aoi.id}:`, error);
-        errors.push(`AOI ${aoi.name}: ${(error as Error).message}`);
       }
     }
 
-    // Clean up old weather data (keep only last 30 days)
+    // Cleanup old data
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const { error: cleanupError } = await supabase
-      .from('cecil_weather_data')
-      .delete()
-      .lt('measurement_timestamp', thirtyDaysAgo.toISOString());
-
-    if (cleanupError) {
-      console.error('Error cleaning up old weather data:', cleanupError);
-    } else {
-      console.log('Old weather data cleaned up successfully');
-    }
+    await supabase.from('cecil_weather_data').delete().lt('measurement_timestamp', thirtyDaysAgo.toISOString());
 
     return new Response(JSON.stringify({
       success: true,
-      message: `Weather data update completed`,
       updated_count: updatedCount,
       alerts_generated: alertsGenerated,
-      total_aois: aois.length,
-      errors: errors.length > 0 ? errors : undefined,
-      timestamp: new Date().toISOString()
+      total_aois: aois.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Error in cecil-weather-update:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: (error as Error).message,
-      timestamp: new Date().toISOString()
-    }), {
+    return new Response(JSON.stringify({ success: false, error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -166,12 +151,10 @@ function generateRealisticWeatherData(aoi: any): WeatherAPIResponse {
   const hour = now.getHours();
   const month = now.getMonth();
   
-  // Get approximate location from AOI geometry
-  let lat = 22.0; // Default to central Mexico
+  let lat = 22.0;
   let lng = -99.0;
   
   if (aoi.geometry && aoi.geometry.coordinates) {
-    // Extract center point from polygon
     const coords = aoi.geometry.coordinates[0];
     if (coords && coords.length > 0) {
       lng = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coords.length;
@@ -179,18 +162,11 @@ function generateRealisticWeatherData(aoi: any): WeatherAPIResponse {
     }
   }
 
-  // Seasonal factors (based on month)
-  const seasonalTemp = Math.sin((month - 2) / 12 * 2 * Math.PI) * 8; // Peak in July, low in January
-  const seasonalRain = month >= 5 && month <= 9 ? 1 : 0.2; // Rainy season May-September
-  
-  // Daily factors (based on hour)
-  const dailyTempFactor = Math.sin((hour - 6) / 12 * Math.PI) * 0.7; // Peak around 2 PM
-  const solarFactor = Math.max(0, Math.sin((hour - 6) / 12 * Math.PI)); // Sun up 6 AM to 6 PM
-  
-  // Altitude effect (higher altitude = cooler)
-  const altitudeEffect = (lat - 19) * -2; // Rough approximation for Mexican highlands
-  
-  // Random variations
+  const seasonalTemp = Math.sin((month - 2) / 12 * 2 * Math.PI) * 8;
+  const seasonalRain = month >= 5 && month <= 9 ? 1 : 0.2;
+  const dailyTempFactor = Math.sin((hour - 6) / 12 * Math.PI) * 0.7;
+  const solarFactor = Math.max(0, Math.sin((hour - 6) / 12 * Math.PI));
+  const altitudeEffect = (lat - 19) * -2;
   const tempVariation = (Math.random() - 0.5) * 4;
   const humidityVariation = (Math.random() - 0.5) * 15;
   const windVariation = Math.random() * 10;
@@ -209,9 +185,8 @@ function generateRealisticWeatherData(aoi: any): WeatherAPIResponse {
 }
 
 function generateWeatherAlerts(aoi: any, weatherData: WeatherAPIResponse) {
-  const alerts = [];
+  const alerts: any[] = [];
 
-  // High temperature alert
   if (weatherData.temperature && weatherData.temperature > 35) {
     alerts.push({
       type: 'temperature_high',
@@ -224,7 +199,6 @@ function generateWeatherAlerts(aoi: any, weatherData: WeatherAPIResponse) {
     });
   }
 
-  // Low soil moisture alert
   if (weatherData.soil_moisture && weatherData.soil_moisture < 25) {
     alerts.push({
       type: 'soil_moisture_low',
@@ -237,7 +211,6 @@ function generateWeatherAlerts(aoi: any, weatherData: WeatherAPIResponse) {
     });
   }
 
-  // High wind alert
   if (weatherData.wind_speed && weatherData.wind_speed > 40) {
     alerts.push({
       type: 'wind_high',
@@ -250,7 +223,6 @@ function generateWeatherAlerts(aoi: any, weatherData: WeatherAPIResponse) {
     });
   }
 
-  // Heavy precipitation alert
   if (weatherData.precipitation && weatherData.precipitation > 25) {
     alerts.push({
       type: 'precipitation_heavy',

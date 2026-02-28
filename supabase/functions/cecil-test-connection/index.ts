@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 serve(async (req) => {
@@ -11,75 +12,83 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // Verify admin role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const cecilApiKey = Deno.env.get('CECIL_API_KEY');
-    
     if (!cecilApiKey) {
       throw new Error('CECIL_API_KEY is not configured');
     }
 
-    console.log('Testing Cecil API connection...');
-
-    // Test Cecil API connectivity using the correct URL
     const cecilApiUrl = 'https://api.cecil.app';
     
-    console.log(`Testing Cecil API at: ${cecilApiUrl}`);
-    
     const testResponse = await fetch(`${cecilApiUrl}/datasets`, {
-      headers: {
-        'Authorization': `Bearer ${cecilApiKey}`,
-      },
+      headers: { 'Authorization': `Bearer ${cecilApiKey}` },
     });
 
     if (!testResponse.ok) {
-      const errorText = await testResponse.text();
-      throw new Error(`Cecil API connection failed: ${testResponse.status} - ${errorText}. Please verify your CECIL_API_KEY is valid and active.`);
+      throw new Error(`Cecil API connection failed: ${testResponse.status}`);
     }
 
     const datasets = await testResponse.json();
-    console.log('Cecil API connection successful. Available datasets:', datasets.length);
 
-    // Test organization info if available
     let organizationInfo = null;
     try {
       const orgResponse = await fetch(`${cecilApiUrl}/organisation`, {
-        headers: {
-          'Authorization': `Bearer ${cecilApiKey}`,
-        },
+        headers: { 'Authorization': `Bearer ${cecilApiKey}` },
       });
+      if (orgResponse.ok) organizationInfo = await orgResponse.json();
+    } catch (_) {}
 
-      if (orgResponse.ok) {
-        organizationInfo = await orgResponse.json();
-        console.log('Organization info retrieved:', organizationInfo);
-      }
-    } catch (orgError) {
-      console.log('Organization info not available or failed to retrieve');
-    }
-
-    // Test AOI listing
     let aoisInfo = null;
     try {
       const aoisResponse = await fetch(`${cecilApiUrl}/aois`, {
-        headers: {
-          'Authorization': `Bearer ${cecilApiKey}`,
-        },
+        headers: { 'Authorization': `Bearer ${cecilApiKey}` },
       });
-
-      if (aoisResponse.ok) {
-        aoisInfo = await aoisResponse.json();
-        console.log('AOIs retrieved:', aoisInfo.length || 0);
-      }
-    } catch (aoisError) {
-      console.log('AOIs info not available or failed to retrieve');
-    }
+      if (aoisResponse.ok) aoisInfo = await aoisResponse.json();
+    } catch (_) {}
 
     return new Response(JSON.stringify({
       success: true,
       message: 'Cecil API connection successful',
       data: {
-        datasets: datasets,
+        datasets,
         organization: organizationInfo,
         aois: aoisInfo,
-        working_base_url: cecilApiUrl,
         connection_test: 'passed',
         timestamp: new Date().toISOString()
       }
@@ -91,8 +100,7 @@ serve(async (req) => {
     console.error('Cecil connection test failed:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: (error as Error).message,
-      timestamp: new Date().toISOString()
+      error: 'Connection test failed'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
