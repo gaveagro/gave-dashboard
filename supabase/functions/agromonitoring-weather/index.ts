@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const AGROMONITORING_API_URL = 'https://api.agromonitoring.com/agro/1.0';
@@ -14,47 +14,53 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('AGROMONITORING_API_KEY');
-    if (!apiKey) {
-      throw new Error('AGROMONITORING_API_KEY not configured');
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const apiKey = Deno.env.get('AGROMONITORING_API_KEY');
+    if (!apiKey) throw new Error('AGROMONITORING_API_KEY not configured');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, polygonId, lat, lng } = await req.json();
-    console.log(`Agromonitoring weather action: ${action}`);
+    const body = await req.json();
+    const action = typeof body.action === 'string' ? body.action : '';
+    const polygonId = typeof body.polygonId === 'string' ? body.polygonId : '';
 
     switch (action) {
       case 'current': {
-        if (!polygonId) {
-          throw new Error('polygonId required');
-        }
-
-        // Get current weather for polygon
-        const weatherUrl = `${AGROMONITORING_API_URL}/weather?polyid=${polygonId}&appid=${apiKey}`;
-        console.log('Fetching current weather from:', weatherUrl);
-
+        if (!polygonId) throw new Error('polygonId required');
+        const weatherUrl = `${AGROMONITORING_API_URL}/weather?polyid=${encodeURIComponent(polygonId)}&appid=${apiKey}`;
         const weatherResponse = await fetch(weatherUrl);
-        
-        if (!weatherResponse.ok) {
-          const errorText = await weatherResponse.text();
-          throw new Error(`Failed to fetch weather: ${errorText}`);
-        }
+        if (!weatherResponse.ok) throw new Error(`Failed to fetch weather: ${await weatherResponse.text()}`);
 
         const weather = await weatherResponse.json();
-        console.log('Weather data received:', weather);
-
         const measurementDate = new Date().toISOString().split('T')[0];
-
         const weatherRecord = {
-          polygon_id: polygonId,
-          data_type: 'weather_current',
-          measurement_date: measurementDate,
-          temperature_celsius: weather.main?.temp ? weather.main.temp - 273.15 : null, // Convert Kelvin to Celsius
+          polygon_id: polygonId, data_type: 'weather_current', measurement_date: measurementDate,
+          temperature_celsius: weather.main?.temp ? weather.main.temp - 273.15 : null,
           humidity_percent: weather.main?.humidity,
-          wind_speed_kmh: weather.wind?.speed ? weather.wind.speed * 3.6 : null, // Convert m/s to km/h
+          wind_speed_kmh: weather.wind?.speed ? weather.wind.speed * 3.6 : null,
           pressure_hpa: weather.main?.pressure,
           precipitation_mm: weather.rain?.['1h'] || weather.rain?.['3h'] || 0,
           weather_description: weather.weather?.[0]?.description,
@@ -62,181 +68,101 @@ serve(async (req) => {
           raw_data: weather
         };
 
-        // Upsert to database
-        const { error: upsertError } = await supabase
-          .from('agromonitoring_data')
-          .upsert(weatherRecord, {
-            onConflict: 'polygon_id,measurement_date,data_type'
-          });
+        await supabase.from('agromonitoring_data').upsert(weatherRecord, { onConflict: 'polygon_id,measurement_date,data_type' });
 
-        if (upsertError) {
-          console.error('Error upserting weather data:', upsertError);
-        }
-
-        return new Response(JSON.stringify({
-          success: true,
-          data: weatherRecord,
-          raw: weather
-        }), {
+        return new Response(JSON.stringify({ success: true, data: weatherRecord }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
       case 'forecast': {
-        if (!polygonId) {
-          throw new Error('polygonId required');
-        }
-
-        // Get 5-day forecast
-        const forecastUrl = `${AGROMONITORING_API_URL}/weather/forecast?polyid=${polygonId}&appid=${apiKey}`;
-        console.log('Fetching forecast from:', forecastUrl);
-
+        if (!polygonId) throw new Error('polygonId required');
+        const forecastUrl = `${AGROMONITORING_API_URL}/weather/forecast?polyid=${encodeURIComponent(polygonId)}&appid=${apiKey}`;
         const forecastResponse = await fetch(forecastUrl);
-        
-        if (!forecastResponse.ok) {
-          const errorText = await forecastResponse.text();
-          throw new Error(`Failed to fetch forecast: ${errorText}`);
-        }
+        if (!forecastResponse.ok) throw new Error(`Failed to fetch forecast: ${await forecastResponse.text()}`);
 
-        const forecast = await forecastResponse.json();
-        console.log(`Forecast entries: ${forecast.length}`);
-
-        return new Response(JSON.stringify({
-          success: true,
-          forecast
-        }), {
+        return new Response(JSON.stringify({ success: true, forecast: await forecastResponse.json() }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
       case 'soil': {
-        if (!polygonId) {
-          throw new Error('polygonId required');
-        }
-
-        // Get soil data
-        const soilUrl = `${AGROMONITORING_API_URL}/soil?polyid=${polygonId}&appid=${apiKey}`;
-        console.log('Fetching soil data from:', soilUrl);
-
+        if (!polygonId) throw new Error('polygonId required');
+        const soilUrl = `${AGROMONITORING_API_URL}/soil?polyid=${encodeURIComponent(polygonId)}&appid=${apiKey}`;
         const soilResponse = await fetch(soilUrl);
-        
-        if (!soilResponse.ok) {
-          const errorText = await soilResponse.text();
-          throw new Error(`Failed to fetch soil data: ${errorText}`);
-        }
+        if (!soilResponse.ok) throw new Error(`Failed to fetch soil data: ${await soilResponse.text()}`);
 
         const soil = await soilResponse.json();
-        console.log('Soil data received:', soil);
-
         const measurementDate = new Date().toISOString().split('T')[0];
-
         const soilRecord = {
-          polygon_id: polygonId,
-          data_type: 'soil',
-          measurement_date: measurementDate,
-          soil_temperature: soil.t0 ? soil.t0 - 273.15 : null, // Surface temp in Celsius
+          polygon_id: polygonId, data_type: 'soil', measurement_date: measurementDate,
+          soil_temperature: soil.t0 ? soil.t0 - 273.15 : null,
           soil_moisture: soil.moisture,
           raw_data: soil
         };
 
-        // Upsert to database
-        const { error: upsertError } = await supabase
-          .from('agromonitoring_data')
-          .upsert(soilRecord, {
-            onConflict: 'polygon_id,measurement_date,data_type'
-          });
+        await supabase.from('agromonitoring_data').upsert(soilRecord, { onConflict: 'polygon_id,measurement_date,data_type' });
 
-        if (upsertError) {
-          console.error('Error upserting soil data:', upsertError);
-        }
-
-        return new Response(JSON.stringify({
-          success: true,
-          data: soilRecord,
-          raw: soil
-        }), {
+        return new Response(JSON.stringify({ success: true, data: soilRecord }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
       case 'sync-all': {
-        // Get all polygons and sync weather/soil data
-        const { data: polygons, error: polygonsError } = await supabase
-          .from('agromonitoring_polygons')
-          .select('polygon_id, plot_id, name');
-
-        if (polygonsError) {
-          throw polygonsError;
+        // Verify admin for sync-all
+        const userId = claimsData.claims.sub;
+        const { data: prof } = await supabaseAuth.from('profiles').select('role').eq('user_id', userId).single();
+        if (prof?.role !== 'admin') {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
         }
 
-        console.log(`Syncing weather data for ${polygons.length} polygons`);
+        const { data: polygons, error: polygonsError } = await supabase
+          .from('agromonitoring_polygons').select('polygon_id, plot_id, name');
+        if (polygonsError) throw polygonsError;
 
         const results = [];
         for (const polygon of polygons) {
           try {
-            // Fetch current weather
-            const weatherResult = await fetch(`${AGROMONITORING_API_URL}/weather?polyid=${polygon.polygon_id}&appid=${apiKey}`);
+            const weatherResult = await fetch(`${AGROMONITORING_API_URL}/weather?polyid=${encodeURIComponent(polygon.polygon_id)}&appid=${apiKey}`);
             const weather = weatherResult.ok ? await weatherResult.json() : null;
 
-            // Fetch soil data
-            const soilResult = await fetch(`${AGROMONITORING_API_URL}/soil?polyid=${polygon.polygon_id}&appid=${apiKey}`);
+            const soilResult = await fetch(`${AGROMONITORING_API_URL}/soil?polyid=${encodeURIComponent(polygon.polygon_id)}&appid=${apiKey}`);
             const soil = soilResult.ok ? await soilResult.json() : null;
 
             const measurementDate = new Date().toISOString().split('T')[0];
 
             if (weather) {
-              await supabase
-                .from('agromonitoring_data')
-                .upsert({
-                  polygon_id: polygon.polygon_id,
-                  data_type: 'weather_current',
-                  measurement_date: measurementDate,
-                  temperature_celsius: weather.main?.temp ? weather.main.temp - 273.15 : null,
-                  humidity_percent: weather.main?.humidity,
-                  wind_speed_kmh: weather.wind?.speed ? weather.wind.speed * 3.6 : null,
-                  pressure_hpa: weather.main?.pressure,
-                  precipitation_mm: weather.rain?.['1h'] || 0,
-                  weather_description: weather.weather?.[0]?.description,
-                  cloud_coverage: weather.clouds?.all,
-                  raw_data: weather
-                }, { onConflict: 'polygon_id,measurement_date,data_type' });
+              await supabase.from('agromonitoring_data').upsert({
+                polygon_id: polygon.polygon_id, data_type: 'weather_current', measurement_date: measurementDate,
+                temperature_celsius: weather.main?.temp ? weather.main.temp - 273.15 : null,
+                humidity_percent: weather.main?.humidity,
+                wind_speed_kmh: weather.wind?.speed ? weather.wind.speed * 3.6 : null,
+                pressure_hpa: weather.main?.pressure,
+                precipitation_mm: weather.rain?.['1h'] || 0,
+                weather_description: weather.weather?.[0]?.description,
+                cloud_coverage: weather.clouds?.all,
+                raw_data: weather
+              }, { onConflict: 'polygon_id,measurement_date,data_type' });
             }
 
             if (soil) {
-              await supabase
-                .from('agromonitoring_data')
-                .upsert({
-                  polygon_id: polygon.polygon_id,
-                  data_type: 'soil',
-                  measurement_date: measurementDate,
-                  soil_temperature: soil.t0 ? soil.t0 - 273.15 : null,
-                  soil_moisture: soil.moisture,
-                  raw_data: soil
-                }, { onConflict: 'polygon_id,measurement_date,data_type' });
+              await supabase.from('agromonitoring_data').upsert({
+                polygon_id: polygon.polygon_id, data_type: 'soil', measurement_date: measurementDate,
+                soil_temperature: soil.t0 ? soil.t0 - 273.15 : null,
+                soil_moisture: soil.moisture,
+                raw_data: soil
+              }, { onConflict: 'polygon_id,measurement_date,data_type' });
             }
 
-            results.push({
-              polygonId: polygon.polygon_id,
-              plotName: polygon.name,
-              success: true,
-              hasWeather: !!weather,
-              hasSoil: !!soil
-            });
-
-          } catch (syncError) {
-            console.error(`Error syncing polygon ${polygon.polygon_id}:`, syncError);
-            results.push({
-              polygonId: polygon.polygon_id,
-              success: false,
-              error: syncError.message
-            });
+            results.push({ polygonId: polygon.polygon_id, plotName: polygon.name, success: true });
+          } catch (syncError: any) {
+            results.push({ polygonId: polygon.polygon_id, success: false, error: syncError.message });
           }
         }
 
-        return new Response(JSON.stringify({
-          success: true,
-          results
-        }), {
+        return new Response(JSON.stringify({ success: true, results }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
@@ -245,14 +171,10 @@ serve(async (req) => {
         throw new Error(`Unknown action: ${action}`);
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Agromonitoring weather error:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ success: false, error: 'Internal server error' }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });

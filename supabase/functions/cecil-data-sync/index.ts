@@ -3,30 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
-
-interface CecilSatelliteData {
-  id: string;
-  transformation_id: string;
-  x: number;
-  y: number;
-  year: number;
-  month?: number;
-  day?: number;
-  measurement_date?: string;
-  ndvi?: number;
-  evi?: number;
-  savi?: number;
-  msavi?: number;
-  ndwi?: number;
-  biomass?: number;
-  carbon_capture?: number;
-  canopy_cover?: number;
-  cloud_coverage?: number;
-  data_quality?: string;
-  pixel_boundary?: any;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -34,33 +12,68 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // Verify admin role
+    const { data: profile } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const cecilApiKey = Deno.env.get('CECIL_API_KEY')!;
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, requestId, transformationId } = await req.json();
+    const body = await req.json();
+    const action = typeof body.action === 'string' ? body.action : '';
+    const requestId = typeof body.requestId === 'string' ? body.requestId : undefined;
 
     if (action === 'sync_satellite_data') {
-      let requestsToSync = [];
+      let requestsToSync: any[] = [];
 
       if (requestId) {
-        // Sync specific request
         const { data: request } = await supabase
           .from('cecil_data_requests')
           .select('*')
           .eq('id', requestId)
           .single();
-        
         if (request) requestsToSync.push(request);
       } else {
-        // Sync all pending requests
         const { data: requests } = await supabase
           .from('cecil_data_requests')
           .select('*')
           .eq('status', 'pending');
-        
         requestsToSync = requests || [];
       }
 
@@ -69,38 +82,14 @@ serve(async (req) => {
 
       for (const request of requestsToSync) {
         try {
-          console.log(`Syncing data for request: ${request.id}`);
-
-          // Check if request is ready in Cecil
           const statusResponse = await fetch(`https://api.cecil.app/data_requests/${request.cecil_request_id}`, {
-            headers: {
-              'Authorization': `Bearer ${cecilApiKey}`,
-            },
+            headers: { 'Authorization': `Bearer ${cecilApiKey}` },
           });
 
-          if (!statusResponse.ok) {
-            console.error(`Failed to check status for request ${request.id}`);
-            continue;
-          }
+          if (!statusResponse.ok) continue;
 
           const statusData = await statusResponse.json();
-          console.log(`Request ${request.id} status:`, statusData.status);
-
-          if (statusData.status !== 'completed') {
-            console.log(`Request ${request.id} not ready yet, status: ${statusData.status}`);
-            continue;
-          }
-
-          // Use new query API to get satellite data directly (no transformations)
-          console.log(`Querying satellite data for request ${request.id}...`);
-          
-          // Query satellite data using the new API
-          const queryPayload = {
-            aoi_id: statusData.aoi_id,
-            dataset_id: request.dataset_id,
-            start_date: '2020-01-01',
-            end_date: new Date().toISOString().split('T')[0] // Current date
-          };
+          if (statusData.status !== 'completed') continue;
 
           const queryResponse = await fetch('https://api.cecil.app/query', {
             method: 'POST',
@@ -108,37 +97,31 @@ serve(async (req) => {
               'Authorization': `Bearer ${cecilApiKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(queryPayload)
+            body: JSON.stringify({
+              aoi_id: statusData.aoi_id,
+              dataset_id: request.dataset_id,
+              start_date: '2020-01-01',
+              end_date: new Date().toISOString().split('T')[0]
+            })
           });
 
-          if (!queryResponse.ok) {
-            const errorText = await queryResponse.text();
-            console.error(`Failed to query data for request ${request.id}:`, errorText);
-            continue;
-          }
+          if (!queryResponse.ok) continue;
 
           const queryData = await queryResponse.json();
-          console.log(`Got query response for request ${request.id}:`, queryData);
 
-          // Process the returned data
-          if (queryData && queryData.data && Array.isArray(queryData.data)) {
-            console.log(`Processing ${queryData.data.length} data points for request ${request.id}`);
-
-            // Store satellite data points
+          if (queryData?.data && Array.isArray(queryData.data)) {
             for (const dataPoint of queryData.data) {
               try {
-                // Convert date format if needed
                 let measurementDate = dataPoint.date || dataPoint.measurement_date;
                 if (measurementDate && typeof measurementDate === 'string') {
-                  const dateObj = new Date(measurementDate);
-                  measurementDate = dateObj.toISOString().split('T')[0];
+                  measurementDate = new Date(measurementDate).toISOString().split('T')[0];
                 }
 
-                const { error: dataError } = await supabase
+                await supabase
                   .from('cecil_satellite_data')
                   .upsert({
                     cecil_aoi_id: request.cecil_aoi_id,
-                    transformation_id: null, // No longer using transformations
+                    transformation_id: null,
                     x: dataPoint.x || dataPoint.longitude || 0,
                     y: dataPoint.y || dataPoint.latitude || 0,
                     year: dataPoint.year || (measurementDate ? new Date(measurementDate).getFullYear() : null),
@@ -157,41 +140,24 @@ serve(async (req) => {
                     cloud_coverage: dataPoint.cloud_coverage,
                     data_quality: dataPoint.data_quality || 'good',
                     pixel_boundary: dataPoint.pixel_boundary || dataPoint.geometry
-                  }, {
-                    onConflict: 'cecil_aoi_id,x,y,measurement_date,dataset_name'
-                  });
-
-                if (dataError) {
-                  console.error(`Error storing data point:`, dataError);
-                }
+                  }, { onConflict: 'cecil_aoi_id,x,y,measurement_date,dataset_name' });
               } catch (pointError) {
-                console.error(`Error processing data point:`, pointError);
+                console.error('Error processing data point:', pointError);
               }
             }
-          } else {
-            console.log(`No data returned for request ${request.id}`);
           }
 
-          // Update request status
           await supabase
             .from('cecil_data_requests')
             .update({ status: 'completed' })
             .eq('id', request.id);
 
           syncedCount++;
-          console.log(`Successfully synced request ${request.id}`);
-
         } catch (error) {
-          console.error(`Error syncing request ${request.id}:`, error);
           errorCount++;
-          
-          // Update request with error
           await supabase
             .from('cecil_data_requests')
-            .update({ 
-              status: 'error',
-              error_message: (error as Error).message 
-            })
+            .update({ status: 'error', error_message: (error as Error).message })
             .eq('id', request.id);
         }
       }
@@ -200,8 +166,7 @@ serve(async (req) => {
         success: true,
         synced: syncedCount,
         errors: errorCount,
-        total: requestsToSync.length,
-        message: `Synced ${syncedCount} requests, ${errorCount} errors`
+        total: requestsToSync.length
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -214,10 +179,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in cecil-data-sync:', error);
-    return new Response(JSON.stringify({ 
-      success: false,
-      error: (error as Error).message 
-    }), {
+    return new Response(JSON.stringify({ success: false, error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

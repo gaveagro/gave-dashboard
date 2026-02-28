@@ -3,28 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
-
-interface CecilCreateAOIRequest {
-  name: string;
-  geometry: {
-    type: string;
-    coordinates: number[][][];
-  };
-  external_ref?: string;
-}
-
-interface CecilDataRequest {
-  aoi_id: string;
-  dataset_id: string;
-}
-
-interface CecilDataset {
-  id: string;
-  name: string;
-  description?: string;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -32,15 +12,64 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // Verify admin role
+    const { data: profile } = await supabaseAuth
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Forbidden: Admin access required' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const cecilApiKey = Deno.env.get('CECIL_API_KEY')!;
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, plotId, datasets } = await req.json();
+    const body = await req.json();
+    const action = typeof body.action === 'string' ? body.action : '';
+    const plotId = typeof body.plotId === 'string' ? body.plotId : '';
+    const datasets = Array.isArray(body.datasets) ? body.datasets.filter((d: any) => typeof d === 'string').slice(0, 10) : [];
+
+    // Validate UUID format for plotId
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     if (action === 'create_aoi_for_plot') {
+      if (!plotId || !uuidRegex.test(plotId)) {
+        return new Response(JSON.stringify({ error: 'Invalid plotId' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Get plot details
       const { data: plot, error: plotError } = await supabase
         .from('plots')
@@ -72,9 +101,7 @@ serve(async (req) => {
       // Create geometry from plot coordinates
       let geometry;
       
-      // Special handling for specific plots with defined coordinates
       if (plot.name === 'La Sierra') {
-        // Use the specific polygon coordinates provided by the user
         geometry = {
           type: "Polygon",
           coordinates: [[
@@ -82,11 +109,10 @@ serve(async (req) => {
             [-99.13111111111111, 21.734722222222224],
             [-99.12972222222221, 21.732499999999998],
             [-99.12972222222221, 21.73222222222222],
-            [-99.13166666666666, 21.734166666666667] // Close the polygon
+            [-99.13166666666666, 21.734166666666667]
           ]]
         };
       } else if (plot.name === 'Aurelio Manrique') {
-        // Use the specific polygon coordinates for Aurelio Manrique
         geometry = {
           type: "Polygon",
           coordinates: [[
@@ -94,13 +120,12 @@ serve(async (req) => {
             [-98.65777777777778, 22.307222222222222], 
             [-98.65777777777778, 22.305555555555557],
             [-98.66111111111111, 22.305555555555557],
-            [-98.65944444444445, 22.30638888888889] // Close the polygon
+            [-98.65944444444445, 22.30638888888889]
           ]]
         };
       } else {
-        // Default polygon creation for other plots
         const [lat, lng] = plot.coordinates.split(', ').map(parseFloat);
-        const buffer = 0.001; // Small buffer around the point
+        const buffer = 0.001;
         geometry = {
           type: "Polygon",
           coordinates: [[
@@ -113,52 +138,41 @@ serve(async (req) => {
         };
       }
 
-      // Get available datasets first
-      console.log('Fetching available datasets from Cecil...');
+      // Get available datasets
       const datasetsResponse = await fetch('https://api.cecil.app/datasets', {
-        headers: {
-          'Authorization': `Bearer ${cecilApiKey}`,
-        },
+        headers: { 'Authorization': `Bearer ${cecilApiKey}` },
       });
 
       if (!datasetsResponse.ok) {
         throw new Error(`Failed to fetch datasets: ${datasetsResponse.status}`);
       }
 
-      const availableDatasets: CecilDataset[] = await datasetsResponse.json();
-      console.log('Available datasets:', availableDatasets.map(d => d.id));
+      const availableDatasets = await datasetsResponse.json();
 
-      // Filter to use only free datasets, prioritizing forest biomass data
-      const forestDatasets = availableDatasets.filter(d => 
+      const forestDatasets = availableDatasets.filter((d: any) => 
         d.name?.toLowerCase().includes('hansen') || 
         d.name?.toLowerCase().includes('forest') || 
         d.name?.toLowerCase().includes('biomass')
       );
       
-      const datasetsToUse = datasets && datasets.length > 0 
-        ? datasets.filter((d: string) => availableDatasets.some(ad => ad.id === d))
+      const datasetsToUse = datasets.length > 0 
+        ? datasets.filter((d: string) => availableDatasets.some((ad: any) => ad.id === d))
         : forestDatasets.length > 0 
-          ? forestDatasets.slice(0, 2).map(d => d.id)
-          : availableDatasets.slice(0, 2).map(d => d.id);
-
-      console.log('Datasets to use:', datasetsToUse);
+          ? forestDatasets.slice(0, 2).map((d: any) => d.id)
+          : availableDatasets.slice(0, 2).map((d: any) => d.id);
 
       // Create AOI in Cecil
-      const cecilAOIPayload: CecilCreateAOIRequest = {
-        name: plot.name,
-        geometry: geometry,
-        external_ref: `plot-${plot.id}`
-      };
-
-      console.log('Creating AOI in Cecil:', cecilAOIPayload);
-
       const cecilResponse = await fetch('https://api.cecil.app/aois', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${cecilApiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(cecilAOIPayload)
+        body: JSON.stringify({
+          name: plot.name,
+          geometry: geometry,
+          external_ref: `plot-${plot.id}`
+        })
       });
 
       if (!cecilResponse.ok) {
@@ -167,9 +181,8 @@ serve(async (req) => {
       }
 
       const cecilAOI = await cecilResponse.json();
-      console.log('Cecil AOI created:', cecilAOI);
 
-      // Store in our database
+      // Store in database
       const { data: newAOI, error: aoiError } = await supabase
         .from('cecil_aois')
         .insert({
@@ -180,67 +193,46 @@ serve(async (req) => {
           hectares: plot.area,
           cecil_aoi_id: cecilAOI.id,
           status: 'active',
-          created_by: '00000000-0000-0000-0000-000000000000' // System user
+          created_by: userId
         })
         .select()
         .single();
 
       if (aoiError) {
-        console.error('Error storing AOI:', aoiError);
         throw new Error(`Failed to store AOI: ${aoiError.message}`);
       }
 
-      // Create data requests for specified datasets
+      // Create data requests
       const dataRequests = [];
       for (const datasetId of datasetsToUse) {
         try {
-          const dataRequestPayload: CecilDataRequest = {
-            aoi_id: cecilAOI.id,
-            dataset_id: datasetId
-          };
-
-          console.log(`Creating data request for ${datasetId}:`, dataRequestPayload);
-
           const dataResponse = await fetch('https://api.cecil.app/data_requests', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${cecilApiKey}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(dataRequestPayload)
+            body: JSON.stringify({ aoi_id: cecilAOI.id, dataset_id: datasetId })
           });
 
-          if (!dataResponse.ok) {
-            const errorText = await dataResponse.text();
-            console.error(`Data request failed for ${datasetId}:`, errorText);
-            continue;
-          }
+          if (!dataResponse.ok) continue;
 
           const dataRequest = await dataResponse.json();
-          console.log(`Data request created for ${datasetId}:`, dataRequest);
+          const datasetInfo = availableDatasets.find((d: any) => d.id === datasetId);
 
-          // Get dataset name from available datasets
-          const datasetInfo = availableDatasets.find(d => d.id === datasetId);
-          const datasetName = datasetInfo ? datasetInfo.name : datasetId;
-
-          // Store data request in our database
-          const { error: requestError } = await supabase
+          await supabase
             .from('cecil_data_requests')
             .insert({
               external_ref: `${plot.id}-${datasetId}`,
               cecil_aoi_id: newAOI.id,
-              dataset_name: datasetName,
+              dataset_name: datasetInfo ? datasetInfo.name : datasetId,
               dataset_id: datasetId,
               cecil_request_id: dataRequest.id,
               status: 'pending',
-              created_by: '00000000-0000-0000-0000-000000000000'
+              created_by: userId
             });
 
-          if (requestError) {
-            console.error(`Error storing data request for ${datasetId}:`, requestError);
-          } else {
-            dataRequests.push(dataRequest);
-          }
+          dataRequests.push(dataRequest);
         } catch (error) {
           console.error(`Error processing dataset ${datasetId}:`, error);
         }
@@ -249,9 +241,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         success: true,
         aoi: newAOI,
-        cecilAOI: cecilAOI,
-        dataRequests: dataRequests,
-        message: `AOI created successfully with ${dataRequests.length} data requests`
+        message: `AOI created with ${dataRequests.length} data requests`
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -266,7 +256,7 @@ serve(async (req) => {
     console.error('Error in cecil-integration:', error);
     return new Response(JSON.stringify({ 
       success: false,
-      error: (error as Error).message 
+      error: 'Internal server error'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
