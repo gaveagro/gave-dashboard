@@ -98,40 +98,73 @@ const PlotMap: React.FC<PlotMapProps> = ({ latitude, longitude, name, plotId }) 
   useEffect(() => {
     if (!mapContainer.current || !mapboxToken) return;
 
+    // Ensure container has actual dimensions before initializing Mapbox
+    const { offsetWidth, offsetHeight } = mapContainer.current;
+    if (offsetWidth === 0 || offsetHeight === 0) {
+      console.warn('PlotMap: Container has zero dimensions, deferring map init');
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+            resizeObserver.disconnect();
+            // Re-trigger effect by forcing a state update
+            setMapboxToken(prev => prev); // no-op but triggers re-render
+          }
+        }
+      });
+      resizeObserver.observe(mapContainer.current);
+      return () => resizeObserver.disconnect();
+    }
+
     // Set Mapbox access token
     mapboxgl.accessToken = mapboxToken;
 
+    // Validate base coordinates
+    const validLng = typeof longitude === 'number' && !isNaN(longitude) ? longitude : -99.13;
+    const validLat = typeof latitude === 'number' && !isNaN(latitude) ? latitude : 21.73;
+
     // Prioritize AOI geometry for bounds calculation
-    let center: [number, number] = [longitude, latitude];
+    let center: [number, number] = [validLng, validLat];
     let bounds: mapboxgl.LngLatBoundsLike | undefined;
 
     // Use AOI geometry if available for proper polygon display
     if (aoi?.geometry && typeof aoi.geometry === 'object' && 'coordinates' in aoi.geometry) {
-      console.log('PlotMap: Using AOI geometry for map bounds:', aoi.geometry);
-      const coordinates = (aoi.geometry as any).coordinates[0];
-      const lngs = coordinates.map((coord: number[]) => coord[0]);
-      const lats = coordinates.map((coord: number[]) => coord[1]);
-      
-      const minLng = Math.min(...lngs);
-      const maxLng = Math.max(...lngs);
-      const minLat = Math.min(...lats);
-      const maxLat = Math.max(...lats);
-      
-      bounds = [[minLng, minLat], [maxLng, maxLat]];
-      center = [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
-      console.log('PlotMap: Calculated bounds from AOI:', bounds);
+      try {
+        const coordinates = (aoi.geometry as any).coordinates[0];
+        if (Array.isArray(coordinates) && coordinates.length > 0) {
+          const lngs = coordinates.map((coord: number[]) => coord[0]).filter((v: number) => typeof v === 'number' && !isNaN(v));
+          const lats = coordinates.map((coord: number[]) => coord[1]).filter((v: number) => typeof v === 'number' && !isNaN(v));
+          
+          if (lngs.length > 0 && lats.length > 0) {
+            const minLng = Math.min(...lngs);
+            const maxLng = Math.max(...lngs);
+            const minLat = Math.min(...lats);
+            const maxLat = Math.max(...lats);
+            
+            bounds = [[minLng, minLat], [maxLng, maxLat]];
+            center = [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+            console.log('PlotMap: Calculated bounds from AOI:', bounds);
+          }
+        }
+      } catch (err) {
+        console.error('PlotMap: Error parsing AOI geometry:', err);
+      }
     }
 
-    // Initialize map with satellite view for AgTech MVP
+    // Initialize map - always provide a valid zoom, use fitBounds after load if bounds exist
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
       center: center,
-      zoom: bounds ? undefined : 16,
-      bounds: bounds ? bounds : undefined,
-      fitBoundsOptions: bounds ? { padding: 50 } : undefined,
-      pitch: 30, // Reduced pitch for better polygon visibility
+      zoom: 16,
+      pitch: 30,
     });
+
+    // Fit bounds after map is initialized (avoids NaN during resize)
+    if (bounds) {
+      map.current.on('load', () => {
+        map.current?.fitBounds(bounds as mapboxgl.LngLatBoundsLike, { padding: 50 });
+      });
+    }
 
     // Add navigation controls
     map.current.addControl(
