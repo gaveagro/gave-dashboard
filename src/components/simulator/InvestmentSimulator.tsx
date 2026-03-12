@@ -610,6 +610,9 @@ export const InvestmentSimulator: React.FC = () => {
           <CardContent>
             <div className="text-2xl font-bold">
               {results.isReadyForHarvest ? "¡Lista!" : `${results.yearsToHarvest} años`}
+              {currentSpecies?.name?.toLowerCase().includes('espadín') && !results.isReadyForHarvest && (
+                <span className="text-sm font-normal text-muted-foreground ml-1">(maduración: 5.5 a 6 años)</span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {t('simulator.harvestDate')}: {results.maturationDate.toLocaleDateString('es-MX', { 

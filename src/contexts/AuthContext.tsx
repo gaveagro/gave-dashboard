@@ -191,7 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: 'demo@gaveagro.com',
       name: 'Usuario Demo',
       role: 'demo' as const,
-      account_balance: 500000,
+      account_balance: 890000,
       phone: '+52 555 123 4567',
       created_at: new Date().toISOString(),
     };
