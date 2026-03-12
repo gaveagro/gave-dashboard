@@ -1,52 +1,57 @@
 
+# Plan: Columnas ordenables en la tabla de Rentas
 
-## Plan: Three Fixes
+## Resumen
 
-### 1. Demo user balance showing zero
+Agregar la funcionalidad de ordenamiento (sort) a todas las columnas de la tabla del Calendario de Rentas. Al hacer clic en el encabezado de una columna, los datos se ordenaran de forma ascendente; al hacer clic de nuevo, de forma descendente. Se mostrara un icono de flecha indicando la direccion del orden activo.
 
-The `AuthContext.tsx` sets `account_balance: 500000` for the demo profile (line 194), while `DemoContext.tsx` sets `account_balance: 890000` (line 65). These are inconsistent but both non-zero. The issue is likely that the dashboard reads `profile?.account_balance` from `AuthContext`, and the value `500000` is correct but might be getting overwritten somewhere, or the balance display in `AppLayout.tsx` line 87 shows `$0` because the profile object is stale.
+## Cambios
 
-**Fix:** Synchronize demo balance in `AuthContext.tsx` to `890000` (matching DemoContext's total of investments: 250k + 400k + 240k). This ensures both contexts agree.
+### Archivo: `src/components/admin/LeaseManager.tsx`
 
-### 2. Map provider — replace Mapbox with a free alternative
+**1. Nuevo estado para controlar el ordenamiento**
 
-The Mapbox map requires an API token fetched via edge function (`get-mapbox-token`). If the token is missing or the edge function auth fails (after security hardening), the map won't render.
+Agregar dos estados:
+- `sortColumn`: indica que columna esta activa (por defecto `null` para mantener el orden actual por cosecha)
+- `sortDirection`: `'asc'` o `'desc'`
 
-**Fix:** Replace Mapbox GL JS with **Leaflet + OpenStreetMap** tiles in `PlotMap.tsx` and `MonitoringMap.tsx`. Leaflet is free, no API key needed, and supports satellite-like views via Esri World Imagery tiles (free for non-commercial/limited use) which look similar to Google Maps. Will use `leaflet` package with React.
+**2. Funcion de ordenamiento**
 
-Changes:
-- Remove `mapbox-gl` dependency, add `leaflet` + `@types/leaflet`
-- Rewrite `PlotMap.tsx` to use Leaflet with Esri satellite tiles + OpenStreetMap as base
-- Keep polygon rendering (GeoJSON layers), corner markers, and heatmap layers (Leaflet heatmap plugin or simplified circle markers)
-- Update `MonitoringMap.tsx` if it uses Mapbox
-- Remove `get-mapbox-token` edge function dependency (optional, can keep for other uses)
+Crear una funcion `sortLeases` que reciba la lista filtrada y la ordene segun la columna seleccionada:
 
-### 3. Espadín maturation range: display as "5.5 a 6 años"
+| Columna | Tipo de orden |
+|---------|---------------|
+| Propietario | Alfabetico (A-Z / Z-A) |
+| Ubicacion | Alfabetico |
+| Ano Plantacion | Numerico |
+| Cosecha Est. | Por fecha de cosecha calculada |
+| Hectareas | Numerico |
+| Renta Anual | Numerico |
+| Frecuencia | Alfabetico |
+| Prox. Renta | Por fecha calculada |
+| Vencimiento | Por fecha (end_date) |
+| Saldo | Numerico |
+| Estado | Por prioridad (overdue > expiring_soon > active > paid_up) |
 
-The DB stores `maturation_years` as a single numeric value (currently 5.5 for Espadín). The user wants it displayed as a **range** ("5.5 a 6 años") in all places where maturation is shown.
+**3. Encabezados clickeables**
 
-This is a **display-only** change — the underlying calculation still uses `maturation_years` (5.5) for progress calculations. We add display logic that shows "5.5 a 6" for Espadín wherever the maturation period is displayed.
+Reemplazar los `<TableHead>` estaticos por elementos clickeables que:
+- Cambien el `sortColumn` al hacer clic
+- Alternen la direccion si ya es la columna activa
+- Muestren un icono `ArrowUpDown` (neutro), `ArrowUp` (asc) o `ArrowDown` (desc) de lucide-react junto al texto
 
-**Files to update:**
-- `src/pages/Dashboard.tsx` — line 416: `{maturationYears} años` → `{maturationYears} a {maturationYears + 0.5} años` (when species is Espadín)
-- `src/components/simulator/InvestmentSimulator.tsx` — maturation time display (line 612)
-- `src/pages/Investments.tsx` — no explicit maturation display but progress bar text could show range
-- `src/contexts/DemoContext.tsx` — demo data `maturation_years` stays 5.5 (calculation value)
-- `src/components/admin/SpeciesManager.tsx` — badge display line 397
+**4. Comportamiento**
 
-**Approach:** Create a helper function `formatMaturationRange(years, speciesName)` that returns "5.5 a 6 años" for Espadín and `"{years} años"` for others. Use it in all display locations.
+- Si no hay columna seleccionada, se mantiene el orden actual (por prioridad de cosecha)
+- Al hacer clic en una columna por primera vez: orden ascendente
+- Segundo clic: orden descendente
+- Tercer clic: vuelve al orden por defecto (cosecha)
+- La columna "Acciones" no sera ordenable
 
-### Summary of changes
+### Detalle tecnico
 
-| File | Change |
-|------|--------|
-| `src/contexts/AuthContext.tsx` | Fix demo balance to 890000 |
-| `src/components/PlotMap.tsx` | Replace Mapbox with Leaflet + Esri/OSM tiles |
-| `src/components/monitoring/MonitoringMap.tsx` | Update if needed for Leaflet |
-| `src/pages/Dashboard.tsx` | Show maturation as range for Espadín |
-| `src/pages/Investments.tsx` | Show maturation as range for Espadín |
-| `src/components/simulator/InvestmentSimulator.tsx` | Show maturation as range for Espadín |
-| `src/components/admin/SpeciesManager.tsx` | Show maturation as range for Espadín |
-| `src/lib/maturation.ts` (new) | Helper function for maturation range display |
-| `package.json` | Add leaflet, remove mapbox-gl |
+Se reemplazara la linea `.sort((a, b) => getMonthsToHarvest(a) - getMonthsToHarvest(b))` en `filteredLeases` por una funcion que primero revise si hay un `sortColumn` activo, y si lo hay, ordene por esa columna; si no, use el orden por defecto de cosecha.
 
+Se importara `ArrowUpDown`, `ArrowUp` y `ArrowDown` de lucide-react.
+
+No se requieren cambios en la base de datos ni en otros archivos.

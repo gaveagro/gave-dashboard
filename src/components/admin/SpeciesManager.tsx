@@ -394,7 +394,7 @@ export function SpeciesManager() {
                         <span className="text-sm">años</span>
                       </div>
                     ) : (
-                      <Badge variant="secondary">{specie.maturation_years} años</Badge>
+                      <Badge variant="secondary">{specie.name?.toLowerCase().includes('espadín') ? '5.5 a 6' : specie.maturation_years} años</Badge>
                     )}
                   </CardTitle>
                   <CardDescription>

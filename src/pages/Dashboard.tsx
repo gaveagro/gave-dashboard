@@ -413,7 +413,7 @@ const Dashboard = () => {
                           {Math.round(progress)}%
                         </p>
                         <p className="text-xs text-green-600 dark:text-green-400">
-                          {yearsGrownDisplay} de {maturationYears} años
+                          {yearsGrownDisplay} de {investment.plant_species?.name?.toLowerCase().includes('espadín') ? '5.5 a 6' : maturationYears} años
                         </p>
                       </div>
                     </div>
