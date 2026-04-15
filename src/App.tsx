@@ -10,16 +10,23 @@ import { DemoProvider } from "@/contexts/DemoContext";
 import AppLayout from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Investments from "./pages/Investments";
-import Plots from "./pages/Plots";
-
-import Profile from "./pages/Profile";
-import Simulator from "./pages/Simulator";
-import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import React, { Suspense } from "react";
+
+const Dashboard = React.lazy(() => import("./pages/Dashboard"));
+const Investments = React.lazy(() => import("./pages/Investments"));
+const Plots = React.lazy(() => import("./pages/Plots"));
+const Profile = React.lazy(() => import("./pages/Profile"));
+const Simulator = React.lazy(() => import("./pages/Simulator"));
+const Admin = React.lazy(() => import("./pages/Admin"));
 
 const queryClient = new QueryClient();
+
+const LazyFallback = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
 
 function App() {
   return (
@@ -35,12 +42,12 @@ function App() {
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/" element={<AppLayout><Outlet /></AppLayout>}>
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="investments" element={<Investments />} />
-                  <Route path="plots" element={<Plots />} />
-                  <Route path="profile" element={<Profile />} />
-                  <Route path="simulator" element={<Simulator />} />
-                  <Route path="admin" element={<Admin />} />
+                  <Route path="dashboard" element={<Suspense fallback={<LazyFallback />}><Dashboard /></Suspense>} />
+                  <Route path="investments" element={<Suspense fallback={<LazyFallback />}><Investments /></Suspense>} />
+                  <Route path="plots" element={<Suspense fallback={<LazyFallback />}><Plots /></Suspense>} />
+                  <Route path="profile" element={<Suspense fallback={<LazyFallback />}><Profile /></Suspense>} />
+                  <Route path="simulator" element={<Suspense fallback={<LazyFallback />}><Simulator /></Suspense>} />
+                  <Route path="admin" element={<Suspense fallback={<LazyFallback />}><Admin /></Suspense>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
