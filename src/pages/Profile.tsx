@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDemo } from '@/contexts/DemoContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { User, Phone, Mail, Save, Edit, Lock } from 'lucide-react';
@@ -12,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 
 const Profile = () => {
   const { user, profile } = useAuth();
+  const { isDemoMode, demoData } = useDemo();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -29,8 +31,11 @@ const Profile = () => {
 
   // Fetch total invested capital
   const { data: totalInvested } = useQuery({
-    queryKey: ['user-total-invested', user?.id],
+    queryKey: ['user-total-invested', user?.id, isDemoMode],
     queryFn: async () => {
+      if (isDemoMode) {
+        return demoData.investments.reduce((sum, inv) => sum + inv.total_amount, 0);
+      }
       if (!user) return 0;
       
       const { data, error } = await supabase
@@ -42,7 +47,7 @@ const Profile = () => {
       
       return data.reduce((sum, investment) => sum + Number(investment.total_amount), 0);
     },
-    enabled: !!user
+    enabled: !!user || isDemoMode
   });
 
   useEffect(() => {

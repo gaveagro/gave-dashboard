@@ -1,7 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/contexts/LanguageContext';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface MonitoringMapProps {
   plots?: any[];
@@ -9,7 +11,75 @@ interface MonitoringMapProps {
 
 const MonitoringMap: React.FC<MonitoringMapProps> = ({ plots = [] }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
   const { t } = useLanguage();
+
+  useEffect(() => {
+    if (!mapContainer.current || mapRef.current) return;
+
+    // Default center: Oaxaca, Mexico
+    const defaultCenter: [number, number] = [16.5, -96.7];
+
+    const map = L.map(mapContainer.current, {
+      center: defaultCenter,
+      zoom: 8,
+      zoomControl: true,
+    });
+
+    // Esri satellite tiles
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: 'Tiles &copy; Esri',
+        maxZoom: 18,
+      }
+    ).addTo(map);
+
+    // Labels overlay
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 18 }
+    ).addTo(map);
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // Add/update plot markers when plots change
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !plots?.length) return;
+
+    const markers: L.Marker[] = [];
+    const validCoords: [number, number][] = [];
+
+    plots.forEach((plot) => {
+      const lat = Number(plot.latitude);
+      const lng = Number(plot.longitude);
+      if (!isFinite(lat) || !isFinite(lng)) return;
+
+      validCoords.push([lat, lng]);
+
+      const marker = L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup(
+          `<strong>${plot.name}</strong><br/>${plot.location || ''}<br/>${plot.area ? plot.area + ' ha' : ''}`
+        );
+      markers.push(marker);
+    });
+
+    if (validCoords.length > 0) {
+      map.fitBounds(L.latLngBounds(validCoords).pad(0.3));
+    }
+
+    return () => {
+      markers.forEach((m) => m.remove());
+    };
+  }, [plots]);
 
   return (
     <Card className="w-full">
@@ -25,40 +95,10 @@ const MonitoringMap: React.FC<MonitoringMapProps> = ({ plots = [] }) => {
         </div>
       </CardHeader>
       <CardContent className="p-4">
-        <div 
-          ref={mapContainer} 
-          className="w-full h-[300px] bg-gradient-to-br from-green-100 via-blue-50 to-green-50 rounded-lg relative overflow-hidden"
-        >
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute top-10 left-10 w-24 h-24 bg-green-400 rounded-full blur-xl"></div>
-            <div className="absolute top-16 right-16 w-20 h-20 bg-blue-400 rounded-full blur-xl"></div>
-            <div className="absolute bottom-16 left-16 w-16 h-16 bg-yellow-400 rounded-full blur-xl"></div>
-          </div>
-          
-          {/* Content */}
-          <div className="relative z-10 h-full flex items-center justify-center">
-            <div className="text-center p-6 bg-white/80 backdrop-blur-sm rounded-lg shadow-lg max-w-sm">
-              <div className="text-2xl mb-2">🗺️</div>
-              <div className="text-lg font-bold mb-1 text-gray-800">{t('monitoring.plotsOverview')}</div>
-              <div className="text-sm text-gray-600">
-                {t('monitoring.integratedDescription')}
-              </div>
-            </div>
-          </div>
-          
-          {/* Mock parcel markers */}
-          {plots?.slice(0, 5).map((_, i) => (
-            <div 
-              key={i}
-              className="absolute w-3 h-3 bg-green-600 rounded-full border-2 border-white shadow-lg"
-              style={{
-                top: `${20 + (i * 15) % 60}%`,
-                left: `${25 + (i * 20) % 50}%`
-              }}
-            ></div>
-          ))}
-        </div>
+        <div
+          ref={mapContainer}
+          className="w-full h-[400px] rounded-lg overflow-hidden"
+        />
       </CardContent>
     </Card>
   );
