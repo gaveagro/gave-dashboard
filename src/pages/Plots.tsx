@@ -84,7 +84,16 @@ const Plots = () => {
     staleTime: 5 * 60 * 1000 // Cache for 5 minutes - rarely changes
   });
 
-  const deletePlotMutation = useMutation({
+  // Batch fetch all monitoring data in a single round-trip
+  const plotIds = (plots ?? []).map((p) => p.id);
+  const { data: monitoringByPlot } = useQuery({
+    queryKey: ['plots-monitoring', plotIds.join(',')],
+    queryFn: () => getMonitoringDataForPlots(plotIds),
+    enabled: plotIds.length > 0,
+    staleTime: 10 * 60 * 1000, // 10 min
+    gcTime: 30 * 60 * 1000,
+  });
+
     mutationFn: async (plotId: string) => {
       // First delete all photos associated with the plot
       const { data: photos } = await supabase
