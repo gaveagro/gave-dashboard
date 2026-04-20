@@ -29,15 +29,23 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
   ]);
   
   // Constantes de Gavé
-  const GAVE_COMMISSION = 0.35; // 35% comisión sobre ganancias
-  
+  const GAVE_COMMISSION = 0.35; // 35% sobre utilidad (después de recuperar inversión)
+  const INVESTOR_SHARE = 0.65; // 65% sobre utilidad para el inversionista
+
   // Cálculos
+  // 1. Ingreso bruto por venta de cosecha
   const totalWeightKg = weightPerPlant[0] * investment.plant_count;
   const grossRevenue = totalWeightKg * pricePerKg[0];
-  const grossProfit = grossRevenue - investment.total_amount;
-  const gaveCommission = grossProfit > 0 ? grossProfit * GAVE_COMMISSION : 0;
-  const netRevenue = grossRevenue - gaveCommission;
-  const totalProfit = netRevenue - investment.total_amount;
+  // 2. Restar inversión inicial → utilidad a repartir
+  const distributableProfit = grossRevenue - investment.total_amount;
+  // 3. Repartir 65/35 (solo si hay utilidad positiva)
+  const gaveCommission = distributableProfit > 0 ? distributableProfit * GAVE_COMMISSION : 0;
+  const investorProfit = distributableProfit > 0
+    ? distributableProfit * INVESTOR_SHARE
+    : distributableProfit;
+  // 4. Ingreso neto del inversionista = inversión recuperada + su parte de la utilidad
+  const netRevenue = investment.total_amount + investorProfit;
+  const totalProfit = investorProfit;
   const roi = (totalProfit / investment.total_amount) * 100;
   
   // Currency state and exchange rate
