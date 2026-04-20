@@ -17,8 +17,8 @@ const MonitoringMap: React.FC<MonitoringMapProps> = ({ plots = [] }) => {
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
 
-    // Default center: Oaxaca, Mexico
-    const defaultCenter: [number, number] = [16.5, -96.7];
+    // Default center: San Luis Potosí, Mexico (Huasteca region)
+    const defaultCenter: [number, number] = [22.15, -98.95];
 
     const map = L.map(mapContainer.current, {
       center: defaultCenter,

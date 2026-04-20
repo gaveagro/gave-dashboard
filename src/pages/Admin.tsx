@@ -871,7 +871,7 @@ const Admin = () => {
                     <Input
                       value={plotForm.location}
                       onChange={(e) => setPlotForm(prev => ({ ...prev, location: e.target.value }))}
-                      placeholder="Ej: Oaxaca, México"
+                      placeholder="Ej: Aquismón, San Luis Potosí"
                     />
                   </div>
 

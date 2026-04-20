@@ -141,12 +141,21 @@ const EnvironmentalImpactCard: React.FC<EnvironmentalImpactCardProps> = ({
             <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
             <span>{t('impact.ndviTrend')}</span>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className={`text-2xl font-bold tracking-tight ${ndviTrendPct >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-              {ndviTrendPct >= 0 ? '+' : ''}{formatNumber(ndviTrendPct, 1)}%
-            </span>
-          </div>
-          <Sparkline values={ndviSeries.length ? ndviSeries : [0.3, 0.32, 0.31, 0.34, 0.36, 0.38]} />
+          {ndviSeries.length >= 2 ? (
+            <>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-2xl font-bold tracking-tight ${ndviTrendPct >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {ndviTrendPct >= 0 ? '+' : ''}{formatNumber(ndviTrendPct, 1)}%
+                </span>
+              </div>
+              <Sparkline values={ndviSeries} />
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-bold tracking-tight text-muted-foreground">—</div>
+              <p className="text-[11px] text-muted-foreground">{t('impact.ndviNoData')}</p>
+            </>
+          )}
         </div>
 
         {/* Days monitored */}

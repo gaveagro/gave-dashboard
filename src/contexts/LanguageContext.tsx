@@ -92,7 +92,7 @@ const translations = {
     
     // Plots
     'plots.title': 'Parcelas de Cultivo',
-    'plots.description': 'Información detallada sobre nuestras parcelas de agave en Oaxaca',
+    'plots.description': 'Información detallada sobre nuestras parcelas de agave en San Luis Potosí',
     'plots.totalPlots': 'Total Parcelas',
     'plots.totalArea': 'Área Total',
     'plots.totalPlants': 'Total Plantas',
@@ -299,6 +299,7 @@ const translations = {
     'impact.plantsLabel': 'plantas',
     'impact.cumulativeSinceStart': 'Acumulado desde plantación',
     'impact.downloadReport': 'Descargar reporte',
+    'impact.ndviNoData': 'Sin datos satelitales aún',
     'timeslider.play': 'Reproducir',
     'timeslider.pause': 'Pausar',
     'timeslider.frames': 'cuadros',
@@ -413,7 +414,7 @@ const translations = {
     
     // Plots
     'plots.title': 'Cultivation Plots',
-    'plots.description': 'Detailed information about our agave plots in Oaxaca',
+    'plots.description': 'Detailed information about our agave plots in San Luis Potosí',
     'plots.totalPlots': 'Total Plots',
     'plots.totalArea': 'Total Area',
     'plots.totalPlants': 'Total Plants',
@@ -620,6 +621,7 @@ const translations = {
     'impact.plantsLabel': 'plants',
     'impact.cumulativeSinceStart': 'Cumulative since planting',
     'impact.downloadReport': 'Download report',
+    'impact.ndviNoData': 'No satellite data yet',
     'timeslider.play': 'Play',
     'timeslider.pause': 'Pause',
     'timeslider.frames': 'frames',
