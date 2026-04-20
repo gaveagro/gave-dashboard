@@ -94,6 +94,7 @@ const Plots = () => {
     gcTime: 30 * 60 * 1000,
   });
 
+  const deletePlotMutation = useMutation({
     mutationFn: async (plotId: string) => {
       // First delete all photos associated with the plot
       const { data: photos } = await supabase
