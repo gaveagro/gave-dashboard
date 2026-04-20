@@ -165,6 +165,60 @@ export const getSatelliteHistory = async (polygonId: string, days: number = 90):
   return data || [];
 };
 
+// Batch fetch monitoring data for many plots in a single round-trip
+export interface PlotMonitoringData {
+  polygon: AgromonitoringPolygon | null;
+  satellite: AgromonitoringData | null;
+  weather: AgromonitoringData | null;
+  history: AgromonitoringData[];
+}
+
+export const getMonitoringDataForPlots = async (
+  plotIds: string[]
+): Promise<Record<string, PlotMonitoringData>> => {
+  if (!plotIds || plotIds.length === 0) return {};
+
+  // 1. Get all polygons for these plots in one query
+  const { data: polygons, error: polyErr } = await supabase
+    .from('agromonitoring_polygons')
+    .select('*')
+    .in('plot_id', plotIds);
+  if (polyErr) throw polyErr;
+
+  const result: Record<string, PlotMonitoringData> = {};
+  for (const id of plotIds) {
+    result[id] = { polygon: null, satellite: null, weather: null, history: [] };
+  }
+  if (!polygons || polygons.length === 0) return result;
+
+  const polygonIds = polygons.map((p) => p.polygon_id);
+  const polygonByPlot = new Map(polygons.map((p) => [p.plot_id, p]));
+
+  // 2. Get all monitoring rows for these polygons in one query
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+  const { data: rows, error: rowsErr } = await supabase
+    .from('agromonitoring_data')
+    .select('*')
+    .in('polygon_id', polygonIds)
+    .gte('measurement_date', ninetyDaysAgo.toISOString().split('T')[0])
+    .order('measurement_date', { ascending: false });
+  if (rowsErr) throw rowsErr;
+
+  // 3. Bucket per plot
+  for (const [plotId, polygon] of polygonByPlot.entries()) {
+    const polyRows = (rows ?? []).filter((r) => r.polygon_id === polygon.polygon_id);
+    const satellite = polyRows.find((r) => r.data_type === 'satellite') ?? null;
+    const weather = polyRows.find((r) => r.data_type === 'weather_current') ?? null;
+    const history = polyRows
+      .filter((r) => r.data_type === 'satellite')
+      .sort((a, b) => a.measurement_date.localeCompare(b.measurement_date));
+    result[plotId] = { polygon, satellite, weather, history };
+  }
+  return result;
+};
+
 // Sync all data for all polygons
 export const syncAllData = async () => {
   const [satelliteResult, weatherResult] = await Promise.all([
