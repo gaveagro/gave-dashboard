@@ -421,7 +421,22 @@ const Plots = () => {
                   )}
                 </div>
 
-                {/* Mapa de ubicación - Increased prominence */}
+                {/* Environmental Impact Card - corporate-grade summary */}
+                <div className="pt-4 border-t">
+                  <EnvironmentalImpactCard
+                    plotName={plot.name}
+                    totalPlants={plot.total_plants || 0}
+                    areaHectares={Number(plot.area) || 0}
+                    establishmentYear={(plot as any).establishment_year}
+                    carbonPerPlant={0.85}
+                    maturationYears={5.5}
+                    satelliteHistory={monitoringByPlot?.[plot.id]?.history || []}
+                    lastSatelliteDate={monitoringByPlot?.[plot.id]?.satellite?.measurement_date || null}
+                    cloudCoverage={monitoringByPlot?.[plot.id]?.satellite?.cloud_coverage ?? null}
+                  />
+                </div>
+
+                {/* Mapa de ubicación */}
                 {plot.latitude && plot.longitude && (
                   <div className="pt-4 border-t">
                     <div className="flex items-center gap-2 mb-4">
@@ -434,25 +449,34 @@ const Plots = () => {
                         longitude={plot.longitude}
                         name={plot.name}
                         plotId={plot.id}
+                        polygon={monitoringByPlot?.[plot.id]?.polygon || null}
+                        satelliteHistory={monitoringByPlot?.[plot.id]?.history || []}
                       />
                     </div>
                   </div>
                 )}
 
-                {/* Agromonitoring Satellite Monitoring */}
+                {/* Agromonitoring Satellite Monitoring (collapsible) */}
                 <div className="pt-4 border-t">
                   <ErrorBoundary
                     fallback={
                       <Card>
                         <CardContent className="pt-6">
-                          <p className="text-sm text-muted-foreground">{t('monitoring.demo')}</p>
+                          <p className="text-sm text-muted-foreground">{t('monitoring.satelliteUnavailable')}</p>
                         </CardContent>
                       </Card>
                     }
                   >
-                    <AgromonitoringMonitor plotId={plot.id} plotName={plot.name} />
+                    <AgromonitoringMonitor
+                      plotId={plot.id}
+                      plotName={plot.name}
+                      polygon={monitoringByPlot?.[plot.id]?.polygon || null}
+                      satelliteData={monitoringByPlot?.[plot.id]?.satellite || null}
+                      weatherData={monitoringByPlot?.[plot.id]?.weather || null}
+                    />
                   </ErrorBoundary>
                 </div>
+
 
                 {/* Admin photo upload */}
                 {profile?.role === 'admin' && (
