@@ -181,34 +181,18 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
           <h4 className="font-medium text-sm">{t('investments.valuationProjection')}</h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Columna de Ingresos */}
+            {/* Columna Izquierda: Cálculo de utilidad */}
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2 border-b border-muted">
                 <span className="text-sm text-muted-foreground">{t('investments.totalEstimatedWeight')}</span>
                 <span className="font-medium">{formatNumber(totalWeightKg)} kg</span>
               </div>
-              
+
               <div className="flex justify-between items-center py-2 border-b border-muted">
                 <span className="text-sm text-muted-foreground">{t('investments.grossRevenue')}</span>
                 <span className="font-medium text-profit">{formatCurrency(grossRevenue)}</span>
               </div>
-              
-              <div className="flex justify-between items-center py-2 border-b border-muted">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Minus className="h-3 w-3" />
-                  {t('investments.gaveCommission')}
-                </span>
-                <span className="font-medium text-destructive">-{formatCurrency(gaveCommission)}</span>
-              </div>
-              
-              <div className="flex justify-between items-center py-2 border-b-2 border-primary">
-                <span className="text-sm font-medium">{t('investments.netRevenue')}</span>
-                <span className="font-bold text-profit">{formatCurrency(netRevenue)}</span>
-              </div>
-            </div>
 
-            {/* Columna de ROI */}
-            <div className="space-y-3">
               <div className="flex justify-between items-center py-2 border-b border-muted">
                 <span className="text-sm text-muted-foreground flex items-center gap-1">
                   <Minus className="h-3 w-3" />
@@ -216,14 +200,37 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
                 </span>
                 <span className="font-medium text-investment">-{formatCurrency(investment.total_amount)}</span>
               </div>
-              
+
               <div className="flex justify-between items-center py-2 border-b-2 border-primary">
-                <span className="text-sm font-medium">{t('investments.totalProfit')}</span>
-                <span className={`font-bold ${totalProfit >= 0 ? 'text-profit' : 'text-destructive'}`}>
-                  {formatCurrency(totalProfit)}
+                <span className="text-sm font-medium">Utilidad a repartir</span>
+                <span className={`font-bold ${distributableProfit >= 0 ? 'text-profit' : 'text-destructive'}`}>
+                  {formatCurrency(distributableProfit)}
                 </span>
               </div>
-              
+            </div>
+
+            {/* Columna Derecha: Reparto 65/35 y ROI */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b border-muted">
+                <span className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Minus className="h-3 w-3" />
+                  Comisión Gavé (35% de utilidad)
+                </span>
+                <span className="font-medium text-destructive">-{formatCurrency(gaveCommission)}</span>
+              </div>
+
+              <div className="flex justify-between items-center py-2 border-b border-muted">
+                <span className="text-sm text-muted-foreground">Tu ganancia (65% de utilidad)</span>
+                <span className={`font-medium ${investorProfit >= 0 ? 'text-profit' : 'text-destructive'}`}>
+                  {formatCurrency(investorProfit)}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-2 border-b-2 border-primary">
+                <span className="text-sm font-medium">{t('investments.netRevenue')}</span>
+                <span className="font-bold text-profit">{formatCurrency(netRevenue)}</span>
+              </div>
+
               <div className="bg-gradient-to-r from-profit/10 to-roi/10 p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-1">
                   <TrendingUp className="h-4 w-4 text-roi" />
@@ -234,6 +241,8 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
                 </div>
               </div>
             </div>
+          </div>
+        </div>
           </div>
         </div>
 
