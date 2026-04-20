@@ -243,8 +243,7 @@ export const InvestmentValuationCalculator = ({ investment }: InvestmentValuatio
             </div>
           </div>
         </div>
-          </div>
-        </div>
+
 
         <div className="text-xs text-muted-foreground bg-muted/20 p-3 rounded-lg">
           <strong>Nota:</strong> {t('investments.calculatorNote')}
