@@ -1,64 +1,102 @@
 
 
-## Assessment Report: Gavé Agro Platform
+## Plan: Fix Monitoring Edge Function + Overhaul Monitoring UX/UI/Performance
 
-### Status of All Sections
+### Root cause of "Edge Function returned a non-2xx status code"
 
-| Section | Status | Issues Found |
-|---------|--------|-------------|
-| Landing page (`/`) | Working | None |
-| Auth (`/auth`) | Working | Minor: autocomplete attributes missing on password input |
-| Dashboard (`/dashboard`) | Working | Espadín maturation shows "5.5 a 6 años" correctly; balance $890,000 correct |
-| Investments (`/investments`) | Working | All 3 investments render with calculators; no errors |
-| Plots (`/plots`) | Working | Leaflet maps with Esri satellite tiles render correctly for all plots |
-| Simulator (`/simulator`) | Working | Maturation shows "5.5 a 6 años" correctly |
-| Profile (`/profile`) | **Bug** | "Capital Total Invertido" shows $0 for demo user |
-| Admin (`/admin`) | Working | Correctly denies access to demo user |
-| Runtime errors | None | Clean console, no crashes |
+The `agromonitoring-polygon` edge function tries to parse the plot's `coordinates` field as a multi-point polygon by splitting on a single space:
+
+```ts
+plot.coordinates.split(' ').map(pair => { const [lat, lng] = pair.split(',').map(Number); return [lng, lat]; })
+```
+
+But all plots in the DB store a single point like `"22.306612, -98.659598"`. After splitting by space, we get two malformed pieces (`"22.306612,"` and `"-98.659598"`), producing a single broken pair. The Agromonitoring API rejects with **"a LinearRing of coordinates needs to have four or more positions"** → 500 status → "non-2xx" error in the UI.
+
+The fallback path that builds a square polygon from `latitude`/`longitude` works, but is never reached because `plot.coordinates` is truthy.
 
 ---
 
-### Bug: Profile Page — Demo User Shows $0 Invested
+### Part 1 — Fix the polygon creation (immediate bugfix)
 
-**Root cause:** `Profile.tsx` (line 31-46) queries Supabase `investments` table filtered by `user.id`. The demo user has a fake UUID that doesn't exist in the database, so it always returns $0. Unlike Dashboard and Investments pages, Profile doesn't check for demo mode.
+**File:** `supabase/functions/agromonitoring-polygon/index.ts`
 
-**Fix:** Add demo mode check — if `isDemoMode`, calculate total from `demoData.investments` instead of querying Supabase.
+Robust parser:
+1. Try to parse `coordinates` as a multi-point string. Accept both `lat,lng lat,lng` (space-separated) **and** `lat, lng; lat, lng` patterns. Strip whitespace on each piece.
+2. If parsing yields fewer than 3 distinct points, **fall back to lat/lng** and build a square polygon — using `area` (in hectares) to compute a realistic side length instead of the hard-coded `0.005°` offset. A 10 ha plot → ~316m square; convert to degrees using `√(area_ha × 10000) / 111320`.
+3. Always close the ring (first === last).
+4. Log the generated GeoJSON before posting to Agromonitoring for easier debugging.
+
+Also surface the real error message back to the client (currently swallowed as "Internal server error") so future failures are visible.
+
+### Part 2 — Performance: why the section is slow
+
+Current waterfall on `/plots`: Plots query → Photos query → Investments query → Species query → for each plot card, **3 sequential queries** inside `AgromonitoringMonitor` (polygon → satellite → weather), plus PlotMap fires its own Cecil AOI + satellite queries. With 10 plots that's ~60 sequential round-trips.
+
+**Fixes:**
+- **Batch the Agromonitoring queries**: one query loads all polygons, all latest satellite rows, and all latest weather rows by plot list. Pass them down as props to `AgromonitoringMonitor` and `PlotMap` (no per-card queries).
+- **Lazy-mount maps**: render PlotMap only when the card scrolls into view (`IntersectionObserver`). Today all 10 maps initialize on first paint — Leaflet creates 10 map instances + tile layers immediately.
+- **Defer Agromonitoring section**: only mount when the user expands it (`<details>` / collapsible). Most users never scroll to it.
+- **Cache aggressively**: bump satellite/weather staleTime to 10 min, polygons to 30 min (data updates ~1×/day).
+- Result: initial paint goes from ~60 queries to ~5; map memory drops dramatically.
+
+### Part 3 — UX/UI overhaul of the monitoring experience
+
+Reposition this as a **corporate environmental-impact dashboard** worth paying for. Three deliverables:
+
+#### 3a. New `EnvironmentalImpactCard` (corporate-grade summary, top of each plot)
+Replace the demo gradient placeholder with a clean impact tile showing:
+- **CO₂ captured** (live counter, computed from `total_plants × species.carbon_capture_per_plant × maturation_progress`)
+- **Active hectares restored**
+- **NDVI vs. baseline** (mini sparkline, last 90 days) — green if improving
+- **Days monitored** + last satellite pass date
+- Single "Descargar reporte" button (PDF/CSV stub for future)
+
+Visual: dark card with subtle gradient accent, large numbers, compact units. Apple-Keynote feel.
+
+#### 3b. Time-slider on the satellite map
+Add a **temporal NDVI viewer** on the plot map:
+- Bottom slider showing months across the last 12–24 months.
+- Dragging swaps the map's NDVI tile (using existing Agromonitoring `image.tile.ndvi` URLs already stored in `agromonitoring_data.satellite_image_url`).
+- "Play ▶" button auto-advances every 700ms — visualizes vegetation evolution across seasons. This is the "watch the land change over time" feature.
+- Uses Leaflet `imageOverlay` clipped to the polygon bounds; no new dependencies.
+
+#### 3c. Cleaner Monitoring tab on `/plots`
+- Replace the always-expanded `AgromonitoringMonitor` block with a **collapsible section** ("Ver datos satelitales y clima") closed by default — drastically faster initial load and less visual noise.
+- When opened, show 3 clean tabs: **Vegetación · Clima · Suelo**. Each tab loads its own data on demand.
+- Replace small grey indicator boxes with proper KPI cards (icon + label + value + trend chevron + colored background based on health threshold).
+- Add a "Última pasada satelital: hace 3 días · 12% nubes" timestamp line — builds trust.
+
+#### 3d. Map provider polish
+PlotMap already uses Leaflet + Esri satellite. Add:
+- **Layer toggle** in top-right: Satélite / Mapa / Híbrido (Esri + labels).
+- **Fullscreen button**.
+- **Scale bar** (km).
+- **Smooth fly-to** when expanding a card.
+- Polygon outlined in semi-transparent green (`#22c55e80`) showing the actual plot boundary (from `agromonitoring_polygons.geo_json` if available; otherwise the computed square).
+
+### Part 4 — Demo mode & error handling
+
+- If the polygon-creation call fails (Agromonitoring rate limit, invalid coords), the UI should keep showing the new EnvironmentalImpactCard with computed-from-DB metrics (carbon, hectares, plants) instead of a sad "demo" badge. The corporate visitor should never see "demo mode" — they should always see real impact numbers.
+- Add a small "Datos satelitales no disponibles" inline message only inside the collapsible section.
 
 ---
 
-### Optimization Opportunities
+### Files to change
 
-#### 1. Performance (FCP = 5.5s, Total load = 6.1s)
-- **Lazy-load routes**: Admin.tsx (63KB), InvestmentSimulator.tsx (31KB), UserManager.tsx (28KB) are loaded eagerly even when not needed. Using `React.lazy()` with `Suspense` for these routes would cut initial bundle significantly.
-- **Lazy-load Leaflet**: The leaflet.js (78KB) is loaded on every page even when no map is visible. Dynamically import it only in PlotMap.
-- **Lazy-load Recharts**: recharts.js (219KB) is the largest dependency. Only import it in pages that use charts.
-- **lucide-react** (157KB): Import only needed icons, not the entire library (this is likely already done but verify tree-shaking is working).
+| File | Change |
+|------|--------|
+| `supabase/functions/agromonitoring-polygon/index.ts` | Fix coordinate parsing, area-based square, return real error |
+| `src/lib/agromonitoring.ts` | Add `getMonitoringDataForPlots(plotIds[])` batch fetcher |
+| `src/pages/Plots.tsx` | Single batch query for monitoring data; pass as props; collapsible monitoring section |
+| `src/components/PlotMap.tsx` | Lazy mount via IntersectionObserver; layer toggle; fullscreen; scale bar; polygon overlay; **time-slider for NDVI tiles** |
+| `src/components/monitoring/AgromonitoringMonitor.tsx` | Accept polygon/satellite/weather as props; remove internal queries; new collapsible tabbed layout |
+| `src/components/monitoring/EnvironmentalImpactCard.tsx` *(new)* | Corporate impact KPIs (CO₂, hectares, NDVI sparkline, days monitored) |
+| `src/components/monitoring/NDVITimeSlider.tsx` *(new)* | Time slider + play button for satellite imagery |
+| `src/components/monitoring/AgromonitoringIndicators.tsx` | Restyled KPI cards with trend + thresholds |
+| `src/contexts/LanguageContext.tsx` | Add new ES/EN keys (impact card, time slider, layer toggle) |
 
-#### 2. MonitoringMap is a Placeholder
-- `MonitoringMap.tsx` shows a static gradient with mock markers instead of a real map. It should use Leaflet (like PlotMap) to show actual plot locations on a real map.
-
-#### 3. Code Quality
-- **Duplicate demo data**: Demo user/profile is defined in both `AuthContext.tsx` and `DemoContext.tsx`. Single source of truth would prevent sync issues.
-- **`any` types**: `userInvestments` and `allInvestments` in Investments.tsx use `any[]`. Proper typing would prevent runtime issues.
-- **No error boundaries on routes**: Only a global ErrorBoundary exists. Route-level boundaries would prevent one page crash from blanking the whole app.
-
-#### 4. Security (Already Addressed, Pending Manual)
-- OTP expiry reduction (Supabase dashboard)
-- Leaked password protection (Supabase dashboard)
-- Postgres version upgrade (Supabase dashboard)
-
-#### 5. UX Improvements
-- **MonitoringMap**: Replace placeholder with real Leaflet map showing all plots
-- **Profile page**: Add investment summary cards similar to dashboard
-- **Mobile sidebar**: Verify collapse behavior on small screens
-- **Loading states**: Some pages show "Cargando..." text instead of skeleton loaders
-
----
-
-### Recommended Priority
-
-1. **Fix Profile page demo bug** (quick fix, user-facing)
-2. **Lazy-load routes** (biggest performance win)
-3. **Replace MonitoringMap placeholder** with real Leaflet map
-4. **Consolidate demo data** into single source of truth
+### Out of scope (keep for later)
+- Server-side aggregation/caching of Agromonitoring data via a scheduled job.
+- PDF report export — only stub the button.
+- Per-user OAuth for Agromonitoring (current shared admin key is fine).
 
