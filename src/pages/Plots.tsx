@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,8 +14,10 @@ import { MapPin, Camera, Thermometer, Droplets, Mountain, Upload, Trash2, Extern
 import { useToast } from '@/hooks/use-toast';
 import PhotoModal from '@/components/PhotoModal';
 import AgromonitoringMonitor from '@/components/monitoring/AgromonitoringMonitor';
+import EnvironmentalImpactCard from '@/components/monitoring/EnvironmentalImpactCard';
 import PlotMap from '@/components/PlotMap';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { getMonitoringDataForPlots } from '@/lib/agromonitoring';
 
 const Plots = () => {
   const { profile } = useAuth();
