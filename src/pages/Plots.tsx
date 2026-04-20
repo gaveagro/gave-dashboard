@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,8 +14,10 @@ import { MapPin, Camera, Thermometer, Droplets, Mountain, Upload, Trash2, Extern
 import { useToast } from '@/hooks/use-toast';
 import PhotoModal from '@/components/PhotoModal';
 import AgromonitoringMonitor from '@/components/monitoring/AgromonitoringMonitor';
+import EnvironmentalImpactCard from '@/components/monitoring/EnvironmentalImpactCard';
 import PlotMap from '@/components/PlotMap';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { getMonitoringDataForPlots } from '@/lib/agromonitoring';
 
 const Plots = () => {
   const { profile } = useAuth();
@@ -80,6 +82,16 @@ const Plots = () => {
       return data;
     },
     staleTime: 5 * 60 * 1000 // Cache for 5 minutes - rarely changes
+  });
+
+  // Batch fetch all monitoring data in a single round-trip
+  const plotIds = (plots ?? []).map((p) => p.id);
+  const { data: monitoringByPlot } = useQuery({
+    queryKey: ['plots-monitoring', plotIds.join(',')],
+    queryFn: () => getMonitoringDataForPlots(plotIds),
+    enabled: plotIds.length > 0,
+    staleTime: 10 * 60 * 1000, // 10 min
+    gcTime: 30 * 60 * 1000,
   });
 
   const deletePlotMutation = useMutation({
@@ -409,7 +421,22 @@ const Plots = () => {
                   )}
                 </div>
 
-                {/* Mapa de ubicación - Increased prominence */}
+                {/* Environmental Impact Card - corporate-grade summary */}
+                <div className="pt-4 border-t">
+                  <EnvironmentalImpactCard
+                    plotName={plot.name}
+                    totalPlants={plot.total_plants || 0}
+                    areaHectares={Number(plot.area) || 0}
+                    establishmentYear={(plot as any).establishment_year}
+                    carbonPerPlant={0.85}
+                    maturationYears={5.5}
+                    satelliteHistory={monitoringByPlot?.[plot.id]?.history || []}
+                    lastSatelliteDate={monitoringByPlot?.[plot.id]?.satellite?.measurement_date || null}
+                    cloudCoverage={monitoringByPlot?.[plot.id]?.satellite?.cloud_coverage ?? null}
+                  />
+                </div>
+
+                {/* Mapa de ubicación */}
                 {plot.latitude && plot.longitude && (
                   <div className="pt-4 border-t">
                     <div className="flex items-center gap-2 mb-4">
@@ -422,25 +449,34 @@ const Plots = () => {
                         longitude={plot.longitude}
                         name={plot.name}
                         plotId={plot.id}
+                        polygon={monitoringByPlot?.[plot.id]?.polygon || null}
+                        satelliteHistory={monitoringByPlot?.[plot.id]?.history || []}
                       />
                     </div>
                   </div>
                 )}
 
-                {/* Agromonitoring Satellite Monitoring */}
+                {/* Agromonitoring Satellite Monitoring (collapsible) */}
                 <div className="pt-4 border-t">
                   <ErrorBoundary
                     fallback={
                       <Card>
                         <CardContent className="pt-6">
-                          <p className="text-sm text-muted-foreground">{t('monitoring.demo')}</p>
+                          <p className="text-sm text-muted-foreground">{t('monitoring.satelliteUnavailable')}</p>
                         </CardContent>
                       </Card>
                     }
                   >
-                    <AgromonitoringMonitor plotId={plot.id} plotName={plot.name} />
+                    <AgromonitoringMonitor
+                      plotId={plot.id}
+                      plotName={plot.name}
+                      polygon={monitoringByPlot?.[plot.id]?.polygon || null}
+                      satelliteData={monitoringByPlot?.[plot.id]?.satellite || null}
+                      weatherData={monitoringByPlot?.[plot.id]?.weather || null}
+                    />
                   </ErrorBoundary>
                 </div>
+
 
                 {/* Admin photo upload */}
                 {profile?.role === 'admin' && (

@@ -182,7 +182,12 @@ const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
         </TabsList>
 
         <TabsContent value="satellite" className="space-y-4">
-          <AgromonitoringMonitor plotName={plotName} />
+          <AgromonitoringMonitor
+            plotName={plotName}
+            polygon={null}
+            satelliteData={null}
+            weatherData={null}
+          />
         </TabsContent>
 
         <TabsContent value="overview" className="space-y-4">
