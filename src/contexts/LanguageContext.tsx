@@ -92,7 +92,7 @@ const translations = {
     
     // Plots
     'plots.title': 'Parcelas de Cultivo',
-    'plots.description': 'Información detallada sobre nuestras parcelas de agave en Oaxaca',
+    'plots.description': 'Información detallada sobre nuestras parcelas de agave en San Luis Potosí',
     'plots.totalPlots': 'Total Parcelas',
     'plots.totalArea': 'Área Total',
     'plots.totalPlants': 'Total Plantas',
@@ -413,7 +413,7 @@ const translations = {
     
     // Plots
     'plots.title': 'Cultivation Plots',
-    'plots.description': 'Detailed information about our agave plots in Oaxaca',
+    'plots.description': 'Detailed information about our agave plots in San Luis Potosí',
     'plots.totalPlots': 'Total Plots',
     'plots.totalArea': 'Total Area',
     'plots.totalPlants': 'Total Plants',
