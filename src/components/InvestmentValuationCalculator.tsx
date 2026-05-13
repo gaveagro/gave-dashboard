@@ -22,7 +22,7 @@ interface InvestmentValuationCalculatorProps {
 export const InvestmentValuationCalculator = ({ investment }: InvestmentValuationCalculatorProps) => {
   const { t } = useLanguage();
   // Estados para los parámetros ajustables
-  const [pricePerKg, setPricePerKg] = useState([20]); // Rango base MXN por kg
+  const [pricePerKg, setPricePerKg] = useState([6]); // Rango base MXN por kg
   const [weightPerPlant, setWeightPerPlant] = useState([
     Math.floor((investment.plant_species?.min_weight_kg || 40) + 
     ((investment.plant_species?.max_weight_kg || 80) - (investment.plant_species?.min_weight_kg || 40)) / 2)
