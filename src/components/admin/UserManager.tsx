@@ -92,6 +92,7 @@ export function UserManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users-admin'] });
       setIsCreateDialogOpen(false);
       setNewUserData({
         email: '',
