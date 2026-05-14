@@ -283,17 +283,11 @@ export function UserManager() {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      // First delete the profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('user_id', userId);
-      
-      if (profileError) throw profileError;
-
-      // Then delete from auth.users using admin API
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      if (authError) throw authError;
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: userId },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'No se pudo eliminar el usuario');
     },
     onSuccess: () => {
       toast({
@@ -301,11 +295,12 @@ export function UserManager() {
         description: "El usuario ha sido eliminado correctamente",
       });
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['users-admin'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "No se pudo eliminar el usuario",
+        description: error?.message || "No se pudo eliminar el usuario",
         variant: "destructive",
       });
     },
