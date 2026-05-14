@@ -97,5 +97,8 @@ verify_jwt = false
 [functions.admin-create-user]
 verify_jwt = true
 
+[functions.admin-delete-user]
+verify_jwt = true
+
 [edge-runtime]
 inspector_port = 8083
