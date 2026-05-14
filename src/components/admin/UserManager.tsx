@@ -29,6 +29,7 @@ export function UserManager() {
     email: '',
     name: '',
     phone: '',
+    password: '',
     role: 'investor' as 'admin' | 'investor',
     account_balance: 0
   });
@@ -75,33 +76,35 @@ export function UserManager() {
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof newUserData) => {
-      const { data, error } = await supabase.rpc('create_user_with_profile_v2', {
-        user_email: userData.email,
-        user_name: userData.name,
-        user_role: userData.role,
-        user_balance: userData.account_balance
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email: userData.email,
+          password: userData.password,
+          name: userData.name,
+          phone: userData.phone || null,
+          role: userData.role,
+          account_balance: userData.account_balance,
+        },
       });
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Error desconocido');
       return data;
     },
-    onSuccess: (data: any) => {
-      if (data?.success) {
-        queryClient.invalidateQueries({ queryKey: ['users'] });
-        setIsCreateDialogOpen(false);
-        setNewUserData({
-          email: '',
-          name: '',
-          phone: '',
-          role: 'investor',
-          account_balance: 0
-        });
-        toast({
-          title: "Usuario creado",
-          description: "El usuario ha sido creado exitosamente con confirmación automática",
-        });
-      } else {
-        throw new Error(data?.error || 'Error desconocido');
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setIsCreateDialogOpen(false);
+      setNewUserData({
+        email: '',
+        name: '',
+        phone: '',
+        password: '',
+        role: 'investor',
+        account_balance: 0
+      });
+      toast({
+        title: "Usuario creado",
+        description: "El usuario ha sido creado con la contraseña proporcionada",
+      });
     },
     onError: (error: any) => {
       toast({
@@ -414,6 +417,17 @@ admin@email.com,Admin User,+52 555 555 5555,0,admin`;
                     value={newUserData.phone}
                     onChange={(e) => setNewUserData(prev => ({ ...prev, phone: e.target.value }))}
                     placeholder="+52 123 456 7890"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={newUserData.password}
+                    onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Mínimo 6 caracteres"
+                    autoComplete="new-password"
                   />
                 </div>
                 <div>

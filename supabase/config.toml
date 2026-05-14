@@ -94,5 +94,8 @@ verify_jwt = false
 [functions.get-mapbox-token]
 verify_jwt = false
 
+[functions.admin-create-user]
+verify_jwt = true
+
 [edge-runtime]
 inspector_port = 8083
