@@ -1019,8 +1019,6 @@ export type Database = {
           email: string
           id: string
           name: string | null
-          password_reset_expires: string | null
-          password_reset_token: string | null
           phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
@@ -1032,8 +1030,6 @@ export type Database = {
           email: string
           id?: string
           name?: string | null
-          password_reset_expires?: string | null
-          password_reset_token?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -1045,8 +1041,6 @@ export type Database = {
           email?: string
           id?: string
           name?: string | null
-          password_reset_expires?: string | null
-          password_reset_token?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
@@ -1094,7 +1088,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      request_password_reset: { Args: { user_email: string }; Returns: Json }
       send_investment_notification: {
         Args: {
           establishment_year: number
