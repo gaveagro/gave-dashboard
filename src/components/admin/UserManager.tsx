@@ -420,6 +420,17 @@ admin@email.com,Admin User,+52 555 555 5555,0,admin`;
                   />
                 </div>
                 <div>
+                  <Label htmlFor="password">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={newUserData.password}
+                    onChange={(e) => setNewUserData(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Mínimo 6 caracteres"
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div>
                   <Label htmlFor="balance">Balance Inicial</Label>
                   <Input
                     id="balance"
