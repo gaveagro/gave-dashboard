@@ -29,6 +29,7 @@ export function UserManager() {
     email: '',
     name: '',
     phone: '',
+    password: '',
     role: 'investor' as 'admin' | 'investor',
     account_balance: 0
   });
