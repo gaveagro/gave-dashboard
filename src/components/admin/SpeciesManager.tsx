@@ -1,4 +1,5 @@
 
+import { formatMaturationRangeShort } from '@/lib/maturation';
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -394,7 +395,7 @@ export function SpeciesManager() {
                         <span className="text-sm">años</span>
                       </div>
                     ) : (
-                      <Badge variant="secondary">{specie.name?.toLowerCase().includes('espadín') ? '5.5 a 6' : specie.maturation_years} años</Badge>
+                      <Badge variant="secondary">{formatMaturationRangeShort(specie.maturation_years, specie.name)} años</Badge>
                     )}
                   </CardTitle>
                   <CardDescription>

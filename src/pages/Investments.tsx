@@ -9,9 +9,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDemo } from '@/contexts/DemoContext';
+import { isEspadin, getMaturationRange, formatHarvestYears, formatYears, isRange, maturationProgress, yearsRemaining } from '@/lib/maturation';
 
 const Investments = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isEspadinInvestment = (inv: any) => isEspadin(inv.plant_species?.name);
   const { profile } = useAuth();
   const { isDemoMode, demoData } = useDemo();
   const [userInvestments, setUserInvestments] = useState<any[]>([]);
@@ -305,7 +307,11 @@ const Investments = () => {
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <div className="font-medium">{t('investments.estimatedHarvest')}</div>
-                      <div className="text-muted-foreground">{investment.expected_harvest_year}</div>
+                      <div className="text-muted-foreground">
+                        {isEspadinInvestment(investment)
+                          ? formatHarvestYears(investment.plantation_year, getMaturationRange(investment.plant_species?.name))
+                          : investment.expected_harvest_year}
+                      </div>
                     </div>
                   </div>
                   
@@ -334,24 +340,40 @@ const Investments = () => {
               {/* Progreso de Maduración - calculated from April */}
               {(() => {
                 const now = new Date();
-                const plantingDate = new Date(investment.plantation_year, 3, 1); // April
-                const harvestDate = new Date(investment.expected_harvest_year, 9, 1); // October (expected)
-                const totalMonths = (harvestDate.getFullYear() - plantingDate.getFullYear()) * 12 + 
-                                   (harvestDate.getMonth() - plantingDate.getMonth());
-                const monthsGrown = Math.max(0,
-                  (now.getFullYear() - plantingDate.getFullYear()) * 12 +
-                  (now.getMonth() - plantingDate.getMonth())
-                );
-                const progress = Math.min(100, Math.max(0, (monthsGrown / totalMonths) * 100));
-                const monthsRemaining = Math.max(0, totalMonths - monthsGrown);
-                const yearsRemaining = (monthsRemaining / 12).toFixed(1);
-                
+                let progress: number;
+                let remainingLabel: string;
+                let inWindow = false;
+                const espadin = isEspadinInvestment(investment);
+
+                if (espadin) {
+                  // Espadín: illustrative window of 5.5 to 6.5 years; maturity = quiote emergence
+                  const range = getMaturationRange(investment.plant_species?.name);
+                  progress = maturationProgress(investment.plantation_year, range, now);
+                  const rem = yearsRemaining(investment.plantation_year, range, now);
+                  inWindow = rem.min <= 0;
+                  remainingLabel = inWindow
+                    ? t('maturation.inWindow')
+                    : `${formatYears({ min: Number(rem.min.toFixed(1)), max: Number(rem.max.toFixed(1)) }, language === 'en' ? 'en' : 'es')} ${t('investments.remainingYears')}`;
+                } else {
+                  const plantingDate = new Date(investment.plantation_year, 3, 1); // April
+                  const harvestDate = new Date(investment.expected_harvest_year, 9, 1); // October (expected)
+                  const totalMonths = (harvestDate.getFullYear() - plantingDate.getFullYear()) * 12 +
+                                     (harvestDate.getMonth() - plantingDate.getMonth());
+                  const monthsGrown = Math.max(0,
+                    (now.getFullYear() - plantingDate.getFullYear()) * 12 +
+                    (now.getMonth() - plantingDate.getMonth())
+                  );
+                  progress = Math.min(100, Math.max(0, (monthsGrown / totalMonths) * 100));
+                  const monthsRemaining = Math.max(0, totalMonths - monthsGrown);
+                  remainingLabel = `${(monthsRemaining / 12).toFixed(1)} ${t('investments.remainingYears')}`;
+                }
+
                 return (
                   <div className="border-t pt-4">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="text-sm font-medium">Progreso de Maduración</div>
-                      <div className="text-sm text-muted-foreground">
-                        {yearsRemaining} {t('investments.remainingYears')}
+                      <div className="text-sm text-muted-foreground text-right">
+                        {remainingLabel}
                       </div>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
@@ -360,6 +382,11 @@ const Investments = () => {
                         style={{ width: `${progress}%` }}
                       ></div>
                     </div>
+                    {espadin && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {language === 'en' ? 'Estimated maturity' : 'Madurez estimada'}: {formatYears(getMaturationRange(investment.plant_species?.name), language === 'en' ? 'en' : 'es')} {t('maturation.years')}. {t('maturation.note')}
+                      </p>
+                    )}
                   </div>
                 );
               })()}

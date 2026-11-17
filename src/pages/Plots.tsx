@@ -18,6 +18,7 @@ import EnvironmentalImpactCard from '@/components/monitoring/EnvironmentalImpact
 import PlotMap from '@/components/PlotMap';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { getMonitoringDataForPlots } from '@/lib/agromonitoring';
+import { getMaturationRange, harvestWindow, formatHarvestYears, isEspadin, maturationProgress } from '@/lib/maturation';
 
 const Plots = () => {
   const { profile } = useAuth();
@@ -256,13 +257,13 @@ const Plots = () => {
     const plotInvestments = investments?.filter(inv => inv.plot_id === plotId) || [];
     if (plotInvestments.length === 0) return 0;
 
-    const currentYear = new Date().getFullYear();
+    const now = new Date();
     const totalProgress = plotInvestments.reduce((sum, inv) => {
       const species = plantSpecies?.find(s => s.id === inv.species_id);
       if (!species) return sum;
       
-      const progress = Math.min(100, ((currentYear - inv.plantation_year) / species.maturation_years) * 100);
-      return sum + progress;
+      const range = getMaturationRange(species.name, species.maturation_years);
+      return sum + maturationProgress(inv.plantation_year, range, now);
     }, 0);
 
     return Math.round(totalProgress / plotInvestments.length);
@@ -272,8 +273,24 @@ const Plots = () => {
     const plotInvestments = investments?.filter(inv => inv.plot_id === plotId) || [];
     if (plotInvestments.length === 0) return null;
 
-    return Math.min(...plotInvestments.map(inv => inv.expected_harvest_year));
+    // Earliest estimated harvest window among the plot's plantings
+    let best: { start: number; label: string } | null = null;
+    for (const inv of plotInvestments) {
+      const species = plantSpecies?.find(s => s.id === inv.species_id);
+      if (species && isEspadin(species.name)) {
+        const range = getMaturationRange(species.name, species.maturation_years);
+        const start = harvestWindow(inv.plantation_year, range).start.getTime();
+        if (!best || start < best.start) best = { start, label: formatHarvestYears(inv.plantation_year, range) };
+      } else {
+        const start = new Date(inv.expected_harvest_year, 9, 1).getTime();
+        if (!best || start < best.start) best = { start, label: String(inv.expected_harvest_year) };
+      }
+    }
+    return best?.label ?? null;
   };
+
+  const plotHasEspadin = (plotId: string) =>
+    (investments || []).some(inv => inv.plot_id === plotId && isEspadin(plantSpecies?.find(s => s.id === inv.species_id)?.name));
 
   const getPlantsEstablished = (plotId: string) => {
     // Get from plot data instead of counting investments
@@ -395,6 +412,9 @@ const Plots = () => {
                       <p className="text-xs text-muted-foreground">
                         {t('plots.nextHarvestEstimate')}: {nextHarvest}
                       </p>
+                    )}
+                    {plotHasEspadin(plot.id) && (
+                      <p className="text-xs text-muted-foreground">{t('maturation.note')}</p>
                     )}
                   </div>
                 )}
