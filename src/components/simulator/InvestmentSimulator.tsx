@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Calculator, TrendingUp, Clock, Leaf, Info, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getMaturationRange, formatHarvestWindow, isEspadin } from '@/lib/maturation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useDemo } from '@/contexts/DemoContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +28,8 @@ interface InvestmentResults {
   isReadyForHarvest: boolean;
   yearsToHarvest: number;
   actualHarvestYear: number;
+  yearsToHarvestMax: number;
+  harvestWindowLabel: string;
 }
 
 export const InvestmentSimulator: React.FC = () => {
@@ -143,7 +146,9 @@ export const InvestmentSimulator: React.FC = () => {
         avgWeightPerPlant: 0,
         isReadyForHarvest: false,
         yearsToHarvest: 0,
-        actualHarvestYear: 0
+        actualHarvestYear: 0,
+        yearsToHarvestMax: 0,
+        harvestWindowLabel: ''
       };
     }
 
@@ -153,7 +158,9 @@ export const InvestmentSimulator: React.FC = () => {
     
     // Calculate from April of the establishment year (month 3 = April, 0-indexed)
     const plantingDate = new Date(establishmentYear, 3, 1);
-    const maturationMonths = currentSpecies.maturation_years * 12; // e.g., 5.5 * 12 = 66 months
+    // Espadín uses an illustrative 5.5–6.5 year window (maturity = quiote emergence)
+    const range = getMaturationRange(currentSpecies.name, currentSpecies.maturation_years);
+    const maturationMonths = range.min * 12; // start of the maturity window
     
     // Calculate months grown since April of establishment year
     const monthsGrown = Math.max(0, 
@@ -165,6 +172,8 @@ export const InvestmentSimulator: React.FC = () => {
     const monthsToHarvest = Math.max(0, maturationMonths - monthsGrown);
     const yearsToHarvest = Math.ceil(monthsToHarvest / 12 * 10) / 10; // Round to 1 decimal
     const isReadyForHarvest = monthsToHarvest <= 0;
+    const yearsToHarvestMax = Math.ceil(Math.max(0, range.max * 12 - monthsGrown) / 12 * 10) / 10;
+    const harvestWindowLabel = formatHarvestWindow(establishmentYear, range);
     
     // Calculate harvest date: April + maturation months
     const harvestDate = new Date(plantingDate);
@@ -209,7 +218,9 @@ export const InvestmentSimulator: React.FC = () => {
       avgWeightPerPlant,
       isReadyForHarvest,
       yearsToHarvest,
-      actualHarvestYear
+      actualHarvestYear,
+      yearsToHarvestMax,
+      harvestWindowLabel
     };
   }, [currentSpecies, numberOfPlants, selectedPricePerKg, weightPerPlant, currentPricePerPlant, selectedYear]);
 
@@ -434,7 +445,9 @@ export const InvestmentSimulator: React.FC = () => {
                 <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
                   <AlertTriangle className="h-4 w-4 text-green-600" />
                   <span className="text-sm text-green-700">
-                    ¡Estas plantas ya están listas para cosechar!
+                    {isEspadin(currentSpecies?.name)
+                      ? 'Estas plantas ya están en su ventana de madurez: se cosechan cuando aparece el quiote.'
+                      : '¡Estas plantas ya están listas para cosechar!'}
                   </span>
                 </div>
               )}
@@ -442,7 +455,9 @@ export const InvestmentSimulator: React.FC = () => {
                 <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded">
                   <Clock className="h-4 w-4 text-amber-600" />
                   <span className="text-sm text-amber-700">
-                    Faltan {results.yearsToHarvest.toFixed(1)} años para la cosecha (Octubre {results.actualHarvestYear})
+                    {isEspadin(currentSpecies?.name)
+                      ? `Faltan ${results.yearsToHarvest.toFixed(1)} a ${results.yearsToHarvestMax.toFixed(1)} años para la cosecha (${results.harvestWindowLabel})`
+                      : `Faltan ${results.yearsToHarvest.toFixed(1)} años para la cosecha (${results.harvestWindowLabel})`}
                   </span>
                 </div>
               )}
@@ -609,17 +624,19 @@ export const InvestmentSimulator: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {results.isReadyForHarvest ? "¡Lista!" : `${results.yearsToHarvest} años`}
-              {currentSpecies?.name?.toLowerCase().includes('espadín') && !results.isReadyForHarvest && (
-                <span className="text-sm font-normal text-muted-foreground ml-1">(maduración: 5.5 a 6 años)</span>
+              {isEspadin(currentSpecies?.name)
+                ? (results.isReadyForHarvest ? "En ventana de madurez" : `${results.yearsToHarvest} a ${results.yearsToHarvestMax} años`)
+                : (results.isReadyForHarvest ? "¡Lista!" : `${results.yearsToHarvest} años`)}
+              {isEspadin(currentSpecies?.name) && !results.isReadyForHarvest && (
+                <span className="text-sm font-normal text-muted-foreground ml-1">(maduración: 5.5 a 6.5 años)</span>
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {t('simulator.harvestDate')}: {results.maturationDate.toLocaleDateString('es-MX', { 
-                year: 'numeric', 
-                month: 'long' 
-              })}
+              {t('simulator.harvestDate')}: {results.harvestWindowLabel}
             </p>
+            {isEspadin(currentSpecies?.name) && (
+              <p className="text-xs text-muted-foreground mt-2">{t('maturation.note')}</p>
+            )}
           </CardContent>
         </Card>
 

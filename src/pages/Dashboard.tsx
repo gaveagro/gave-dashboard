@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { TreePine, Coins, Leaf, Calendar, Plus, TrendingUp, BarChart3, Sprout, Bell, AlertTriangle } from 'lucide-react';
+import { TreePine, Coins, Leaf, Calendar, Plus, TrendingUp, BarChart3, Sprout, Bell, AlertTriangle, Info } from 'lucide-react';
 import NotificationsPanel from '@/components/NotificationsPanel';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -22,10 +22,12 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import MonitoringDashboard from '@/components/monitoring/MonitoringDashboard';
+import { getMaturationRange, harvestWindow, formatHarvestYears, formatHarvestWindow, formatYears, isEspadin, isRange, maturationProgress, monthsSincePlanting } from '@/lib/maturation';
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const lang = language === 'en' ? 'en' : 'es';
   const { toast } = useToast();
   const { isDemoMode, demoData } = useDemo();
   const [showInvestmentRequestDialog, setShowInvestmentRequestDialog] = useState(false);
@@ -190,26 +192,25 @@ const Dashboard = () => {
     return sum + (inv.plant_count * co2PerPlantPerYear * yearsGrown);
   }, 0) || 0;
 
-  // Find next harvest
+  // Find next harvest (earliest start of the estimated harvest window)
+  const harvestStartTime = (inv: any) =>
+    harvestWindow(inv.plantation_year, getMaturationRange(inv.plant_species?.name, inv.plant_species?.maturation_years)).start.getTime();
   const nextHarvest = investments?.reduce((closest, inv) => {
-    if (!closest || inv.expected_harvest_year < closest.expected_harvest_year) {
+    if (!closest || harvestStartTime(inv) < harvestStartTime(closest)) {
       return inv;
     }
     return closest;
   }, null as any);
+  const nextHarvestLabel = nextHarvest
+    ? formatHarvestYears(nextHarvest.plantation_year, getMaturationRange(nextHarvest.plant_species?.name, nextHarvest.plant_species?.maturation_years))
+    : 'N/A';
+  const hasRangeSpecies = investments?.some((inv) => isEspadin(inv.plant_species?.name)) ?? false;
 
   // Calculate average progress using months since April
   const now = new Date();
   const averageProgress = investments?.length ? investments.reduce((sum, inv) => {
-    const plantingDate = new Date(inv.plantation_year, 3, 1); // April of plantation year
-    const maturationYears = inv.plant_species?.maturation_years || 5.5;
-    const maturationMonths = maturationYears * 12;
-    const monthsGrown = Math.max(0, 
-      (now.getFullYear() - plantingDate.getFullYear()) * 12 + 
-      (now.getMonth() - plantingDate.getMonth())
-    );
-    const progress = Math.min((monthsGrown / maturationMonths) * 100, 100);
-    return sum + progress;
+    const range = getMaturationRange(inv.plant_species?.name, inv.plant_species?.maturation_years);
+    return sum + maturationProgress(inv.plantation_year, range, now);
   }, 0) / investments.length : 0;
 
   const formatCurrency = (amount: number) => {
@@ -352,7 +353,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-700 dark:text-orange-300">
-              {nextHarvest ? nextHarvest.expected_harvest_year : 'N/A'}
+              {nextHarvestLabel}
             </div>
             <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
               {nextHarvest ? `${nextHarvest.plant_count.toLocaleString()} plantas` : t('dashboard.noActiveInvestments')}
@@ -377,22 +378,11 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               {investments.map((investment) => {
-                // Calculate progress using months since April
-                const plantingDate = new Date(investment.plantation_year, 3, 1);
-                const maturationYears = investment.plant_species?.maturation_years || 5.5;
-                const maturationMonths = maturationYears * 12;
-                const monthsGrown = Math.max(0, 
-                  (now.getFullYear() - plantingDate.getFullYear()) * 12 + 
-                  (now.getMonth() - plantingDate.getMonth())
-                );
-                const progress = Math.min((monthsGrown / maturationMonths) * 100, 100);
-                const yearsGrownDisplay = (monthsGrown / 12).toFixed(1);
-                
-                // Calculate harvest date
-                const harvestDate = new Date(plantingDate);
-                harvestDate.setMonth(harvestDate.getMonth() + maturationMonths);
-                const harvestMonth = harvestDate.toLocaleString('es-ES', { month: 'long' });
-                const harvestYear = harvestDate.getFullYear();
+                // Progress counted from April of the plantation year
+                const range = getMaturationRange(investment.plant_species?.name, investment.plant_species?.maturation_years);
+                const progress = maturationProgress(investment.plantation_year, range, now);
+                const yearsGrownDisplay = (monthsSincePlanting(investment.plantation_year, now) / 12).toFixed(1);
+                const harvestLabel = formatHarvestWindow(investment.plantation_year, range, lang);
                 
                 return (
                   <div key={investment.id} className="space-y-3 p-4 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950 border border-green-200 dark:border-green-800">
@@ -405,7 +395,7 @@ const Dashboard = () => {
                           {investment.plant_count.toLocaleString()} plantas • Establecido en abril {investment.plantation_year}
                         </p>
                         <p className="text-xs text-green-500 dark:text-green-500">
-                          Inversión: {formatCurrency(investment.total_amount)} • Cosecha: {harvestMonth} {harvestYear}
+                          Inversión: {formatCurrency(investment.total_amount)} • Cosecha estimada: {harvestLabel}
                         </p>
                       </div>
                       <div className="text-right">
@@ -413,7 +403,7 @@ const Dashboard = () => {
                           {Math.round(progress)}%
                         </p>
                         <p className="text-xs text-green-600 dark:text-green-400">
-                          {yearsGrownDisplay} de {investment.plant_species?.name?.toLowerCase().includes('espadín') ? '5.5 a 6' : maturationYears} años
+                          {yearsGrownDisplay} de {formatYears(range, lang)} {t('maturation.years')}
                         </p>
                       </div>
                     </div>
@@ -421,12 +411,20 @@ const Dashboard = () => {
                     {progress >= 100 && (
                       <div className="flex items-center gap-1 text-green-700 dark:text-green-300">
                         <TrendingUp className="h-4 w-4" />
-                        <span className="text-sm font-medium">{t('dashboard.readyForHarvest')}</span>
+                        <span className="text-sm font-medium">
+                          {isRange(range) ? t('maturation.inWindow') : t('dashboard.readyForHarvest')}
+                        </span>
                       </div>
                     )}
                   </div>
                 );
               })}
+              {hasRangeSpecies && (
+                <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{t('maturation.note')}</span>
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
